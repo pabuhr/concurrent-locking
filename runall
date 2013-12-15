@@ -1,0 +1,32 @@
+#!/bin/sh -
+
+algorithms="Communicate Aravind Burns2 DeBruijn Dijkstra Eisendberg Hehner Hesselink Kessels Knuth LamportRetract LamportBakery LamportFast LycklamaBuhr Lynch Peterson PetersonT PetersonBuhr Szymanski Taubenfeld TaubenfeldBuhr Arbiter MCS SpinLock PthreadLock ZhangYA Zhang2T ZhangdT"
+
+if [ ${#} -ne 0 ] ; then
+    algorithms="${@}"
+fi
+
+cflag="-Wall -Werror -std=gnu99 -g -O3" # -DFAST
+
+runalgorithm() {
+    echo ${1}${2}
+    gcc ${cflag} -DAlgorithm=${1} Harness.c -lpthread -lm
+    ./run1 ${2} > ${1}${2}
+    if [ -f core ] ; then
+	echo core generated for ${1}
+	break
+    fi
+}
+
+rm -rf core
+for algorithm in ${algorithms} ; do
+    if [ ${algorithm} = "ZhangdT" -o ${algorithm} = "ZhangdTWHH" ] ; then
+	d=2
+	while [ ${d} -le 32 ] ; do
+	    runalgorithm ${algorithm} ${d}
+	    d=`expr ${d} + ${d}`
+	done
+    else
+	runalgorithm ${algorithm}
+    fi
+done

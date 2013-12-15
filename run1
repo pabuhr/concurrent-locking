@@ -1,0 +1,29 @@
+#!/bin/sh -
+
+# disable address-space randomization (ASR) via the following
+#   sudo
+#   cat /proc/sys/kernel/randomize_va_space
+#   echo 0 > /proc/sys/kernel/randomize_va_space
+#   echo 2 > /proc/sys/kernel/randomize_va_space
+# set CPUs to maximum frequency
+#   sudo
+#   cpufreq-info -f
+#   cpufreq-set --cpu 0 --min 2600000
+#   ... for each even CPU (work in pairs)
+#   cpufreq-set --cpu 0 --min 1000000
+
+Time=20 	# 5 x Time = length of experiment
+N=32		# 1 to N threads tested
+
+rm -rf core
+
+T=1
+while [ ${T} -le ${N} ] ; do
+#    time -f "%U %S %e" a.out ${T} ${Time}
+    ./a.out ${T} ${Time} ${1} # Zhang d-ary
+    if [ -f core ] ; then
+	echo core generated for ${T} ${Time}
+	break
+    fi
+    T=`expr ${T} + 1`
+done
