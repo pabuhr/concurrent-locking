@@ -1,0 +1,15 @@
+#!/bin/sh -
+
+algorithms="Aravind Burns2 BurnsLynchRetract DeBruijn Dekker Dijkstra Eisendberg Hehner Hesselink Kessels Knuth LamportRetract LamportBakery LamportFast Lycklama LycklamaBuhr Lynch Peterson Peterson2 PetersonBuhr PetersonT Szymanski Szymanski2 Szymanski3 Taubenfeld TaubenfeldBuhr Zhang2T ZhangYA ZhangdT"
+
+cflag="-Wall -Werror -O3 -DNDEBUG -I/u/pabuhr/software/relacy_2_4"
+
+rm -rf core
+for algorithm in ${algorithms} ; do
+    g++ ${algorithm}.cc ${cflag}
+    ./a.out
+    if [ -f core ] ; then
+	echo core generated for ${1}
+	break
+    fi
+done
