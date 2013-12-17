@@ -9,17 +9,18 @@
 #   sudo
 #   cpufreq-info -f
 #   cpufreq-set --cpu 0 --min 2600000
-#   ... for each even CPU (work in pairs)
+#   ... for each even CPU (may work in pairs)
 #   cpufreq-set --cpu 0 --min 1000000
 
 Time=20 	# 5 x Time = length of experiment
 N=32		# 1 to N threads tested
 
+# optional argument ${1} is the degree of the tree (d-ary) for Zhang
+
 rm -rf core
 
 T=1
 while [ ${T} -le ${N} ] ; do
-#    time -f "%U %S %e" a.out ${T} ${Time}
     ./a.out ${T} ${Time} ${1} # Zhang d-ary
     if [ -f core ] ; then
 	echo core generated for ${T} ${Time}

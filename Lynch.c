@@ -49,7 +49,6 @@ void ctor() {
 	depth = Clog2( N );									// maximal depth of binary tree
 	width = 1 << depth;									// maximal width of binary tree
 	mask = width - 1;									// 1 bits for masking
-	printf( "%d %d %d\n", depth, width, mask );
 	intents = Allocator( sizeof(volatile TYPE) * width );
 	for ( int i = 0; i < width; i += 1 ) {				// initialize shared data
 		intents[i] = 0;

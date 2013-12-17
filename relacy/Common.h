@@ -18,14 +18,14 @@ static inline int cycleUp( int v, int n ) { return ( ((v) >= (n - 1)) ? 0 : (v +
 static inline int cycleDown( int v, int n ) { return ( ((v) <= 0) ? (n - 1) : (v - 1) ); }
 
 static void SetParms( rl::test_params &p ) {
-    //p.search_type = rl::fair_context_bound_scheduler_type;
-    //p.search_type = rl::sched_bound;
-    //p.search_type = rl::sched_full;
-    //p.execution_depth_limit = 100;
-    //p.initial_state = "280572";
+	//p.search_type = rl::fair_context_bound_scheduler_type;
+	//p.search_type = rl::sched_bound;
+	//p.search_type = rl::sched_full;
+	//p.execution_depth_limit = 100;
+	//p.initial_state = "280572";
 	p.search_type = rl::sched_random;
-    p.iteration_count = 5000000;
-    p.context_bound = 3;
+	p.iteration_count = 5000000;
+	p.context_bound = 3;
 } // SetParms
 
 // Local Variables: //

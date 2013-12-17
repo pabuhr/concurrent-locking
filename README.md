@@ -18,13 +18,14 @@ test harness.
 A single experiment can be run for a particular number of threads and duration,
 e.g.:
 
-  $ a.out 8 20
-  8 20 29533193 3691649.1 656.4 0.0%
+$ a.out 8 20
+8 20 29533193 3691649.1 656.4 0.0%
 
 runs an experiment with: 8 threads, for 20 seconds, with 29533193 entries into
 the critical section by the 8 threads, where the average number of entries is
 3691649.1 with standard deviation of 656.4, and relative standard deviation
-std/avg*100 is 0%. The shell script "run1", runs 32 experiments for 1-32
-threads and 20 second experiments. The shell script "runall", runs script
-"run1" for each of the software-solution algorithms listed in the script (can
-take 20+ hours to complete).
+(std/avg*100) is 0%. The shell script "run1", runs 32 experiments for 1-32
+threads and 20 second experiments for a pre-compiled algorithm. The shell
+script "runall" compiles all the algorithms listed in the script, and uses the
+"run1" script to run each of them for 1-32 threads (can take 1-2 days to
+complete).
