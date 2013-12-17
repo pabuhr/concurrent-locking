@@ -19,6 +19,7 @@ A single experiment can be run for a particular number of threads and duration,
 e.g.:
 
 $ a.out 8 20
+
 8 20 29533193 3691649.1 656.4 0.0%
 
 runs an experiment with: 8 threads, for 20 seconds, with 29533193 entries into
