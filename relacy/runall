@@ -4,7 +4,7 @@ algorithms="Aravind Burns2 BurnsLynchRetract DeBruijn Dekker Dijkstra Eisendberg
 
 cflag="-Wall -Werror -O3 -DNDEBUG -I/u/pabuhr/software/relacy_2_4"
 
-rm -rf core
+rm -f core
 for algorithm in ${algorithms} ; do
     g++ ${algorithm}.cc ${cflag}
     ./a.out
@@ -13,3 +13,5 @@ for algorithm in ${algorithms} ; do
 	break
     fi
 done
+
+rm -f a.out

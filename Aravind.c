@@ -1,4 +1,4 @@
-// Aravind, J. Parallel Distrib. Comput. 73 (2013) p. 1033, Fig. 3
+// Aravind, J. Parallel Distrib. Comput. 73 (2013), Fig. 3, p. 1033.
 // Moved turn[id] = 0; after the critical section for performance reasons.
 
 volatile TYPE *intents, *turn;

@@ -19,13 +19,13 @@ static inline int cycleDown( int v, int n ) { return ( ((v) <= 0) ? (n - 1) : (v
 
 static void SetParms( rl::test_params &p ) {
 	//p.search_type = rl::fair_context_bound_scheduler_type;
-	//p.search_type = rl::sched_bound;
 	//p.search_type = rl::sched_full;
 	//p.execution_depth_limit = 100;
 	//p.initial_state = "280572";
+	//p.search_type = rl::sched_bound;
+	//p.context_bound = 3;
 	p.search_type = rl::sched_random;
 	p.iteration_count = 5000000;
-	p.context_bound = 3;
 } // SetParms
 
 // Local Variables: //

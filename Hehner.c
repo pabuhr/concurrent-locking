@@ -39,7 +39,7 @@ static void *Worker( void *arg ) {
 				v = ticket[j];							// could change so copy
 				if ( v != MAX_TICKET && max < v ) max = v;
 			} // for
-#if 0
+#if 1
 			max += 1;									// advance ticket
 			ticket[id] = max;
 			Fence();									// force store before more loads

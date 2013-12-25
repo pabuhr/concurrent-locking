@@ -30,3 +30,9 @@ threads and 20 second experiments for a pre-compiled algorithm. The shell
 script "runall" compiles all the algorithms listed in the script, and uses the
 "run1" script to run each of them for 1-32 threads (can take 1-2 days to
 complete).
+
+The project authors are:
+
+Peter Buhr <pabuhr@uwaterloo.ca>
+David Dice <dave.dice@oracle.com> (advised)
+Wim H. Hesselink <w.h.hesselink@rug.nl>

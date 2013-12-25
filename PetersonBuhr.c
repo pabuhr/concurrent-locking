@@ -1,3 +1,5 @@
+// Static and dynamic allocation of tables available.
+
 typedef struct {
 	TYPE Q[2], R, PAD;									// make structure even multiple of word size by padding
 } Token;
@@ -7,6 +9,8 @@ typedef struct {
 	TYPE es;											// left/right opponent
 	volatile Token *ns;									// pointer to path node from leaf to root
 } Tuple;
+//Tuple **states;											// handle 64 threads with maximal tree depth of 6 nodes (lg 64)
+//int *levels;											// minimal level for binary tree
 static Tuple states[64][6];								// handle 64 threads with maximal tree depth of 6 nodes (lg 64)
 static int levels[64] = { -1 };							// minimal level for binary tree
 
@@ -77,9 +81,13 @@ void ctor() {
 	// s ranges from 0 to the tree level of a start point (leaf) in a minimal binary tree.
 	// levels[id] is level of start point minus 1 so bi-directional tree traversal is uniform.
 
+//	states = Allocator( sizeof(Tuple *) * N );
+//	levels = Allocator( sizeof(int) * N );
+//	levels[0] = -1;										// default for N=1
 	for ( unsigned int id = 0; id < N; id += 1 ) {
 		t[id].Q[0] = t[id].Q[1] = 0;
 		unsigned int start = N + id, level = Log2( start );
+//		states[id] = Allocator( sizeof(Tuple) * level );
 		levels[id] = level - 1;
 		for ( unsigned int s = 0; start > 1; start >>= 1, s += 1 ) {
 			states[id][s].es = start & 1;
@@ -89,6 +97,7 @@ void ctor() {
 } // ctor
 
 void dtor() {
+//	free( (void *)levels );
 	free( (void *)t );
 } // dtor
 

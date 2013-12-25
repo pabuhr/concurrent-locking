@@ -4,7 +4,7 @@
 enum { N = 8 };
 
 // Boleslaw K. Szymanski, Mutual Exclusion Revisited, Proceedings of the 5th Jerusalem Conference on Information
-// Technology, 1990, Page 113, Figure 1
+// Technology, 1990, Figure 1, Page 113.
 
 struct Szymanski : rl::test_suite<Szymanski, N> {
 	std::atomic<int> a[N], w[N], s[N];

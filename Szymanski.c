@@ -1,5 +1,5 @@
 // Boleslaw K. Szymanski. A simple solution to Lamport's concurrent programming problem with linear wait.
-// Proceedings of the 2nd International Conference on Supercomputing, 1988, Page 624, Figure 2.
+// Proceedings of the 2nd International Conference on Supercomputing, 1988, Figure 2, Page 624.
 // Waiting after CS can be moved before it.
 
 volatile TYPE *flag;
