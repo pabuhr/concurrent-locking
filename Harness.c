@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <signal.h>
 #include <stdlib.h>										// abort, exit, atoi, ran, qsort
+#include <stdint.h>										// intptr_t, INTPTR_MAX
 #include <sys/time.h>
 #include <poll.h>										// poll
 #include <malloc.h>										// memalign
@@ -21,15 +22,9 @@
 #include <math.h>										// sqrt
 #include <assert.h>
 
-#if defined( __sparc ) || defined( __i386 )
-typedef int32_t TYPE;
-#elif defined( __x86_64 )
-typedef int64_t TYPE;
-#else
-#error unsupported architecture
-#endif
+typedef intptr_t TYPE;									// atomically addressable word-size
 
-#define CACHE_ALIGN 128
+#define CACHE_ALIGN 128									// Intel recommendation
 #define CALIGN __attribute__(( aligned (CACHE_ALIGN) ))
 
 enum { RUNS = 5 };
@@ -338,7 +333,7 @@ int main( int argc, char *argv[] ) {
 	double std = sqrt( sum / Threads );
 	printf( " %.1f %.1f %.1f%%", avg, std, std / avg * 100 );
 
-//	for ( int i = 0; i < T; i += 1 ) {					// print values
+//	for ( int i = 0; i < Threads; i += 1 ) {					// print values
 //		printf( "id:%d %ld ", i, entries[i] );
 //	} // for
 

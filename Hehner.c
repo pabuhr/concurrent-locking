@@ -1,17 +1,7 @@
 // Eric C. R. Hehner and R. K. Shyamasundar, An Implementation of P and V, Information Processing Letters, 1981, 12(4),
 // pp. 196-197
 
-#include <limits.h>
-
-enum { MAX_TICKET =
-#if defined( __sparc ) || defined( __i386 )
-	   LONG_MAX
-#elif defined( __x86_64 )
-	   LLONG_MAX
-#else
-#error unsupported architecture
-#endif
-};
+enum { MAX_TICKET = INTPTR_MAX };
 
 volatile TYPE *ticket;
 
