@@ -36,7 +36,7 @@ static void *Worker( void *arg ) {
 				for ( int j = 1; j <= N; j += 1 )
 					await( ! b[j] );
 				if ( y != id ) {
-					await( y == 0 );
+//					await( y == 0 );
 					goto start;
 				}
 			}

@@ -1,8 +1,8 @@
 // Nancy A. Lynch, Distributed Algorithms, Morgan Kaufmann, 1996, Section 10.5.3
 // Significant parts of this algorithm are written in prose, and therefore, left to our interpretation with respect to implementation.
 
-volatile TYPE *intents, *turns;
-int depth, width, mask;
+static volatile TYPE *intents, *turns;
+static int depth, width, mask;
 
 static inline TYPE min( TYPE a, TYPE b ) { return a < b ? a : b; }
 
@@ -29,9 +29,9 @@ static void *Worker( void *arg ) {
 				turns[comp] = role;						// RACE
 				Fence();								// force store before more loads
 				low = ((lid) ^ 1) << km1;				// lower competition
-				high = min( low | mask >> (depth - km1), N ); // higher competition
-			  L: for ( int i = low; i <= high; i += 1 )	// busy wait
-					if ( intents[i] >= k && turns[comp] == role ) { Pause(); goto L; }
+				high = min( low | mask >> (depth - km1), N - 1 ); // higher competition
+				for ( int i = low; i <= high; i += 1 )	// busy wait
+					while ( intents[i] >= k && turns[comp] == role ) Pause();
 			} // for
 			CriticalSection( id );
 			intents[id] = 0;							// exit protocol
@@ -49,11 +49,11 @@ void ctor() {
 	depth = Clog2( N );									// maximal depth of binary tree
 	width = 1 << depth;									// maximal width of binary tree
 	mask = width - 1;									// 1 bits for masking
-	intents = Allocator( sizeof(volatile TYPE) * width );
-	for ( int i = 0; i < width; i += 1 ) {				// initialize shared data
+	intents = Allocator( sizeof(volatile TYPE) * N );
+	for ( int i = 0; i < N; i += 1 ) {					// initialize shared data
 		intents[i] = 0;
 	} // for
-	turns = Allocator( sizeof(volatile TYPE *) * width );
+	turns = Allocator( sizeof(volatile TYPE) * width );
 } // ctor
 
 void dtor() {

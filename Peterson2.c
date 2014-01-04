@@ -2,7 +2,7 @@
 // Separate code for each thread is unified using an array.
 
 enum Intent { DontWantIn, WantIn };
-volatile TYPE intents[2] = { DontWantIn, DontWantIn }, last;
+static volatile TYPE intents[2] = { DontWantIn, DontWantIn }, last;
 
 static void *Worker( void *arg ) {
     const unsigned int id = (size_t)arg;

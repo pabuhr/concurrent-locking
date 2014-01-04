@@ -18,7 +18,7 @@ struct Lynch : rl::test_suite<Lynch, N> {
 		depth = Log2( N );
 		width = 1 << depth;
 		mask = width - 1;
-		for ( int i = 0; i < width; i += 1 ) {			// initialize shared data
+		for ( int i = 0; i < N; i += 1 ) {			// initialize shared data
 			intents[i]($) = 0;
 		} // for
 	} // before
@@ -33,9 +33,9 @@ struct Lynch : rl::test_suite<Lynch, N> {
 			intents[id]($) = k;							// declare intent, current round
 			turns[comp]($) = role;						// RACE
 			low = ((lid) ^ 1) << km1;					// lower competition
-			high = min( low | mask >> (depth - km1), N ); // higher competition
-		  L: for ( int i = low; i <= high; i += 1 )		// busy wait
-				if ( intents[i]($) >= k && turns[comp]($) == role ) { Pause(); goto L; }
+			high = min( low | mask >> (depth - km1), N - 1 ); // higher competition
+			for ( int i = low; i <= high; i += 1 )	// busy wait
+				while ( intents[i]($) >= k && turns[comp]($) == role ) Pause();
 		} // for
 		data($) = id + 1;								// critical section
 		intents[id]($) = 0;								// exit protocol

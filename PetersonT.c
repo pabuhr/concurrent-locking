@@ -1,7 +1,7 @@
 // Gary L. Peterson and Michael J. Fischer, Economical Solutions for the Critical Section Problem in a Distributed
 // System (Extended Abstract), Proceedings of the Ninth Annual ACM Symposium on Theory of Computing, STOC '77, 1977, p. 93
 
-#include <stdint.h>										// uint*
+#include <stdint.h>										// uint*_t
 
 typedef union {
 	uint32_t atom;										// ensure atomic assignment
@@ -14,15 +14,15 @@ typedef union {
 #define L(t) ((t).tuple.level)
 #define R(s) ((s).tuple.state)
 #define EQ(a, b) ((a).tuple.state == (b).tuple.state)
-int bit( int i, int k ) { return (i & (1 << (k - 1))) != 0; }
-int min( int a, int b ) { return a < b ? a : b; }
+static inline int bit( int i, int k ) { return (i & (1 << (k - 1))) != 0; }
+static inline int min( int a, int b ) { return a < b ? a : b; }
 
-int depth, mask;
-volatile Tuple *Q;
+static int depth, mask;
+static volatile Tuple *Q;
 
 uint32_t QMAX( int w, unsigned int id, int k ) {
 	int low = ((id >> (k - 1)) ^ 1) << (k - 1);
-	int high = min( low | mask >> (depth - (k - 1)), N );
+	int high = min( low | mask >> (depth - (k - 1)), N - 1 );
 	Tuple opp;
 	for ( int i = low; i <= high; i += 1 ) {
 		opp.atom = Q[i].atom;
@@ -80,8 +80,8 @@ void ctor() {
 	depth = Clog2( N );									// maximal depth of binary tree
 	int width = 1 << depth;								// maximal width of binary tree
 	mask = width - 1;									// 1 bits for masking
-	Q = Allocator( sizeof(volatile Tuple) * width );
-	for ( int i = 0; i < width; i += 1 ) {				// initialize shared data
+	Q = Allocator( sizeof(volatile Tuple) * N );
+	for ( int i = 0; i < N; i += 1 ) {					// initialize shared data
 		Q[i].atom = (Tuple){ .tuple = {0, 0} }.atom;
 	} // for
 } // ctor

@@ -2,7 +2,7 @@
 // Fig. 1, p. 337
 
 enum Intent { DontWantIn, WantIn };
-volatile TYPE *intents;									// shared
+static volatile TYPE *intents;							// shared
 
 static void *Worker( void *arg ) {
 	unsigned int id = (size_t)arg;
@@ -57,5 +57,5 @@ void dtor() {
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -std=gnu99 -O3 -DAlgorithm=LamportRetractIntent Harness.c -lpthread -lm" //
+// compile-command: "gcc -Wall -std=gnu99 -O3 -DAlgorithm=LamportRetract Harness.c -lpthread -lm" //
 // End: //

@@ -43,7 +43,7 @@ struct PetersonT : rl::test_suite<PetersonT, N> {
 		depth = Log2( N );
 		int width = 1 << depth;
 		mask = width - 1;
-	    for ( int i = 0; i < width; i += 1 ) {			// initialize shared data
+	    for ( int i = 0; i < N; i += 1 ) {			// initialize shared data
 			Q[i]($) = 0;
 	    } // for
 	} // before
