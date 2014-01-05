@@ -1,6 +1,6 @@
 #!/bin/sh -
 
-algorithms="Communicate Aravind Burns2 DeBruijn Dijkstra Eisendberg Hehner Hesselink Kessels Knuth LamportRetract LamportBakery LamportFast LycklamaBuhr Lynch Peterson PetersonT PetersonBuhr Szymanski Taubenfeld TaubenfeldBuhr Arbiter MCS SpinLock PthreadLock ZhangYA Zhang2T ZhangdT"
+algorithms="Communicate Aravind Burns2 DeBruijn Dijkstra Eisenberg Hehner Hesselink Kessels Knuth LamportRetract LamportBakery LamportFast LycklamaBuhr Lynch Peterson PetersonT PetersonBuhr Szymanski Taubenfeld TaubenfeldBuhr Arbiter MCS SpinLock PthreadLock ZhangYA Zhang2T ZhangdT"
 
 if [ ${#} -ne 0 ] ; then
     algorithms="${@}"

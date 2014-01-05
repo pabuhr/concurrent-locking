@@ -6,7 +6,7 @@ enum { N = 8 };
 // Murray A. Eisenberg and Michael R. McGuire}, Further Comments on Dijkstra's Concurrent Programming Control Problem,
 // CACM, 1972, 15(11), p. 999
 
-struct Eisendberg : rl::test_suite<Eisendberg, N> {
+struct Eisenberg : rl::test_suite<Eisenberg, N> {
 	enum Intent { DontWantIn, WantIn, EnterCS };
 	std::atomic<int> control[N], HIGH;
 
@@ -39,15 +39,15 @@ struct Eisendberg : rl::test_suite<Eisendberg, N> {
 			if ( control[j]($) != DontWantIn ) { HIGH($) = j; break; }
 		control[id]($) = DontWantIn;
 	} // thread
-}; // Eisendberg
+}; // Eisenberg
 
 int main() {
     rl::test_params p;
 	SetParms( p );
-	rl::simulate<Eisendberg>( p );
+	rl::simulate<Eisenberg>( p );
 } // main
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "g++ -Wall -O3 -DNDEBUG -I/u/pabuhr/software/relacy_2_4 Eisendberg.cc" //
+// compile-command: "g++ -Wall -O3 -DNDEBUG -I/u/pabuhr/software/relacy_2_4 Eisenberg.cc" //
 // End: //
