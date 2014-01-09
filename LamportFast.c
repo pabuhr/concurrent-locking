@@ -1,4 +1,7 @@
 // Leslie Lamport, A Fast Mutual Exclusion Algorithm, ACM Transactions on Computer Systems, 5(1), 1987, Fig. 2, p. 5
+// N => do not want in, versus 0 in original paper, so "b" is dimensioned 0..N-1 rather than 1..N.
+
+#include <stdbool.h>
 
 volatile TYPE *b;
 volatile TYPE x, y;
@@ -6,7 +9,7 @@ volatile TYPE x, y;
 #define await( E ) while ( ! (E) ) Pause()
 
 static void *Worker( void *arg ) {
-	unsigned int id = (size_t)arg + 1;
+	unsigned int id = (size_t)arg;
 #ifdef FAST
 	unsigned int cnt = 0;
 #endif // FAST
@@ -19,30 +22,30 @@ static void *Worker( void *arg ) {
 			id = startpoint( cnt );						// different starting point each experiment
 			cnt = cycleUp( cnt, NoStartPoints );
 #endif // FAST
-		  start: b[id] = 1;								// entry protocol
+		  start: b[id] = true;							// entry protocol
 			x = id;
 			Fence();									// force store before more loads
-			if ( y != 0 ) {
-				b[id] = 0;
+			if ( y != N ) {
+				b[id] = false;
 				Fence();								// force store before more loads
-				await( y == 0 );
+				await( y == N );
 				goto start;
 			}
 			y = id;
 			Fence();									// force store before more loads
 			if ( x != id ) {
-				b[id] = 0;
+				b[id] = false;
 				Fence();								// force store before more loads
-				for ( int j = 1; j <= N; j += 1 )
+				for ( int j = 0; j < N; j += 1 )
 					await( ! b[j] );
 				if ( y != id ) {
-//					await( y == 0 );
+//					await( y == N );
 					goto start;
 				}
 			}
 			CriticalSection( id );
-			y = 0;										// exit protocol
-			b[id] = 0;
+			y = N;										// exit protocol
+			b[id] = false;
 			entries[r] += 1;
 		} // while
 		__sync_fetch_and_add( &Arrived, 1 );
@@ -54,11 +57,11 @@ static void *Worker( void *arg ) {
 } // Worker
 
 void ctor() {
-	b = Allocator( sizeof(volatile TYPE) * (N + 1) );
-	for ( int i = 0; i <= N; i += 1 ) {					// initialize shared data
-		b[i] = 0;
+	b = Allocator( sizeof(volatile TYPE) * N );
+	for ( int i = 0; i < N; i += 1 ) {					// initialize shared data
+		b[i] = false;
 	} // for
-	y = 0;
+	y = N;
 } // ctor
 
 void dtor() {

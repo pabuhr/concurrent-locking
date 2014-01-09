@@ -8,41 +8,40 @@ enum { N = 8 };
 struct LamportFast : rl::test_suite<LamportFast, N> {
 #   define await( E ) while ( ! (E) ) Pause()
 
-	std::atomic<int> b[N+1], x, y;
+	std::atomic<int> b[N], x, y;
 
 	rl::var<int> data;
 
 	void before() {
-		for ( int i = 0; i <= N; i += 1 ) {				// initialize shared data
-			b[i]($) = 0;
+		for ( int i = 0; i < N; i += 1 ) {				// initialize shared data
+			b[i]($) = false;
 		} // for
-		y($) = 0;
+		y($) = N;
 	} // before
 
 	void thread( int id ) {
-		id += 1;
-	  start: b[id]($) = 1;								// entry protocol
+	  start: b[id]($) = true;							// entry protocol
 		x($) = id;
-		if ( y($) != 0 ) {
-			b[id]($) = 0;
-			await( y($) == 0 );
+		if ( y($) != N ) {
+			b[id]($) = false;
+			await( y($) == N );
 			Pause();
 			goto start;
 		}
 		y($) = id;
 		if ( x($) != id ) {
-			b[id]($) = 0;
-			for ( int j = 1; j <= N; j += 1 )
+			b[id]($) = false;
+			for ( int j = 0; j < N; j += 1 )
 				await( ! b[j]($) );
 			if ( y($) != id ) {
-				await( y($) == 0 );
+//				await( y($) == N );
 				Pause();
 				goto start;
 			}
 		}
-		data($) = id + 1;								// critical section
-		y($) = 0;										// exit protocol
-		b[id]($) = 0;
+		data($) = id;									// critical section
+		y($) = N;										// exit protocol
+		b[id]($) = false;
 	} // thread
 }; // LamportFast
 
