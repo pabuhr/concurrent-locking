@@ -26,11 +26,11 @@ static void *Worker( void *arg ) {
 					// the fence is conservative.
 					Fence();
 					while ( last == id ) Pause();		// low priority busy wait
+					intents[id] = WantIn;
+					Fence();
 				} else {
 					Pause();
 				} // if
-				intents[id] = WantIn;
-				Fence();
 			} // while
 			CriticalSection( id );
 			last = id;									// exit protocol
