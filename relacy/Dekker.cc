@@ -25,9 +25,9 @@ struct Dekker : rl::test_suite<Dekker, N> {
 			if ( last($) == id ) {
 				intents[id]($) = DontWantIn;
 				while ( last($) == id ) Pause();		// low priority busy wait
+				intents[id]($) = WantIn;				// declare intent
 			} else
 				Pause();
-			intents[id]($) = WantIn;					// declare intent
 		}
 		data($) = id + 1;								// critical section
 		last($) = id;
