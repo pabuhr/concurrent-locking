@@ -2,7 +2,7 @@
 // 2005, 17(9), Figure 3, p. 1151
 
 enum Intent { DontWantIn, WantIn };
-volatile TYPE intents[2] = { DontWantIn, DontWantIn }, last = 0;
+static volatile TYPE intents[2] = { DontWantIn, DontWantIn }, last = 0;
 
 static void *Worker( void *arg ) {
 	const unsigned int id = (size_t)arg;
@@ -15,8 +15,7 @@ static void *Worker( void *arg ) {
 			intents[id] = WantIn;
 			// Necessary to prevent the read of intents[other] from floating above the assignment
 			// intents[id] = WantIn, when the hardware determines the two subscripts are different.
-			Fence();
-			// Non-atomic because equality check and only single assignment to intents.
+			Fence();									// force store before more loads
 			while ( intents[other] == WantIn ) {
 				if ( last == id ) {
 					intents[id] = DontWantIn;
@@ -24,10 +23,10 @@ static void *Worker( void *arg ) {
 					// intends[id]=DontWantIn. Because a thread only writes its own id into "last",
 					// and because of eventual consistency (writes eventually become visible),
 					// the fence is conservative.
-					Fence();
+					Fence();							// force store before more loads
 					while ( last == id ) Pause();		// low priority busy wait
 					intents[id] = WantIn;
-					Fence();
+					Fence();							// force store before more loads
 				} else {
 					Pause();
 				} // if

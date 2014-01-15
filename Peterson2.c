@@ -14,7 +14,7 @@ static void *Worker( void *arg ) {
 		while ( stop == 0 ) {
 			intents[id] = WantIn;						// entry protocol
 			last = id;									// RACE
-			Fence();
+			Fence();									// force store before more loads
 			while ( intents[other] == WantIn && last == id ) Pause();
 			CriticalSection( id );
 			intents[id] = DontWantIn;					// exit protocol
@@ -39,4 +39,3 @@ void dtor() {
 // tab-width: 4 //
 // compile-command: "gcc -Wall -std=gnu99 -O3 -DAlgorithm=Peterson2 Harness.c -lpthread -lm" //
 // End: //
-
