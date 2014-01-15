@@ -17,25 +17,42 @@ static int levels[64] = { -1 };							// minimal level for binary tree
 #define inv( c ) (1 - c)
 
 static inline void binary_prologue( TYPE c, volatile Token *t ) {
-#if 1		// Peterson
+#if defined( DEKKER )
+	t->Q[c] = 1;
+	Fence();											// force store before more loads
+	while ( t->Q[inv( c )] ) {
+		if ( t->R == c ) {
+			t->Q[c] = 0;
+			Fence();									// force store before more loads
+			while ( t->R == c ) Pause();				// low priority busy wait
+			t->Q[c] = 1;
+			Fence();									// force store before more loads
+		} else {
+			Pause();
+		} // if
+	} // while
+#elif defined( TSAY )
+	t->Q[c] = 1;
+	t->R = c;
+	Fence();											// force store before more loads
+	if ( t->Q[inv( c )] ) while ( t->R == c ) Pause();	// busy wait
+#else	// Peterson (default)
 	t->Q[c] = 1;
 	t->R = c;
 	Fence();											// force store before more loads
 	while ( t->Q[inv( c )] && t->R == c ) Pause();		// busy wait
-#else		// Tsay
-	t->Q[c] = 1;
-	t->R = c;
-	Fence();											// force store before more loads
-	if ( t->Q[inv( c ) ) while ( t->R == c ) Pause();	// busy wait
 #endif
 } // binary_prologue
 
 static inline void binary_epilogue( TYPE c, volatile Token *t ) {
-#if 1		// Peterson
+#if defined( DEKKER )
+	t->R = c;
 	t->Q[c] = 0;
-#else		// Tsay
+#elif defined( TSAY )
 	t->Q[c] = 0;
 	t->R = c;
+#else	// Peterson (default)
+	t->Q[c] = 0;
 #endif
 } // binary_epilogue
 
