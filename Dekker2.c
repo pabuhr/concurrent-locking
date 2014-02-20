@@ -6,11 +6,12 @@ static volatile TYPE intents[2] = { DontWantIn, DontWantIn }, last = 0;
 
 static void *Worker( void *arg ) {
 	const unsigned int id = (size_t)arg;
+	uint64_t entry;
+
 	int other = 1 - id;
-	size_t entries[RUNS];
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
-		entries[r] = 0;
+		entry = 0;
 		while ( stop == 0 ) {
 			intents[id] = WantIn;
 			// Necessary to prevent the read of intents[other] from floating above the assignment
@@ -34,14 +35,14 @@ static void *Worker( void *arg ) {
 			CriticalSection( id );
 			last = id;									// exit protocol
 			intents[id] = DontWantIn;
-			entries[r] += 1;
+			entry += 1;
 		} // while
+		entries[r][id] = entry;
 		__sync_fetch_and_add( &Arrived, 1 );
 		while ( stop != 0 ) Pause();
 		__sync_fetch_and_add( &Arrived, -1 );
 	} // for
-	qsort( entries, RUNS, sizeof(size_t), compare );
-	return (void *)median(entries);
+	return NULL;
 } // Worker
 
 void ctor() {

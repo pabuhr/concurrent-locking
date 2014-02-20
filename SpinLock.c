@@ -18,13 +18,13 @@ void spin_unlock( volatile TYPE *lock ) {
 
 static void *Worker( void *arg ) {
 	unsigned int id = (size_t)arg;
+	uint64_t entry;
 #ifdef FAST
-	unsigned int cnt = 0;
+	unsigned int cnt = 0, oid = id;
 #endif // FAST
-	size_t entries[RUNS];
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
-		entries[r] = 0;
+		entry = 0;
 		while ( stop == 0 ) {
 #ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
@@ -33,14 +33,17 @@ static void *Worker( void *arg ) {
 			spin_lock( &lock );
 			CriticalSection( id );
 			spin_unlock( &lock );
-			entries[r] += 1;
+			entry += 1;
 		} // while
+#ifdef FAST
+		id = oid;
+#endif // FAST
+		entries[r][id] = entry;
 		__sync_fetch_and_add( &Arrived, 1 );
 		while ( stop != 0 ) Pause();
 		__sync_fetch_and_add( &Arrived, -1 );
 	} // for
-	qsort( entries, RUNS, sizeof(size_t), compare );
-	return (void *)median(entries);
+	return NULL;
 } // Worker
 
 void ctor() {

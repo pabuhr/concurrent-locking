@@ -56,8 +56,8 @@ static volatile int stop = 0;
 // merge the ST and FENCE into a single STFenced(Location,Value) primitive which is implemented via XCHG.  On SPARC
 // STFenced() is implemented via ST;MEMBAR.
 #elif defined(__x86_64) 
-#define Fence() __asm__ __volatile__ ("mfence")
-//#define Fence() __asm__ __volatile__ ("lock;addq $0,(%%rsp);" ::: "cc")
+//#define Fence() __asm__ __volatile__ ("mfence")
+#define Fence() __asm__ __volatile__ ("lock; addq $0,(%%rsp);" ::: "cc")
 #elif defined(__i386)
 #define Fence() __asm__ __volatile__ ("lock; addl $0,(%%esp);" ::: "cc")
 #else
@@ -231,6 +231,12 @@ static __attribute__((noinline)) int PollBarrier() {
 } // PollBarrier
 #endif // STRESSINTERVAL
 
+#ifdef CNT
+volatile int fcnt, scnt, pcnt;
+#endif // CNT
+
+uint64_t **entries;										// holds CS entry results for each threads for all runs
+
 #define xstr(s) str(s)
 #define str(s) #s
 #include xstr(Algorithm.c)
@@ -246,6 +252,10 @@ static void shuffle( unsigned int set[], const int size ) {
 		set[p2] = temp;
 	} // for
 } // shuffle
+
+int ThreadToCPU( int I ) { // 4x8x2 : 4 sockets, 8 cores per socket, 2 hyperthreads per core
+	return (I & 0x30) | ((I & 1) << 3) | ((I & 0xE) >> 1) ;
+} // ThreadToCPU
 
 int main( int argc, char *argv[] ) {
 	N = 8;												// defaults
@@ -277,7 +287,13 @@ int main( int argc, char *argv[] ) {
 	startpoints( N );
 #else
 	Threads = N;										// allow testing of T < N
+	//N = 32;
 #endif // FAST
+	entries = (uint64_t **)malloc( RUNS * sizeof(uint64_t *) );
+	for ( int r = 0; r < RUNS; r += 1 ) {
+		entries[r] = Allocator( Threads * sizeof(uint64_t) );
+	} // for
+
 	unsigned int set[Threads];
 	for ( int i = 0; i < Threads; i += 1 ) set[ i ] = i;
 	//srand( getpid() );
@@ -286,8 +302,21 @@ int main( int argc, char *argv[] ) {
 	ctor();												// global algorithm constructor
 
 	pthread_t workers[Threads];
-	for ( int i = 0; i < Threads; i += 1 ) {			// start workers
-		if ( pthread_create( &workers[i], NULL, Worker, (void *)(size_t)set[i] ) != 0 ) abort();
+#if defined( __linux ) && defined( PIN )
+	cpu_set_t mask;
+#endif // linux && PIN
+	for ( int id = 0; id < Threads; id += 1 ) {			// start workers
+		if ( pthread_create( &workers[id], NULL, Worker, (void *)(size_t)set[id] ) != 0 ) abort();
+#if defined( __linux ) && defined( PIN )
+		CPU_ZERO( &mask );
+//		printf( "%d\n", ThreadToCPU( id ) );
+//		CPU_SET( ThreadToCPU( id ), &mask );
+		CPU_SET( id, &mask );
+		if ( pthread_setaffinity_np( workers[id], sizeof(cpu_set_t), &mask ) != 0 ) {
+			perror( "setaffinity" );
+			abort();
+		} // if
+#endif // linux && PIN
 	} // for
 
 #ifdef STRESSINTERVAL
@@ -303,42 +332,73 @@ int main( int argc, char *argv[] ) {
 		BarHalt = 1; 
 	} // for
 #else
-	for ( int i = 0; i < RUNS; i += 1 ) {
+	for ( int r = 0; r < RUNS; r += 1 ) {
 		poll( NULL, 0, Time * 1000 );
 		stop = 1;										// reset
 		while ( Arrived != Threads ) Pause();
+#ifdef CNT
+		printf( "f:%d s:%d p:%d\n", fcnt, scnt, pcnt );
+		fcnt = scnt = pcnt = 0;
+#endif // CNT
 		stop = 0;
 		while ( Arrived != 0 ) Pause();
 	} // for
 #endif // STRESSINTERVAL
 
-	size_t entries[Threads];
 	for ( int i = 0; i < Threads; i += 1 ) {			// terminate workers
-		if ( pthread_join( workers[i], (void *)&entries[i] ) != 0 ) abort();
+		if ( pthread_join( workers[i], NULL ) != 0 ) abort();
 	} // for
 
 	dtor();												// global algorithm destructor
 
-	double sum = 0.0;
-	for ( int i = 0; i < Threads; i += 1 ) {			// sum values
-		sum += entries[i];
+	uint64_t totals[RUNS], sort[RUNS];
+
+#ifdef DEBUG
+	printf( "\n" );
+#endif // DEBUG
+	for ( int r = 0; r < RUNS; r += 1 ) {
+		totals[r] = 0;
+		for ( int id = 0; id < Threads; id += 1 ) {
+			totals[r] += entries[r][id];
+#ifdef DEBUG
+			printf( "%ju ", entries[r][id] );
+#endif // DEBUG
+		} // for
+#ifdef DEBUG
+		printf( "\n" );
+#endif // DEBUG
+		sort[r] = totals[r];
 	} // for
-	printf( "%.0f", sum );								// sum of median round
-	double avg = sum / Threads;							// average
-	sum = 0.0;
-	for ( int i = 0; i < Threads; i += 1 ) {			// sum squared differences from average
-		double diff = entries[i] - avg;
+	qsort( sort, RUNS, sizeof(uint64_t), compare );
+	uint64_t med = median( sort );
+	printf( "%ju", med );								// median round
+
+	unsigned int posn;
+	for ( posn = 0; posn < RUNS && totals[posn] != med; posn += 1 ); // assumes RUNS is odd
+#ifdef DEBUG
+	printf( "\ntotals: " );
+	for ( int i = 0; i < RUNS; i += 1 ) {				// print values
+		printf( "%ju ", totals[i] );
+	} // for
+	printf( "\nsorted: " );
+	for ( int i = 0; i < RUNS; i += 1 ) {				// print values
+		printf( "%ju ", sort[i] );
+	} // for
+	printf( "\nmedian posn:%d\n", posn );
+#endif // DEBUG
+	double avg = (double)totals[posn] / Threads;		// average
+	double sum = 0.0;
+	for ( int id = 0; id < Threads; id += 1 ) {			// sum squared differences from average
+		double diff = entries[posn][id] - avg;
 		sum += diff * diff;
 	} // for
 	double std = sqrt( sum / Threads );
 	printf( " %.1f %.1f %.1f%%", avg, std, std / avg * 100 );
 
-//	for ( int i = 0; i < Threads; i += 1 ) {					// print values
-//		printf( "id:%d %ld ", i, entries[i] );
-//	} // for
+	free( entries );
 
 	printf( "\n" );
-} // uMain::main
+} // main
 
 // Local Variables: //
 // tab-width: 4 //

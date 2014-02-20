@@ -58,15 +58,16 @@ static inline void binary_epilogue( TYPE c, volatile Token *t ) {
 
 static void *Worker( void *arg ) {
 	unsigned int id = (size_t)arg;
+	uint64_t entry;
+#ifdef FAST
+	unsigned int cnt = 0, oid = id;
+#endif // FAST
+
 	int s, level = levels[id];
 	Tuple *state = states[id];
-#ifdef FAST
-	unsigned int cnt = 0;
-#endif // FAST
-	size_t entries[RUNS];
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
-		entries[r] = 0;
+		entry = 0;
 		while ( stop == 0 ) {
 #ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
@@ -79,14 +80,17 @@ static void *Worker( void *arg ) {
 			for ( s = level; s >= 0; s -= 1 ) {			// exit protocol, reverse order
 				binary_epilogue( state[s].es, state[s].ns );
 			} // for
-			entries[r] += 1;
+			entry += 1;
 		} // while
+#ifdef FAST
+		id = oid;
+#endif // FAST
+		entries[r][id] = entry;
 		__sync_fetch_and_add( &Arrived, 1 );
 		while ( stop != 0 ) Pause();
 		__sync_fetch_and_add( &Arrived, -1 );
 	} // for
-	qsort( entries, RUNS, sizeof(size_t), compare );
-	return (void *)median(entries);
+	return NULL;
 } // Worker
 
 void ctor() {

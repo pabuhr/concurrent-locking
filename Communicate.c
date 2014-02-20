@@ -2,21 +2,21 @@ volatile TYPE turn;
 
 static void *Worker( void *arg ) {
 	const unsigned int id = (size_t)arg;
-	size_t entries[RUNS];
+	uint64_t entry;
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
-		entries[r] = 0;
+		entry = 0;
 		while ( stop == 0 ) {
 			turn = id;									// perturb cache
 			Fence();									// force store before more loads
-			entries[r] += 1;
+			entry += 1;
 		} // while
+		entries[r][id] = entry;
 		__sync_fetch_and_add( &Arrived, 1 );
 		while ( stop != 0 ) Pause();
 		__sync_fetch_and_add( &Arrived, -1 );
 	} // for
-	qsort( entries, RUNS, sizeof(size_t), compare );
-	return (void *)median(entries);
+	return NULL;
 } // Worker
 
 void ctor() {

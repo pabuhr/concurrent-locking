@@ -20,7 +20,7 @@ static inline int min( int a, int b ) { return a < b ? a : b; }
 static int depth, mask;
 static volatile Tuple *Q;
 
-uint32_t QMAX( int w, unsigned int id, int k ) {
+uint32_t QMAX( unsigned int id, int k ) {
 	int low = ((id >> (k - 1)) ^ 1) << (k - 1);
 	int high = min( low | mask >> (depth - (k - 1)), N - 1 );
 	Tuple opp;
@@ -33,47 +33,54 @@ uint32_t QMAX( int w, unsigned int id, int k ) {
 
 static void *Worker( void *arg ) {
 	unsigned int id = (size_t)arg;
-	Tuple opp;
+	uint64_t entry;
 #ifdef FAST
-	unsigned int cnt = 0;
+	unsigned int cnt = 0, oid = id;
 #endif // FAST
-	size_t entries[RUNS];
+
+	Tuple opp;
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
-		entries[r] = 0;
+		entry = 0;
 		while ( stop == 0 ) {
 #ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
 			cnt = cycleUp( cnt, NoStartPoints );
 #endif // FAST
 			for ( int k = 1; k <= depth; k += 1 ) {		// entry protocol, round
-				opp.atom = QMAX( 1, id, k );
+				opp.atom = QMAX( id, k );
 				Fence();								// force store before more loads
 				Q[id].atom = L(opp) == k ? (Tuple){ .tuple = {k, bit(id,k) ^ R(opp)} }.atom : (Tuple){ .tuple = {k, 1} }.atom;
 				Fence();								// force store before more loads
-				opp.atom = QMAX( 2, id, k );
+				opp.atom = QMAX( id, k );
 				Fence();								// force store before more loads
 				Q[id].atom = L(opp) == k ? (Tuple){ .tuple = {k, bit(id,k) ^ R(opp)} }.atom : Q[id].atom;
-//			  wait:	opp.atom = QMAX( id, k );
-//				Fence();								// force store before more loads
-//				if ( (L(opp) == k && (bit(id,k) ^ EQ(opp, Q[id]))) || L(opp) > k ) { Pause(); goto wait; }
-//				int cnt = 0, max = -1;
+#if 0
+			  wait:	opp.atom = QMAX( id, k );
 				Fence();								// force store before more loads
-				while ( L(opp) > k || (L(opp) == k && (bit(id,k) ^ EQ(opp, Q[id]))) ) {
+				if ( (L(opp) == k && (bit(id,k) ^ EQ(opp, Q[id]))) || L(opp) > k ) { Pause(); goto wait; }
+#else
+				// modify to remove fence from loop
+				Fence();								// force store before more loads
+				while ( (L(opp) == k && (bit(id,k) ^ EQ(opp, Q[id]))) || L(opp) > k ) {
 					Pause();
-					opp.atom = QMAX( 3, id, k );
+					opp.atom = QMAX( id, k );
 				} // while
+#endif
 			} // for
 			CriticalSection( id );
 			Q[id].atom = (Tuple){ .tuple = {0, 0} }.atom; // exit protocol
-			entries[r] += 1;
+			entry += 1;
 		} // while
+#ifdef FAST
+		id = oid;
+#endif // FAST
+		entries[r][id] = entry;
 		__sync_fetch_and_add( &Arrived, 1 );
 		while ( stop != 0 ) Pause();
 		__sync_fetch_and_add( &Arrived, -1 );
 	} // for
-	qsort( entries, RUNS, sizeof(size_t), compare );
-	return (void *)median(entries);
+	return NULL;
 } // Worker
 
 void ctor() {

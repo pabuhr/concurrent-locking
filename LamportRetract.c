@@ -6,14 +6,13 @@ static volatile TYPE *intents;							// shared
 
 static void *Worker( void *arg ) {
 	unsigned int id = (size_t)arg;
-	int j;
+	uint64_t entry;
 #ifdef FAST
-	unsigned int cnt = 0;
+	unsigned int cnt = 0, oid = id;
 #endif // FAST
-	size_t entries[RUNS];
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
-		entries[r] = 0;
+		entry = 0;
 		while ( stop == 0 ) {
 #ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
@@ -21,8 +20,8 @@ static void *Worker( void *arg ) {
 #endif // FAST
 		  L: intents[id] = WantIn;
 			Fence();									// force store before more loads
-			for ( j = 0; j < id; j += 1 ) {				// check if thread with higher id wants in
-//			for ( j = id - 1; j >= 0; j -= 1 ) {
+			for ( int j = 0; j < id; j += 1 ) {			// check if thread with higher id wants in
+//			for ( int j = id - 1; j >= 0; j -= 1 ) {
 				if ( intents[j] == WantIn ) {
 					intents[id] = DontWantIn;
 					Fence();							// force store before more loads
@@ -30,18 +29,21 @@ static void *Worker( void *arg ) {
 					goto L;
 				} // if
 			} // for
-			for ( j = id + 1; j < N; j += 1 )
+			for ( int j = id + 1; j < N; j += 1 )
 				while ( intents[j] == WantIn ) Pause();
 			CriticalSection( id );						// critical section
 			intents[id] = DontWantIn;					// exit protocol
-			entries[r] += 1;
+			entry += 1;
 		} // while
+#ifdef FAST
+		id = oid;
+#endif // FAST
+		entries[r][id] = entry;
 		__sync_fetch_and_add( &Arrived, 1 );
 		while ( stop != 0 ) Pause();
 		__sync_fetch_and_add( &Arrived, -1 );
 	} // for
-	qsort( entries, RUNS, sizeof(size_t), compare );
-	return (void *)median(entries);
+	return NULL;
 } // Worker
 
 void ctor() {

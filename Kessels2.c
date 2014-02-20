@@ -7,16 +7,16 @@ static volatile TYPE Q[2], R[2];
 
 static void *Worker( void *arg ) {
 	const unsigned int id = (size_t)arg;
-	size_t entries[RUNS];
+	uint64_t entry;
 
 	size_t rv = (size_t) &rv ; 
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
-		entries[r] = 0;
+		entry = 0;
 		while ( stop == 0 ) {
 			Q[id] = 1;									// entry protocol
 			Fence();									// force store before more loads
-#if 1
+#if 0
 			R[id] = plus( R[inv(id)], id );
 			Fence();									// force store before more loads
 			while ( Q[inv(id)] == 1 && R[id] == plus( R[inv(id)], id ) ) Pause();
@@ -27,14 +27,14 @@ static void *Worker( void *arg ) {
 #endif
 			CriticalSection( id );
 			Q[id] = 0;									// exit protocol
-			entries[r] += 1;
+			entry += 1;
 		} // while
+		entries[r][id] = entry;
 		__sync_fetch_and_add( &Arrived, 1 );
 		while ( stop != 0 ) Pause();
 		__sync_fetch_and_add( &Arrived, -1 );
 	} // for
-	qsort( entries, RUNS, sizeof(size_t), compare );
-	return (void *)median(entries);
+	return NULL;
 } // Worker
 
 void ctor() {
