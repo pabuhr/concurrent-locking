@@ -178,7 +178,7 @@ static inline bool entryComb( unsigned int id
 	return b;
 } // entryComb
 
-static void inline exitComb( unsigned int id, bool b
+static inline void exitComb( unsigned int id, bool b
 #ifndef TB
 							 , int level, Tuple *state
 #endif // ! TB
