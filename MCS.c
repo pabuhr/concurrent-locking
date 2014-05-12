@@ -36,7 +36,7 @@ void mcs_lock( MCS_lock *lock, MCS_node *node ) {
 #else
 	pred = __sync_lock_test_and_set( lock, node );		// fetch-and-store
 #endif
-	if ( pred != NULL ) {								// someone on list ?
+	if ( FASTPATH( pred != NULL ) ) {					// someone on list ?
 		node->spin = 1;									// mark as waiting
 		pred->next = node;								// add to list of waiting threads
 		while ( node->spin == 1 ) Pause();				// busy wait on my spin variable
@@ -55,7 +55,7 @@ void mcs_unlock( MCS_lock *lock, MCS_node *node ) {
 	node->next->spin = 0;								// stop their busy wait
 } // mcs_unlock
 
-MCS_lock lock CALIGN;
+static MCS_lock lock CALIGN;
 
 static void *Worker( void *arg ) {
 	unsigned int id = (size_t)arg;
@@ -98,5 +98,5 @@ void dtor() {
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -std=gnu99 -O3 -DAlgorithm=MCS Harness.c -lpthread -lm" //
+// compile-command: "gcc -Wall -std=gnu99 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=MCS Harness.c -lpthread -lm" //
 // End: //

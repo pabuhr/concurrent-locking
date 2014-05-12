@@ -17,17 +17,23 @@ static void *Worker( void *arg ) {
 			id = startpoint( cnt );						// different starting point each experiment
 			cnt = cycleUp( cnt, NoStartPoints );
 #endif // FAST
-			ridi = id;
+#if defined( __sparc )
+			__asm__ volatile( "" : : : "memory" );
+#endif // __sparc
+//			ridi = id;
 			for ( int lv = 0; lv < depth; lv += 1 ) {	// entry protocol
-//				ridi = id >> lv;						// round id for intent
+				ridi = id >> lv;						// round id for intent
 				ridt = ridi >> 1;						// round id for turn
 				intents[lv][ridi] = 1;					// declare intent
 				turns[lv][ridt] = ridi;					// RACE
 				Fence();								// force store before more loads
 				while ( intents[lv][ridi ^ 1] == 1 && turns[lv][ridt] == ridi ) Pause();
-				ridi >>= 1;
+//				ridi >>= 1;
 			} // for
 			CriticalSection( id );
+#if defined( __sparc )
+			__asm__ volatile( "" : : : "memory" );
+#endif // __sparc
 			for ( int lv = depth - 1; lv >= 0; lv -= 1 ) { // exit protocol
 				intents[lv][id >> lv] = 0;				// retract all intents in reverse order
 			} // for
@@ -44,7 +50,7 @@ static void *Worker( void *arg ) {
 	return NULL;
 } // Worker
 
-void ctor() {
+void __attribute__((noinline)) ctor() {
 	depth = Clog2( N );									// maximal depth of binary tree
 	int width = 1 << depth;								// maximal width of binary tree
 	intents = Allocator( sizeof(volatile TYPE *) * depth );	// allocate matrix columns
@@ -59,7 +65,7 @@ void ctor() {
 	} // for
 } // ctor
 
-void dtor() {
+void __attribute__((noinline)) dtor() {
 	for ( int r = 0; r < depth; r += 1 ) {				// deallocate matrix rows
 		free( (void *)turns[r] );
 		free( (void *)intents[r] );
@@ -70,5 +76,5 @@ void dtor() {
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -std=gnu99 -O3 -DAlgorithm=TaubenfeldBuhr Harness.c -lpthread -lm" //
+// compile-command: "gcc -Wall -std=gnu99 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=TaubenfeldBuhr Harness.c -lpthread -lm" //
 // End: //

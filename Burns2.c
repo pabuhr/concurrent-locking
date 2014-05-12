@@ -19,10 +19,13 @@ static void *Worker( void *arg ) {
 			id = startpoint( cnt );						// different starting point each experiment
 			cnt = cycleUp( cnt, NoStartPoints );
 #endif // FAST
+#if defined( __sparc )
+			__asm__ volatile( "" : : : "memory" );
+#endif // __sparc
 		  L0: flag[id] = 1;								// entry protocol
 			turn = id;									// RACE
 			Fence();									// force store before more loads
-		  L1: if ( turn != id ) {
+		  L1: if ( FASTPATH( turn != id ) ) {
 				flag[id] = 0;
 				Fence();								// force store before more loads
 			  L11: for ( j = 0; j < N; j += 1 )
@@ -31,9 +34,9 @@ static void *Worker( void *arg ) {
 			} else {
 //				flag[id] = 1;
 //				Fence();								// force store before more loads
-			  L2: if ( turn != id ) goto L1;
+			  L2: if ( FASTPATH( turn != id ) ) goto L1;
 				for ( j = 0; j < N; j += 1 )
-					if ( j != id && flag[j] != 0 ) goto L2;
+					if ( FASTPATH( j != id && flag[j] != 0 ) ) goto L2;
 			} // if
 			CriticalSection( id );
 			flag[id] = 0;								// exit protocol
@@ -64,5 +67,5 @@ void dtor() {
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -std=gnu99 -O3 -DAlgorithm=Burns2 Harness.c -lpthread -lm" //
+// compile-command: "gcc -Wall -std=gnu99 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=Burns2 Harness.c -lpthread -lm" //
 // End: //

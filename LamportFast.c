@@ -3,8 +3,8 @@
 
 #include <stdbool.h>
 
-volatile TYPE *b;
-volatile TYPE x, y;
+static volatile TYPE *b;
+static volatile TYPE x, y;
 
 #define await( E ) while ( ! (E) ) Pause()
 
@@ -25,7 +25,7 @@ static void *Worker( void *arg ) {
 		  start: b[id] = true;							// entry protocol
 			x = id;
 			Fence();									// force store before more loads
-			if ( y != N ) {
+			if ( FASTPATH( y != N ) ) {
 				b[id] = false;
 				Fence();								// force store before more loads
 				await( y == N );
@@ -33,12 +33,12 @@ static void *Worker( void *arg ) {
 			} // if
 			y = id;
 			Fence();									// force store before more loads
-			if ( x != id ) {
+			if ( FASTPATH( x != id ) ) {
 				b[id] = false;
 				Fence();								// force store before more loads
 				for ( int j = 0; j < N; j += 1 )
 					await( ! b[j] );
-				if ( y != id ) {
+				if ( FASTPATH( y != id ) ) {
 //					await( y == N );
 					goto start;
 				} // if
@@ -62,7 +62,7 @@ static void *Worker( void *arg ) {
 void ctor() {
 	b = Allocator( sizeof(volatile TYPE) * N );
 	for ( int i = 0; i < N; i += 1 ) {					// initialize shared data
-		b[i] = false;
+		b[i] = 0;
 	} // for
 	y = N;
 } // ctor
@@ -73,5 +73,5 @@ void dtor() {
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -std=gnu99 -O3 -DAlgorithm=LamportFast Harness.c -lpthread -lm" //
+// compile-command: "gcc -Wall -std=gnu99 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=LamportFast Harness.c -lpthread -lm" //
 // End: //

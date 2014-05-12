@@ -1,19 +1,32 @@
 // Joep L. W. Kessels, Arbitration Without Common Modifiable Variables, Acta Informatica, 17(2), 1982, pp. 140-141
 
 typedef struct {
-	TYPE Q[2], R[2];
+	TYPE Q[2],
+#if defined( PETERSON )
+		R, PAD;
+#else // default Kessels' read race
+	R[2];
+#endif // PETERSON
 } Token;
-volatile Token *t;
+
+static volatile Token *t;
 
 #define inv( c ) (1 - c)
 #define plus( a, b ) ((a + b) & 1)
 
 static inline void binary_prologue( TYPE c, volatile Token *t ) {
+#if defined( PETERSON )
+	t->Q[c] = 1;
+	t->R = c;
+	Fence();											// force store before more loads
+	while ( t->Q[inv( c )] && t->R == c ) Pause();		// busy wait
+#else // default Kessels' read race
 	t->Q[c] = 1;
 	Fence();											// force store before more loads
 	t->R[c] = plus( t->R[inv(c)], c );
 	Fence();											// force store before more loads
 	while ( t->Q[inv( c )] && t->R[c] == plus( t->R[inv( c )], c ) ) Pause(); // busy wait
+#endif // PETERSON
 } // binary_prologue
 
 static inline void binary_epilogue( TYPE c, volatile Token *t ) {
@@ -36,6 +49,9 @@ static void *Worker( void *arg ) {
 			id = startpoint( cnt );						// different starting point each experiment
 			cnt = cycleUp( cnt, NoStartPoints );
 #endif // FAST
+#if defined( __sparc )
+			__asm__ volatile( "" : : : "memory" );
+#endif // __sparc
 			n = N + id;
 			while ( n > 1 ) {							// entry protocol
 #if 1
@@ -52,6 +68,9 @@ static void *Worker( void *arg ) {
 #endif
 			} // while
 			CriticalSection( id );
+#if defined( __sparc )
+			__asm__ volatile( "" : : : "memory" );
+#endif // __sparc
 			for ( n = 1; n < N; n = n + n + e[n] ) {	// exit protocol
 //				n = n + n + e[n];
 //				binary_epilogue( n & 1, &t[n >> 1] );
@@ -84,5 +103,5 @@ void dtor() {
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -std=gnu99 -O3 -DAlgorithm=Kessels Harness.c -lpthread -lm" //
+// compile-command: "gcc -Wall -std=gnu99 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=Kessels Harness.c -lpthread -lm" //
 // End: //

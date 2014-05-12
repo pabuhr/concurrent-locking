@@ -5,7 +5,7 @@ void spin_lock( volatile TYPE *lock ) {
 	unsigned int spin = SPIN_START;
 
 	for ( ;; ) {
-	  if ( *lock == 0 && __sync_lock_test_and_set( lock, 1 ) == 0 ) break;
+		if ( unlikely( *lock == 0 && __sync_lock_test_and_set( lock, 1 ) == 0 ) ) break;
 		for ( int i = 0; i < spin; i += 1 ) Pause();	// exponential spin
 		spin += spin;									// powers of 2
 		if ( spin > SPIN_END ) spin = SPIN_START;		// prevent overflow
@@ -55,5 +55,5 @@ void dtor() {
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -std=gnu99 -O3 -DAlgorithm=SpinLock Harness.c -lpthread -lm" //
+// compile-command: "gcc -Wall -std=gnu99 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=SpinLock Harness.c -lpthread -lm" //
 // End: //

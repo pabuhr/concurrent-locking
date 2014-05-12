@@ -22,6 +22,29 @@
 #include <math.h>										// sqrt
 #include <assert.h>
 
+#if defined( __i386 ) || defined( __x86_64 )
+#ifdef FAST
+// unlikely
+#define FASTPATH(x) __builtin_expect(!!(x), 0)
+#else
+// likely
+#define FASTPATH(x) __builtin_expect(!!(x), 1)
+#endif // FASTPATH
+
+#if BRANCH == 'L'
+#define likely(x) __builtin_expect(!!(x), 1)
+#elif BRANCH == 'U'
+#define likely(x) __builtin_expect(!!(x), 0)
+#elif BRANCH == 'N'
+#define likely(x) (x)
+#else // default is neutral
+#define likely(x) (x)
+#endif // BRANCH
+
+#else
+#define FASTPATH(x) (x)
+#endif // __i386 || __x86_64
+
 typedef intptr_t TYPE;									// atomically addressable word-size
 
 #define CACHE_ALIGN 128									// Intel recommendation
@@ -113,17 +136,10 @@ static inline TYPE cycleDown( TYPE v, TYPE n ) { return ( ((v) <= 0) ? (n - 1) :
 static volatile int Arrived = 0;
 static int N, Threads, Time, Degree = -1;
 
-#define median(a) ((RUNS & 1) == 0 ? (a[RUNS/2-1] + a[RUNS/2]) / 2 : a[RUNS/2] )
-static int compare( const void *p1, const void *p2 ) {
-	size_t i = *((size_t *)p1);
-	size_t j = *((size_t *)p2);
-	return i > j ? 1 : i < j ? -1 : 0;
-}
-
 #ifdef FAST
-const unsigned int MaxStartPoints = 64;
-unsigned int NoStartPoints, reps;
-unsigned int *Startpoints;
+enum { MaxStartPoints = 64 };
+static unsigned int NoStartPoints;
+static unsigned int *Startpoints;
 
 // To ensure the single thread exercises all aspects of an algorithm, it is assigned different start-points on each
 // access to the critical section by randomly changing its thread id.  The randomness is accomplished using
@@ -132,7 +148,7 @@ unsigned int *Startpoints;
 // 1 2.  There are no consecutive thread-ids within a repetition but there may be between repetition.  The thread cycles
 // through this array of ids during an experiment.
 
-void startpoints() {
+void __attribute__((noinline)) startpoints() {
 	Startpoints[0] = N;
 	for ( unsigned int i = 0; i < NoStartPoints; i += N ) {
 		for ( unsigned int j = i; j < i + N; j += 1 ) {
@@ -142,13 +158,17 @@ void startpoints() {
 			for ( k = i; k < j; k += 1 ) {
 				if ( Startpoints[k] == v ) goto L;
 			} // for
+// Unknown performance drop caused by following assert, use -DNDEBUG for experiments
+			assert( k < NoStartPoints );
 			Startpoints[k] = v;
 		} // for
 	} // for
-//    for ( unsigned int i = 0; i < N * reps; i += 1 ) {
-//		printf( "%d ", Startpoints[i] );
-//    } // for
-//    printf( "\n" );
+#if 0
+    for ( unsigned int i = 0; i < NoStartPoints; i += 1 ) {
+		printf( "%d ", Startpoints[i] );
+    } // for
+    printf( "\n" );
+#endif // 0
 } // startpoints
 
 static inline unsigned int startpoint( unsigned int pos ) {
@@ -173,7 +193,7 @@ static inline unsigned int startpoint( unsigned int pos ) {
 static int StressInterval =	STRESSINTERVAL;				// 500 is good
 static volatile int BarHalt = 0; 
 
-static __attribute__((noinline)) int PollBarrier() {
+static int __attribute__((noinline)) PollBarrier() {
   if ( BarHalt == 0 ) return 0; 
 	// singleton barrier instance state
 	static volatile int Ticket = 0;  
@@ -231,20 +251,16 @@ static __attribute__((noinline)) int PollBarrier() {
 } // PollBarrier
 #endif // STRESSINTERVAL
 
-#ifdef CNT
-volatile int fcnt, scnt, pcnt;
-#endif // CNT
-
-uint64_t **entries;										// holds CS entry results for each threads for all runs
+static uint64_t **entries;								// holds CS entry results for each threads for all runs
 
 #define xstr(s) str(s)
 #define str(s) #s
 #include xstr(Algorithm.c)
 
 static void shuffle( unsigned int set[], const int size ) {
-	int p1, p2, temp;
+	unsigned int p1, p2, temp;
 
-	for ( int i = 0; i < 200; i +=1 ) {					// shuffle array N times
+	for ( int i = 0; i < 200; i +=1 ) {					// shuffle array S times
 		p1 = rand() % size;
 		p2 = rand() % size;
 		temp = set[p1];
@@ -253,9 +269,12 @@ static void shuffle( unsigned int set[], const int size ) {
 	} // for
 } // shuffle
 
-int ThreadToCPU( int I ) { // 4x8x2 : 4 sockets, 8 cores per socket, 2 hyperthreads per core
-	return (I & 0x30) | ((I & 1) << 3) | ((I & 0xE) >> 1) ;
-} // ThreadToCPU
+#define median(a) ((RUNS & 1) == 0 ? (a[RUNS/2-1] + a[RUNS/2]) / 2 : a[RUNS/2] )
+static int compare( const void *p1, const void *p2 ) {
+	size_t i = *((size_t *)p1);
+	size_t j = *((size_t *)p2);
+	return i > j ? 1 : i < j ? -1 : 0;
+}
 
 int main( int argc, char *argv[] ) {
 	N = 8;												// defaults
@@ -280,10 +299,10 @@ int main( int argc, char *argv[] ) {
 	printf( "%d %d ", N, Time );
 
 #ifdef FAST
+	assert( N <= MaxStartPoints );
 	Threads = 1;										// fast test, Threads=1, N=1..32
-	reps = MaxStartPoints / N;
-	NoStartPoints = MaxStartPoints / N * N;
-	Startpoints = malloc( sizeof( unsigned int ) * NoStartPoints );
+	NoStartPoints = MaxStartPoints / N * N;				// floor( MaxStartPoints / N )
+	Startpoints = Allocator( sizeof(unsigned int) * NoStartPoints );
 	startpoints( N );
 #else
 	Threads = N;										// allow testing of T < N
@@ -305,13 +324,34 @@ int main( int argc, char *argv[] ) {
 #if defined( __linux ) && defined( PIN )
 	cpu_set_t mask;
 #endif // linux && PIN
+
 	for ( int id = 0; id < Threads; id += 1 ) {			// start workers
 		if ( pthread_create( &workers[id], NULL, Worker, (void *)(size_t)set[id] ) != 0 ) abort();
 #if defined( __linux ) && defined( PIN )
 		CPU_ZERO( &mask );
-//		printf( "%d\n", ThreadToCPU( id ) );
-//		CPU_SET( ThreadToCPU( id ), &mask );
-		CPU_SET( id, &mask );
+#ifdef FAST
+		enum { offset = 35 };							// random CPU in upper range
+#else
+		enum { offset = 32 };							// upper range of cores away from core 0
+#endif // FAST
+		int cpu;
+#if 0
+		// 4x8x2 : 4 sockets, 8 cores per socket, 2 hyperthreads per core
+		cpu = (id & 0x30) | ((id & 1) << 3) | ((id & 0xE) >> 1) + 32;
+#endif // 0
+#if 0
+		static int cpus[] = { 0, 2, 4, 6, 8, 10, 12, 14,
+							  1, 3, 5, 7, 9, 11, 13, 15,
+							  16, 18, 20, 22, 24, 26, 28, 30,
+							  17, 19, 21, 23, 25, 27, 29, 31,
+		}; // cpus
+		cpu = cpus[id] + 32;
+#endif // 0
+#if 1
+		cpu = id + offset;
+#endif // 0
+		//printf( "%d\n", cpu );
+		CPU_SET( cpu, &mask );
 		if ( pthread_setaffinity_np( workers[id], sizeof(cpu_set_t), &mask ) != 0 ) {
 			perror( "setaffinity" );
 			abort();
@@ -336,10 +376,6 @@ int main( int argc, char *argv[] ) {
 		poll( NULL, 0, Time * 1000 );
 		stop = 1;										// reset
 		while ( Arrived != Threads ) Pause();
-#ifdef CNT
-		printf( "f:%d s:%d p:%d\n", fcnt, scnt, pcnt );
-		fcnt = scnt = pcnt = 0;
-#endif // CNT
 		stop = 0;
 		while ( Arrived != 0 ) Pause();
 	} // for

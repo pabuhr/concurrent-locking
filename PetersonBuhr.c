@@ -3,16 +3,17 @@
 typedef struct {
 	TYPE Q[2], R, PAD;									// make structure even multiple of word size by padding
 } Token;
-static volatile Token *t;
 
 typedef struct {
 	TYPE es;											// left/right opponent
 	volatile Token *ns;									// pointer to path node from leaf to root
 } Tuple;
-//Tuple **states;											// handle 64 threads with maximal tree depth of 6 nodes (lg 64)
-//int *levels;											// minimal level for binary tree
-static Tuple states[64][6];								// handle 64 threads with maximal tree depth of 6 nodes (lg 64)
-static int levels[64] = { -1 };							// minimal level for binary tree
+static Tuple **states;									// handle 64 threads with maximal tree depth of 6 nodes (lg 64)
+static int *levels;										// minimal level for binary tree
+//static Tuple states[64][6];								// handle 64 threads with maximal tree depth of 6 nodes (lg 64)
+//static int levels[64] = { -1 };							// minimal level for binary tree
+
+static volatile Token *t;
 
 #define inv( c ) (1 - c)
 
@@ -93,7 +94,7 @@ static void *Worker( void *arg ) {
 	return NULL;
 } // Worker
 
-void ctor() {
+void __attribute__((noinline)) ctor() {
 	// element 0 not used
 	t = Allocator( sizeof(volatile Token) * N );
 
@@ -102,13 +103,13 @@ void ctor() {
 	// s ranges from 0 to the tree level of a start point (leaf) in a minimal binary tree.
 	// levels[id] is level of start point minus 1 so bi-directional tree traversal is uniform.
 
-//	states = Allocator( sizeof(Tuple *) * N );
-//	levels = Allocator( sizeof(int) * N );
-//	levels[0] = -1;										// default for N=1
+	states = Allocator( sizeof(Tuple *) * N );
+	levels = Allocator( sizeof(int) * N );
+	levels[0] = -1;										// default for N=1
 	for ( unsigned int id = 0; id < N; id += 1 ) {
 		t[id].Q[0] = t[id].Q[1] = 0;
 		unsigned int start = N + id, level = Log2( start );
-//		states[id] = Allocator( sizeof(Tuple) * level );
+		states[id] = Allocator( sizeof(Tuple) * level );
 		levels[id] = level - 1;
 		for ( unsigned int s = 0; start > 1; start >>= 1, s += 1 ) {
 			states[id][s].es = start & 1;
@@ -117,12 +118,13 @@ void ctor() {
 	} // for
 } // ctor
 
-void dtor() {
-//	free( (void *)levels );
+void __attribute__((noinline)) dtor() {
+	free( (void *)levels );
+	free( (void *)states );
 	free( (void *)t );
 } // dtor
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -std=gnu99 -O3 -DAlgorithm=PetersonBuhr Harness.c -lpthread -lm" //
+// compile-command: "gcc -Wall -std=gnu99 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=PetersonBuhr Harness.c -lpthread -lm" //
 // End: //

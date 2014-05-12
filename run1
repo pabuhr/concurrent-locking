@@ -1,18 +1,25 @@
 #!/bin/sh -
 
+# IRQs
+#   /proc/irq and /proc/interrupts
+#   /etc/default/irqbalance
+#      ENABLED="0"
+#      reboot
+
 # disable address-space randomization (ASR) via the following
 #   sudo
 #   cat /proc/sys/kernel/randomize_va_space
+#   0 => disable, 2 => randomize stack positions
 #   echo 0 > /proc/sys/kernel/randomize_va_space
 #   echo 2 > /proc/sys/kernel/randomize_va_space
 # set CPUs to maximum frequency
 #   sudo
-#   cpufreq-info -f
+#   cpufreq-info  (lists information about all cores)
 #   cpufreq-set --cpu 0 --min 2600000
 #   ... for each even CPU (may work in pairs)
 #   cpufreq-set --cpu 0 --min 1000000
 
-Time=20 	# 5 x Time = length of experiment
+Time=20 	# R x Time = length of experiment
 N=32		# 1 to N threads tested
 
 # optional argument ${1} is the degree of the tree (d-ary) for Zhang

@@ -62,5 +62,5 @@ void dtor() {
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -std=gnu99 -O3 -DAlgorithm=Peterson2T Harness.c -lpthread -lm" //
+// compile-command: "gcc -std=gnu99 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=Peterson2T Harness.c -lpthread -lm" //
 // End: //
