@@ -1,0 +1,31 @@
+#!/bin/sh -
+
+algorithms="Burns2 LamportFast Taubenfeld TaubenfeldBuhr Kessels PetersonBuhr Triangle TriangleMod MCS"
+
+if [ ${#} -ne 0 ] ; then
+    algorithms="${@}"
+fi
+
+cflag="-Wall -Werror -std=gnu99 -g -O3 -DNDEBUG -fno-reorder-functions -DPIN" #
+
+runalgorithm() {
+    for flag in "" "FAST" ; do
+	echo ${1}${2}${flag}
+	gcc ${cflag} ${flag:+-D${flag}} ${2:+-D${2}} -DAlgorithm=${1} Harness.c -lpthread -lm
+	./run1 > ${1}${2}${flag}
+	if [ -f core ] ; then
+	    echo core generated for ${1}
+	    break
+	fi
+    done
+}
+
+rm -rf core
+for algorithm in ${algorithms} ; do
+    if [ ${algorithm} = "Triangle" -o ${algorithm} = "TriangleMod" ] ; then
+	runalgorithm ${algorithm} PB
+	runalgorithm ${algorithm} TB
+    else
+	runalgorithm ${algorithm}
+    fi
+done
