@@ -68,8 +68,6 @@ static void *Worker( void *arg ) {
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		entry = 0;
-			id = startpoint( cnt );						// different starting point each experiment
-			cnt = cycleUp( cnt, NoStartPoints );
 		while ( stop == 0 ) {
 			mcs_lock( &lock, &node );
 			CriticalSection( id );

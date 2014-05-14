@@ -387,8 +387,8 @@ int main( int argc, char *argv[] ) {
 	} // for
 #endif // STRESSINTERVAL
 
-	for ( int i = 0; i < Threads; i += 1 ) {			// terminate workers
-		if ( pthread_join( workers[i], NULL ) != 0 ) abort();
+	for ( int id = 0; id < Threads; id += 1 ) {			// terminate workers
+		if ( pthread_join( workers[id], NULL ) != 0 ) abort();
 	} // for
 
 	dtor();												// global algorithm destructor
