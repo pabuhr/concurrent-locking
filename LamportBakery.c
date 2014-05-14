@@ -13,10 +13,6 @@ static void *Worker( void *arg ) {
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		entry = 0;
 		while ( stop == 0 ) {
-#ifdef FAST
-			id = startpoint( cnt );						// different starting point each experiment
-			cnt = cycleUp( cnt, NoStartPoints );
-#endif // FAST
 			// step 1, select a ticket
 			choosing[id] = 1;							// entry protocol
 			Fence();									// force store before more loads
@@ -51,6 +47,10 @@ static void *Worker( void *arg ) {
 #endif
 			CriticalSection( id );
 			ticket[id] = 0;								// exit protocol
+#ifdef FAST
+			id = startpoint( cnt );						// different starting point each experiment
+			cnt = cycleUp( cnt, NoStartPoints );
+#endif // FAST
 			entry += 1;
 		} // while
 #ifdef FAST

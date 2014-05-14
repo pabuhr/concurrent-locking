@@ -15,10 +15,6 @@ static void *Worker( void *arg ) {
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		entry = 0;
 		while ( stop == 0 ) {
-#ifdef FAST
-			id = startpoint( cnt );						// different starting point each experiment
-			cnt = cycleUp( cnt, NoStartPoints );
-#endif // FAST
 #if defined( __sparc )
 			__asm__ volatile( "" : : : "memory" );
 #endif // __sparc
@@ -40,6 +36,10 @@ static void *Worker( void *arg ) {
 			} // if
 			CriticalSection( id );
 			flag[id] = 0;								// exit protocol
+#ifdef FAST
+			id = startpoint( cnt );						// different starting point each experiment
+			cnt = cycleUp( cnt, NoStartPoints );
+#endif // FAST
 			entry += 1;
 		} // while
 #ifdef FAST

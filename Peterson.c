@@ -16,10 +16,6 @@ static void *Worker( void *arg ) {
 		entry = 0;
 //		for ( int i = 1; i < N; i += 1 ) cnt[i] = 0;
 		while ( stop == 0 ) {
-#ifdef FAST
-			id = startpoint( cnt );						// different starting point each experiment
-			cnt = cycleUp( cnt, NoStartPoints );
-#endif // FAST
 			for ( TYPE rd = 1; rd < N; rd += 1 ) {		// entry protocol, round
 				Q[id] = rd;								// current round
 				turns[rd] = id;							// RACE
@@ -31,6 +27,10 @@ static void *Worker( void *arg ) {
 			} // for
 			CriticalSection( id );
 			Q[id] = 0;									// exit protocol
+#ifdef FAST
+			id = startpoint( cnt );						// different starting point each experiment
+			cnt = cycleUp( cnt, NoStartPoints );
+#endif // FAST
 			entry += 1;
 		} // while
 #ifdef FAST

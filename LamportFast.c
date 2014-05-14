@@ -18,10 +18,6 @@ static void *Worker( void *arg ) {
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		entry = 0;
 		while ( stop == 0 ) {
-#ifdef FAST
-			id = startpoint( cnt );						// different starting point each experiment
-			cnt = cycleUp( cnt, NoStartPoints );
-#endif // FAST
 		  start: b[id] = true;							// entry protocol
 			x = id;
 			Fence();									// force store before more loads
@@ -46,6 +42,10 @@ static void *Worker( void *arg ) {
 			CriticalSection( id );
 			y = N;										// exit protocol
 			b[id] = false;
+#ifdef FAST
+			id = startpoint( cnt );						// different starting point each experiment
+			cnt = cycleUp( cnt, NoStartPoints );
+#endif // FAST
 			entry += 1;
 		} // while
 #ifdef FAST

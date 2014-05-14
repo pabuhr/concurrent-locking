@@ -26,13 +26,13 @@ static void *Worker( void *arg ) {
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		entry = 0;
 		while ( stop == 0 ) {
+			spin_lock( &lock );
+			CriticalSection( id );
+			spin_unlock( &lock );
 #ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
 			cnt = cycleUp( cnt, NoStartPoints );
 #endif // FAST
-			spin_lock( &lock );
-			CriticalSection( id );
-			spin_unlock( &lock );
 			entry += 1;
 		} // while
 #ifdef FAST

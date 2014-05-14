@@ -18,10 +18,6 @@ static void *Worker( void *arg ) {
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		entry = 0;
 		while ( stop == 0 ) {
-#ifdef FAST
-			id = startpoint( cnt );						// different starting point each experiment
-			cnt = cycleUp( cnt, NoStartPoints );
-#endif // FAST
 			for ( TYPE km1 = 0, k = 1; k <= depth; km1 += 1, k += 1 ) { // entry protocol
 				lid = id >> km1;						// local id
 				comp = (lid >> 1) + (width >> k);		// unique position in the tree
@@ -36,6 +32,10 @@ static void *Worker( void *arg ) {
 			} // for
 			CriticalSection( id );
 			intents[id] = 0;							// exit protocol
+#ifdef FAST
+			id = startpoint( cnt );						// different starting point each experiment
+			cnt = cycleUp( cnt, NoStartPoints );
+#endif // FAST
 			entry += 1;
 		} // while
 #ifdef FAST

@@ -136,6 +136,7 @@ static inline TYPE cycleDown( TYPE v, TYPE n ) { return ( ((v) <= 0) ? (n - 1) :
 static volatile int Arrived = 0;
 static int N, Threads, Time, Degree = -1;
 
+
 #ifdef FAST
 enum { MaxStartPoints = 64 };
 static unsigned int NoStartPoints;
@@ -176,6 +177,7 @@ static inline unsigned int startpoint( unsigned int pos ) {
 //	return rand() % N;
 } // startpoint
 #endif // FAST
+
 
 // Vary concurrency level to help detect exclusion failure and progress-liveness bugs in lock algorithms and
 // implementations.  In many cases lock bugs do not ever manifest in steady-state, so varying the concurrency level
@@ -251,11 +253,13 @@ static int __attribute__((noinline)) PollBarrier() {
 } // PollBarrier
 #endif // STRESSINTERVAL
 
+
 static uint64_t **entries;								// holds CS entry results for each threads for all runs
 
 #define xstr(s) str(s)
 #define str(s) #s
 #include xstr(Algorithm.c)
+
 
 static void shuffle( unsigned int set[], const int size ) {
 	unsigned int p1, p2, temp;
@@ -269,12 +273,14 @@ static void shuffle( unsigned int set[], const int size ) {
 	} // for
 } // shuffle
 
+
 #define median(a) ((RUNS & 1) == 0 ? (a[RUNS/2-1] + a[RUNS/2]) / 2 : a[RUNS/2] )
 static int compare( const void *p1, const void *p2 ) {
 	size_t i = *((size_t *)p1);
 	size_t j = *((size_t *)p2);
 	return i > j ? 1 : i < j ? -1 : 0;
-}
+} // compare
+
 
 int main( int argc, char *argv[] ) {
 	N = 8;												// defaults

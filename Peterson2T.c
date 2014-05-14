@@ -16,10 +16,6 @@ static void *Worker( void *arg ) {
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		entry = 0;
 		while ( stop == 0 ) {
-#ifdef FAST
-			id = startpoint( cnt );						// different starting point each experiment
-			cnt = cycleUp( cnt, NoStartPoints );
-#endif // FAST
 			if ( id == 0 ) {
 				temp = Q[1];
 				Q[0] = temp == Z ? T : (temp == T ? T : F);
@@ -39,6 +35,10 @@ static void *Worker( void *arg ) {
 			} // for
 			CriticalSection( id );
 			Q[id] = Z;
+#ifdef FAST
+			id = startpoint( cnt );						// different starting point each experiment
+			cnt = cycleUp( cnt, NoStartPoints );
+#endif // FAST
 			entry += 1;
 		} // while
 #ifdef FAST

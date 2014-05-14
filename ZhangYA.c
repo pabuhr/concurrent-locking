@@ -18,10 +18,6 @@ static void *Worker( void *arg ) {
 		high = Clog2( N );								// maximal depth of binary tree
 		//printf( "id:%d high:%d\n", id, high );
 		while ( stop == 0 ) {
-#ifdef FAST
-			id = startpoint( cnt );						// different starting point each experiment
-			cnt = cycleUp( cnt, NoStartPoints );
-#endif // FAST
 			for ( j = 0; j < high; j += 1 ) {
 				ridi = id >> j;							// round id for intent
 				ridt = ridi >> 1;						// round id for turn
@@ -54,6 +50,10 @@ static void *Worker( void *arg ) {
 					p[j][rival] = 2;
 				}
 			} // while
+#ifdef FAST
+			id = startpoint( cnt );						// different starting point each experiment
+			cnt = cycleUp( cnt, NoStartPoints );
+#endif // FAST
 			entry += 1;
 		} // while
 #ifdef FAST

@@ -18,10 +18,6 @@ static void *Worker( void *arg ) {
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		entry = 0;
 		while ( stop == 0 ) {
-#ifdef FAST
-			id = startpoint( cnt );						// different starting point each experiment
-			cnt = cycleUp( cnt, NoStartPoints );
-#endif // FAST
 			flag[id] = 1;
 			Fence();									// force store before more loads
 			for ( j = 0; j < N; j += 1 )				// wait until doors open
@@ -47,6 +43,10 @@ static void *Worker( void *arg ) {
 			for ( j = id + 1; j < N; j += 1 )			// wait for all threads in waiting room
 				await( flag[j] < 2 || flag[j] > 3 );	//    to pass through door 2
 			flag[id] = 0;
+#ifdef FAST
+			id = startpoint( cnt );						// different starting point each experiment
+			cnt = cycleUp( cnt, NoStartPoints );
+#endif // FAST
 			entry += 1;
 		} // while
 #ifdef FAST

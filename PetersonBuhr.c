@@ -70,10 +70,6 @@ static void *Worker( void *arg ) {
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		entry = 0;
 		while ( stop == 0 ) {
-#ifdef FAST
-			id = startpoint( cnt );						// different starting point each experiment
-			cnt = cycleUp( cnt, NoStartPoints );
-#endif // FAST
 			for ( s = 0; s <= level; s += 1 ) {			// entry protocol
 				binary_prologue( state[s].es, state[s].ns );
 			} // for
@@ -81,6 +77,10 @@ static void *Worker( void *arg ) {
 			for ( s = level; s >= 0; s -= 1 ) {			// exit protocol, reverse order
 				binary_epilogue( state[s].es, state[s].ns );
 			} // for
+#ifdef FAST
+			id = startpoint( cnt );						// different starting point each experiment
+			cnt = cycleUp( cnt, NoStartPoints );
+#endif // FAST
 			entry += 1;
 		} // while
 #ifdef FAST

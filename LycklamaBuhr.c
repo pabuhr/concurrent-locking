@@ -17,10 +17,6 @@ static void *Worker( void *arg ) {
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		entry = 0;
 		while ( stop == 0 ) {
-#ifdef FAST
-			id = startpoint( cnt );						// different starting point each experiment
-			cnt = cycleUp( cnt, NoStartPoints );
-#endif // FAST
 			c[id] = 1;									// stage 1, establish FCFS
 			Fence();									// force store before more loads
 			for ( j = 0; j < N; j += 1 )				// copy turn values
@@ -45,6 +41,10 @@ static void *Worker( void *arg ) {
 				while ( intents[j] != 0 ) Pause();
 			CriticalSection( id );
 			v[id] = intents[id] = 0;					// exit protocol
+#ifdef FAST
+			id = startpoint( cnt );						// different starting point each experiment
+			cnt = cycleUp( cnt, NoStartPoints );
+#endif // FAST
 			entry += 1;
 		} // while
 #ifdef FAST

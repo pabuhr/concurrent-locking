@@ -68,14 +68,16 @@ static void *Worker( void *arg ) {
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		entry = 0;
+			id = startpoint( cnt );						// different starting point each experiment
+			cnt = cycleUp( cnt, NoStartPoints );
 		while ( stop == 0 ) {
+			mcs_lock( &lock, &node );
+			CriticalSection( id );
+			mcs_unlock( &lock, &node );
 #ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
 			cnt = cycleUp( cnt, NoStartPoints );
 #endif // FAST
-			mcs_lock( &lock, &node );
-			CriticalSection( id );
-			mcs_unlock( &lock, &node );
 			entry += 1;
 		} // while
 #ifdef FAST

@@ -14,10 +14,6 @@ static void *Worker( void *arg ) {
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		entry = 0;
 		while ( stop == 0 ) {
-#ifdef FAST
-			id = startpoint( cnt );						// different starting point each experiment
-			cnt = cycleUp( cnt, NoStartPoints );
-#endif // FAST
 		  L0: control[id] = WantIn;						// entry protocol
 			Fence();									// force store before more loads
 		  L1: for ( int j = turn; j != id; j = cycleDown( j, N ) )
@@ -31,6 +27,10 @@ static void *Worker( void *arg ) {
 			if ( control[turn] == DontWantIn || turn == id ) // exit protocol
 				turn = cycleDown( turn, N );
 			control[id] = DontWantIn;
+#ifdef FAST
+			id = startpoint( cnt );						// different starting point each experiment
+			cnt = cycleUp( cnt, NoStartPoints );
+#endif // FAST
 			entry += 1;
 		} // while
 #ifdef FAST

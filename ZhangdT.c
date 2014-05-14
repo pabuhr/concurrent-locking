@@ -22,11 +22,6 @@ static void *Worker( void *arg ) {
 		j = 0;
 		l = id;
 		while ( stop == 0 ) {
-#ifdef FAST
-			id = startpoint( cnt );						// different starting point each experiment
-			cnt = cycleUp( cnt, NoStartPoints );
-			l = id;
-#endif // FAST
 			k = id / Degree;
 			len = N;
 			while ( j < high ) {
@@ -56,6 +51,11 @@ static void *Worker( void *arg ) {
 				l = id / pow2;
 				x[j][l] = 0;
 			} // while
+#ifdef FAST
+			id = startpoint( cnt );						// different starting point each experiment
+			cnt = cycleUp( cnt, NoStartPoints );
+			l = id;
+#endif // FAST
 			entry += 1;
 		} // while
 #ifdef FAST

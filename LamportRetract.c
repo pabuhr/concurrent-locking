@@ -14,10 +14,6 @@ static void *Worker( void *arg ) {
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		entry = 0;
 		while ( stop == 0 ) {
-#ifdef FAST
-			id = startpoint( cnt );						// different starting point each experiment
-			cnt = cycleUp( cnt, NoStartPoints );
-#endif // FAST
 		  L: intents[id] = WantIn;
 			Fence();									// force store before more loads
 			for ( int j = 0; j < id; j += 1 ) {			// check if thread with higher id wants in
@@ -33,6 +29,10 @@ static void *Worker( void *arg ) {
 				while ( intents[j] == WantIn ) Pause();
 			CriticalSection( id );						// critical section
 			intents[id] = DontWantIn;					// exit protocol
+#ifdef FAST
+			id = startpoint( cnt );						// different starting point each experiment
+			cnt = cycleUp( cnt, NoStartPoints );
+#endif // FAST
 			entry += 1;
 		} // while
 #ifdef FAST

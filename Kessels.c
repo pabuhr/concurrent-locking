@@ -45,10 +45,6 @@ static void *Worker( void *arg ) {
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		entry = 0;
 		while ( stop == 0 ) {
-#ifdef FAST
-			id = startpoint( cnt );						// different starting point each experiment
-			cnt = cycleUp( cnt, NoStartPoints );
-#endif // FAST
 #if defined( __sparc )
 			__asm__ volatile( "" : : : "memory" );
 #endif // __sparc
@@ -76,6 +72,10 @@ static void *Worker( void *arg ) {
 //				binary_epilogue( n & 1, &t[n >> 1] );
 				binary_epilogue( e[n], &t[n] );
 			} // for
+#ifdef FAST
+			id = startpoint( cnt );						// different starting point each experiment
+			cnt = cycleUp( cnt, NoStartPoints );
+#endif // FAST
 			entry += 1;
 		} // while
 #ifdef FAST
