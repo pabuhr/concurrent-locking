@@ -1,5 +1,13 @@
 #!/bin/sh -
 
+# In sudo:
+#   for pid in `cat /cpuset/tasks` ; do echo ${pid} > /cpuset/sys/tasks ; done
+#   echo $$ > /cpuset/cg32_64/tasks
+#   for pid in `cat /cpuset/sys/tasks` ; do echo ${pid} > /cpuset/tasks ; done
+#   echo 0-31 > /cpuset/sys/cpus
+#   echo 1 > /cpuset/exp/cpu_exclusive
+#   echo 1 > /cpuset/sys/cpu_exclusive
+
 # IRQs
 #   /proc/irq and /proc/interrupts
 #   /etc/default/irqbalance
@@ -19,7 +27,7 @@
 #   ... for each even CPU (may work in pairs)
 #   cpufreq-set --cpu 0 --min 1000000
 
-Time=20 	# R x Time = length of experiment
+Time=2 	# R x Time = length of experiment
 N=32		# 1 to N threads tested
 
 # optional argument ${1} is the degree of the tree (d-ary) for Zhang

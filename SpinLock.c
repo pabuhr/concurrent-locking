@@ -1,12 +1,19 @@
-volatile TYPE lock CALIGN;
+static volatile TYPE lock
+#if defined( __i386 ) || defined( __x86_64 )
+	__attribute__(( aligned (128) ));					// Intel recommendation
+#elif defined( __sparc )
+	CALIGN;
+#else
+    #error unsupported architecture
+#endif
 
 void spin_lock( volatile TYPE *lock ) {
 	enum { SPIN_START = 4, SPIN_END = 64 * 1024, };
 	unsigned int spin = SPIN_START;
 
 	for ( ;; ) {
-		if ( unlikely( *lock == 0 && __sync_lock_test_and_set( lock, 1 ) == 0 ) ) break;
-		for ( int i = 0; i < spin; i += 1 ) Pause();	// exponential spin
+	  if ( *lock == 0 && __sync_lock_test_and_set( lock, 1 ) == 0 ) break;
+		for ( unsigned int i = 0; i < spin; i += 1 ) Pause();	// exponential spin
 		spin += spin;									// powers of 2
 		if ( spin > SPIN_END ) spin = SPIN_START;		// prevent overflow
 	} // for
@@ -17,7 +24,7 @@ void spin_unlock( volatile TYPE *lock ) {
 } // spin_unlock
 
 static void *Worker( void *arg ) {
-	unsigned int id = (size_t)arg;
+	TYPE id = (size_t)arg;
 	uint64_t entry;
 #ifdef FAST
 	unsigned int cnt = 0, oid = id;

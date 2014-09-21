@@ -1,10 +1,10 @@
 // Aravind, J. Parallel Distrib. Comput. 73 (2013), Fig. 3, p. 1033.
 // Moved turn[id] = 0; after the critical section for performance reasons.
 
-volatile TYPE *intents, *turn;
+static volatile TYPE *intents CALIGN, *turn CALIGN;
 
 static void *Worker( void *arg ) {
-	unsigned int id = (size_t)arg;
+	TYPE id = (size_t)arg;
 	uint64_t entry;
 #ifdef FAST
 	unsigned int cnt = 0, oid = id;
@@ -61,11 +61,11 @@ static void *Worker( void *arg ) {
 } // Worker
 
 void ctor() {
-	intents = Allocator( sizeof(volatile TYPE) * N );
+	intents = Allocator( sizeof(typeof(intents[0])) * N );
 	for ( int i = 0; i < N; i += 1 ) {
 		intents[i] = 0;
 	} // for
-	turn = Allocator( sizeof(volatile TYPE) * N );
+	turn = Allocator( sizeof(typeof(turn[0])) * N );
 	for ( int i = 0; i < N; i += 1 ) {
 		turn[i] = 0;
 	} // for

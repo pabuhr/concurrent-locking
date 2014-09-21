@@ -7,7 +7,7 @@ static pthread_t arbiter;
 // it advances to the next id, and cycles through the other workers, before it can reach id again.
 
 static void *Worker( void *arg ) {
-	unsigned int id = (size_t)arg;
+	TYPE id = (size_t)arg;
 	uint64_t entry;
 #ifdef FAST
 	unsigned int cnt = 0, oid = id;
@@ -55,8 +55,8 @@ void *Arbiter( void *arg ) {
 } // Arbiter
 
 void ctor() {
-	intents = Allocator( sizeof(volatile TYPE) * N );
-	serving = Allocator( sizeof(volatile TYPE) * N );
+	intents = Allocator( sizeof(typeof(intents[0])) * N );
+	serving = Allocator( sizeof(typeof(serving[0])) * N );
 	for ( int i = 0; i < N; i += 1 ) {					// initialize shared data
 		intents[i] = serving[i] = 0;
 	} // for

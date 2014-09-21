@@ -2,10 +2,11 @@
 // 10(3):137. Letter to the Editor.
 
 enum Intent { DontWantIn, WantIn, EnterCS };
-volatile TYPE *control, turn;
+
+static volatile TYPE *control CALIGN, turn CALIGN;
 
 static void *Worker( void *arg ) {
-	unsigned int id = (size_t)arg;
+	TYPE id = (size_t)arg;
 #ifdef FAST
 	unsigned int cnt = 0, oid = id;
 #endif // FAST
@@ -45,7 +46,7 @@ static void *Worker( void *arg ) {
 } // Worker
 
 void ctor() {
-	control = Allocator( sizeof(volatile TYPE) * N );
+	control = Allocator( sizeof(typeof(control[0])) * N );
 	for ( int i = 0; i < N; i += 1 ) {					// initialize shared data
 		control[i] = DontWantIn;
 	} // for

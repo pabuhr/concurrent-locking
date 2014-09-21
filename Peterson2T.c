@@ -5,7 +5,7 @@ static volatile TYPE Q[2];
 enum { Z, F, T };
 
 static void *Worker( void *arg ) {
-	unsigned int id = (size_t)arg;
+	TYPE id = (size_t)arg;
 	uint64_t entry;
 #ifdef FAST
 	unsigned int cnt = 0, oid = id;

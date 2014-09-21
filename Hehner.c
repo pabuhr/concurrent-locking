@@ -3,10 +3,10 @@
 
 enum { MAX_TICKET = INTPTR_MAX };
 
-volatile TYPE *ticket;
+static volatile TYPE *ticket CALIGN;
 
 static void *Worker( void *arg ) {
-	unsigned int id = (size_t)arg;
+	TYPE id = (size_t)arg;
 	uint64_t entry;
 #ifdef FAST
 	unsigned int cnt = 0, oid = id;
@@ -59,7 +59,7 @@ static void *Worker( void *arg ) {
 } // Worker
 
 void ctor() {
-	ticket = Allocator( sizeof(volatile TYPE) * N );
+	ticket = Allocator( sizeof(typeof(ticket[0])) * N );
 	for ( int i = 0; i < N; i += 1 ) {					// initialize shared data
 		ticket[i] = MAX_TICKET;
 	} // for

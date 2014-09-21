@@ -1,8 +1,8 @@
-volatile TYPE **x, **c;
+static volatile TYPE **x CALIGN, **c CALIGN;
 int lN;
 
 static void *Worker( void *arg ) {
-	unsigned int id = (size_t)arg;
+	TYPE id = (size_t)arg;
 	uint64_t entry;
 #ifdef FAST
 	unsigned int cnt = 0, oid = id;
@@ -83,13 +83,13 @@ void ctor() {
 	lN = N;
 	if ( N % 2 == 1 ) lN += 1;
 
-	x = Allocator( sizeof(volatile TYPE *) * lN );
+	x = Allocator( sizeof(typeof(x[0])) * lN );
 	for ( int i = 0; i < lN; i += 1 ) {
-		x[i] = Allocator( sizeof(TYPE) * lN );
+		x[i] = Allocator( sizeof(typeof(x[0][0])) * lN );
 	} // for
-	c = Allocator( sizeof(volatile TYPE *) * lN );
+	c = Allocator( sizeof(typeof(c[0])) * lN );
 	for ( int i = 0; i < lN; i += 1 ) {
-		c[i] = Allocator( sizeof(TYPE) * lN );
+		c[i] = Allocator( sizeof(typeof(c[0][0])) * lN );
 	} // for
 	for ( int i = 0; i < lN; i += 1 ) {					// initialize shared data
 		for ( int j = 0; j < lN; j += 1 ) {

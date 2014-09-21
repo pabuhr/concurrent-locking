@@ -20,7 +20,7 @@ static inline int min( int a, int b ) { return a < b ? a : b; }
 static int depth, mask;
 static volatile Tuple *Q;
 
-uint32_t QMAX( unsigned int id, int k ) {
+uint32_t QMAX( TYPE id, int k ) {
 	int low = ((id >> (k - 1)) ^ 1) << (k - 1);
 	int high = min( low | mask >> (depth - (k - 1)), N - 1 );
 	Tuple opp;
@@ -32,7 +32,7 @@ uint32_t QMAX( unsigned int id, int k ) {
 } // QMAX
 
 static void *Worker( void *arg ) {
-	unsigned int id = (size_t)arg;
+	TYPE id = (size_t)arg;
 	uint64_t entry;
 #ifdef FAST
 	unsigned int cnt = 0, oid = id;
@@ -87,7 +87,7 @@ void ctor() {
 	depth = Clog2( N );									// maximal depth of binary tree
 	int width = 1 << depth;								// maximal width of binary tree
 	mask = width - 1;									// 1 bits for masking
-	Q = Allocator( sizeof(volatile Tuple) * N );
+	Q = Allocator( sizeof(typeof(Q[0])) * N );
 	for ( int i = 0; i < N; i += 1 ) {					// initialize shared data
 		Q[i].atom = (Tuple){ .tuple = {0, 0} }.atom;
 	} // for

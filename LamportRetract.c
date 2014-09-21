@@ -2,10 +2,11 @@
 // Fig. 1, p. 337
 
 enum Intent { DontWantIn, WantIn };
-static volatile TYPE *intents;							// shared
+
+static volatile TYPE *intents CALIGN;					// shared
 
 static void *Worker( void *arg ) {
-	unsigned int id = (size_t)arg;
+	TYPE id = (size_t)arg;
 	uint64_t entry;
 #ifdef FAST
 	unsigned int cnt = 0, oid = id;
@@ -47,7 +48,7 @@ static void *Worker( void *arg ) {
 } // Worker
 
 void ctor() {
-	intents = Allocator( sizeof(volatile TYPE) * N );
+	intents = Allocator( sizeof(typeof(intents[0])) * N );
 	for ( int i = 0; i < N; i += 1 ) {					// initialize shared data
 		intents[i] = DontWantIn;
 	} // for

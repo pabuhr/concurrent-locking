@@ -2,13 +2,13 @@
 // Shared-Memory Multiprocessors, Parallel Distributed Technology: Systems Applications, IEEE, 1996, 4(1), Figure 14,
 // p. 37
 
-volatile TYPE **x;
+static volatile TYPE **x CALIGN;
 
 #define min( x, y ) (x < y ? x : y)
 #define logx( N, b ) (log(N) / log(b))
 
 static void *Worker( void *arg ) {
-	unsigned int id = (size_t)arg;
+	TYPE id = (size_t)arg;
 	uint64_t entry;
 #ifdef FAST
 	unsigned int cnt = 0, oid = id;
@@ -75,9 +75,9 @@ void ctor() {
 		exit( EXIT_FAILURE );
 	} // if
 
-	x = Allocator( sizeof(volatile TYPE *) * N );
+	x = Allocator( sizeof(typeof(x[0])) * N );
 	for ( int i = 0; i < N; i += 1 ) {
-		x[i] = Allocator( sizeof(TYPE) * N );
+		x[i] = Allocator( sizeof(typeof(x[0][0])) * N );
 	} // for
 	for ( int i = 0; i < N; i += 1 ) {					// initialize shared data
 		for ( int j = 0; j < N; j += 1 ) {

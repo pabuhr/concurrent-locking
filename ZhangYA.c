@@ -2,10 +2,10 @@
 // Shared-Memory Multiprocessors, Parallel Distributed Technology: Systems Applications, IEEE, 1996, 4(1), Figure 5,
 // p. 31
 
-volatile TYPE **c, **p, **t;
+static volatile TYPE **c CALIGN, **p CALIGN, **t CALIGN;
 
 static void *Worker( void *arg ) {
-	unsigned int id = (size_t)arg;
+	TYPE id = (size_t)arg;
 	uint64_t entry;
 #ifdef FAST
 	unsigned int cnt = 0, oid = id;
@@ -68,13 +68,13 @@ static void *Worker( void *arg ) {
 } // Worker
 
 void ctor() {
-	c = Allocator( sizeof(volatile TYPE *) * N );
-	p = Allocator( sizeof(volatile TYPE *) * N );
-	t = Allocator( sizeof(volatile TYPE *) * N );
+	c = Allocator( sizeof(typeof(c[0])) * N );
+	p = Allocator( sizeof(typeof(p[0])) * N );
+	t = Allocator( sizeof(typeof(t[0])) * N );
 	for ( int i = 0; i < N; i += 1 ) {
-		c[i] = Allocator( sizeof(TYPE) * (N+1) );
-		p[i] = Allocator( sizeof(TYPE) * (N+1) );
-		t[i] = Allocator( sizeof(TYPE) * (N+1) );
+		c[i] = Allocator( sizeof(typeof(c[0][0])) * (N+1) );
+		p[i] = Allocator( sizeof(typeof(p[0][0])) * (N+1) );
+		t[i] = Allocator( sizeof(typeof(t[0][0])) * (N+1) );
 		for ( int j = 0; j < (N+1); j += 1 ) {
 			c[i][j] = -1;
 			p[i][j] = 0;

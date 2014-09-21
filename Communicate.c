@@ -1,7 +1,7 @@
-volatile TYPE turn;
+static volatile TYPE turn CALIGN;
 
 static void *Worker( void *arg ) {
-	const unsigned int id = (size_t)arg;
+	const TYPE id = (size_t)arg;
 	uint64_t entry;
 
 	for ( int r = 0; r < RUNS; r += 1 ) {

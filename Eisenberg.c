@@ -2,10 +2,11 @@
 // CACM, 1972, 15(11), p. 999
 
 enum Intent { DontWantIn, WantIn, EnterCS };
-volatile TYPE *control, HIGH;
+
+static volatile TYPE *control CALIGN, HIGH CALIGN;
 
 static void *Worker( void *arg ) {
-	unsigned int id = (size_t)arg;
+	TYPE id = (size_t)arg;
 	uint64_t entry;
 #ifdef FAST
 	unsigned int cnt = 0, oid = id;
@@ -50,7 +51,7 @@ static void *Worker( void *arg ) {
 } // Worker
 
 void ctor() {
-	control = Allocator( sizeof(volatile TYPE) * N );
+	control = Allocator( sizeof(typeof(control[0])) * N );
 	for ( int i = 0; i < N; i += 1 ) {					// initialize shared data
 		control[i] = DontWantIn;
 	} // for

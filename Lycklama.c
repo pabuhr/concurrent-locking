@@ -1,10 +1,10 @@
 // Edward A. Lycklama and Vassos Hadzilacos, A First-Come-First-Served Mutual-Exclusion Algorithm with Small
 // Communication Variables, TOPLAS, 13(4), 1991, Fig. 4, p. 569
 
-volatile TYPE *c, *v, *intents, **turn;
+static volatile TYPE *c CALIGN, *v CALIGN, *intents CALIGN, **turn CALIGN;
 
 static void *Worker( void *arg ) {
-	unsigned int id = (size_t)arg;
+	TYPE id = (size_t)arg;
 	uint64_t entry;
 #ifdef FAST
 	unsigned int cnt = 0, oid = id;
@@ -61,12 +61,12 @@ static void *Worker( void *arg ) {
 } // Worker
 
 void ctor() {
-	c = Allocator( sizeof(volatile TYPE) * N );
-	v = Allocator( sizeof(volatile TYPE) * N );
-	intents = Allocator( sizeof(volatile TYPE) * N );
-	turn = Allocator( sizeof(volatile TYPE *) * N );
+	c = Allocator( sizeof(typeof(c[0])) * N );
+	v = Allocator( sizeof(typeof(v[0])) * N );
+	intents = Allocator( sizeof(typeof(intents[0])) * N );
+	turn = Allocator( sizeof(typeof(turn[0])) * N );
 	for ( int i = 0; i < N; i += 1 ) {
-		turn[i] = Allocator( sizeof(TYPE) * 2 );
+		turn[i] = Allocator( sizeof(typeof(turn[0][0])) * 2 );
 	} // for
 	for ( int i = 0; i < N; i += 1 ) {
 		c[i] = v[i] = intents[i] = 0;

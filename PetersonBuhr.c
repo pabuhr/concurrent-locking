@@ -1,27 +1,30 @@
 // Static and dynamic allocation of tables available.
 
-typedef struct {
-	TYPE Q[2], R, PAD;									// make structure even multiple of word size by padding
+typedef struct CALIGN {
+	TYPE Q[2], R;
 } Token;
 
-typedef struct {
+typedef struct CALIGN {
 	TYPE es;											// left/right opponent
-	volatile Token *ns;									// pointer to path node from leaf to root
+	Token *ns;											// pointer to path node from leaf to root
 } Tuple;
-static Tuple **states;									// handle 64 threads with maximal tree depth of 6 nodes (lg 64)
-static int *levels;										// minimal level for binary tree
-//static Tuple states[64][6];								// handle 64 threads with maximal tree depth of 6 nodes (lg 64)
-//static int levels[64] = { -1 };							// minimal level for binary tree
 
-static volatile Token *t;
+static Tuple **states CALIGN;							// handle N threads
+static int *levels CALIGN;								// minimal level for binary tree
+//static Tuple states[64][6] CALIGN;						// handle 64 threads with maximal tree depth of 6 nodes (lg 64)
+//static int levels[64] = { -1 } CALIGN;					// minimal level for binary tree
+static Token *t CALIGN;
+static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
 
 #define inv( c ) (1 - c)
+#define await( E ) while ( ! (E) ) Pause()
 
 static inline void binary_prologue( TYPE c, volatile Token *t ) {
+	TYPE other = inv( c );
 #if defined( DEKKER )
 	t->Q[c] = 1;
 	Fence();											// force store before more loads
-	while ( t->Q[inv( c )] ) {
+	while ( t->Q[other] ) {
 		if ( t->R == c ) {
 			t->Q[c] = 0;
 			Fence();									// force store before more loads
@@ -32,22 +35,41 @@ static inline void binary_prologue( TYPE c, volatile Token *t ) {
 			Pause();
 		} // if
 	} // while
+#elif defined( DEKKERWHH )
+	for ( ;; ) {
+		t->Q[c] = 1;
+		Fence();										// force store before more loads
+	  if ( ! t->Q[other] ) break;
+	  if ( t->R == c ) {
+			await( ! t->Q[other] );
+			break;
+		} // if
+		t->Q[c] = 0;
+		Fence();
+		await( t->R == c || ! t->Q[other] );
+	} // for
 #elif defined( TSAY )
 	t->Q[c] = 1;
 	t->R = c;
 	Fence();											// force store before more loads
-	if ( t->Q[inv( c )] ) while ( t->R == c ) Pause();	// busy wait
+	if ( t->Q[other] ) while ( t->R == c ) Pause();		// busy wait
 #else	// Peterson (default)
 	t->Q[c] = 1;
-	t->R = c;
+	t->R = c;											// RACE
 	Fence();											// force store before more loads
-	while ( t->Q[inv( c )] && t->R == c ) Pause();		// busy wait
+	while ( t->Q[other] && t->R == c ) Pause();			// busy wait
 #endif
 } // binary_prologue
 
 static inline void binary_epilogue( TYPE c, volatile Token *t ) {
 #if defined( DEKKER )
 	t->R = c;
+	t->Q[c] = 0;
+#elif defined( DEKKERWHH )
+	t->R = c;
+	if ( t->R == c ) {
+		t->R = inv( c );
+	} // if
 	t->Q[c] = 0;
 #elif defined( TSAY )
 	t->Q[c] = 0;
@@ -58,7 +80,7 @@ static inline void binary_epilogue( TYPE c, volatile Token *t ) {
 } // binary_epilogue
 
 static void *Worker( void *arg ) {
-	unsigned int id = (size_t)arg;
+	TYPE id = (size_t)arg;
 	uint64_t entry;
 #ifdef FAST
 	unsigned int cnt = 0, oid = id;
@@ -96,20 +118,20 @@ static void *Worker( void *arg ) {
 
 void __attribute__((noinline)) ctor() {
 	// element 0 not used
-	t = Allocator( sizeof(volatile Token) * N );
+	t = Allocator( sizeof(typeof(t[0])) * N );
 
 	// states[id][s].es indicates the left or right contender at a match.
 	// states[id][s].ns is the address of the structure that contains the match data.
 	// s ranges from 0 to the tree level of a start point (leaf) in a minimal binary tree.
 	// levels[id] is level of start point minus 1 so bi-directional tree traversal is uniform.
 
-	states = Allocator( sizeof(Tuple *) * N );
-	levels = Allocator( sizeof(int) * N );
+	states = Allocator( sizeof(typeof(states[0])) * N );
+	levels = Allocator( sizeof(typeof(levels[0])) * N );
 	levels[0] = -1;										// default for N=1
-	for ( unsigned int id = 0; id < N; id += 1 ) {
+	for ( int id = 0; id < N; id += 1 ) {
 		t[id].Q[0] = t[id].Q[1] = 0;
 		unsigned int start = N + id, level = Log2( start );
-		states[id] = Allocator( sizeof(Tuple) * level );
+		states[id] = Allocator( sizeof(typeof(states[0][0])) * level );
 		levels[id] = level - 1;
 		for ( unsigned int s = 0; start > 1; start >>= 1, s += 1 ) {
 			states[id][s].es = start & 1;

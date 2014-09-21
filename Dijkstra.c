@@ -1,9 +1,9 @@
 // Edsger W. Dijkstra, Solution of a Problem in Concurrent Programming Control, CACM, 8(9), 1965, p. 569
 
-volatile TYPE *b, *c, turn;
+static volatile TYPE *b CALIGN, *c CALIGN, turn CALIGN;
 
 static void *Worker( void *arg ) {
-	unsigned int id = (size_t)arg + 1;					// id 0 => don't-want-in
+	TYPE id = (size_t)arg + 1;							// id 0 => don't-want-in
 	uint64_t entry;
 #ifdef FAST
 	unsigned int cnt = 0, oid = id;
@@ -45,8 +45,8 @@ static void *Worker( void *arg ) {
 } // Worker
 
 void ctor() {
-	b = Allocator( sizeof(volatile TYPE) * (N + 1) );
-	c = Allocator( sizeof(volatile TYPE) * (N + 1) );
+	b = Allocator( sizeof(typeof(b[0])) * (N + 1) );
+	c = Allocator( sizeof(typeof(c[0])) * (N + 1) );
 	for ( int i = 0; i <= N; i += 1 ) {					// initialize shared data
 		c[i] = b[i] = 1;
 	} // for

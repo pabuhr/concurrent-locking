@@ -1,10 +1,9 @@
 // Leslie Lamport, A New Solution of Dijkstra's Concurrent Programming Problem, CACM, 1974, 17(8), p. 454
 
-volatile TYPE *choosing;
-volatile TYPE *ticket;
+volatile TYPE *choosing CALIGN, *ticket CALIGN;			// no "static" on SPARC
 
 static void *Worker( void *arg ) {
-	unsigned int id = (size_t)arg;
+	TYPE id = (size_t)arg;
 	uint64_t entry;
 #ifdef FAST
 	unsigned int cnt = 0, oid = id;
@@ -18,7 +17,7 @@ static void *Worker( void *arg ) {
 			Fence();									// force store before more loads
 			TYPE max = 0;								// O(N) search for largest ticket
 			for ( int j = 0; j < N; j += 1 ) {
-				TYPE v = ticket[j];						// could change so copy
+				TYPE v = ticket[j];						// could change so must copy
 				if ( max < v ) max = v;
 			} // for
 #if 1
@@ -65,8 +64,8 @@ static void *Worker( void *arg ) {
 } // Worker
 
 void ctor() {
-	choosing = Allocator( sizeof(volatile TYPE) * N );
-	ticket = Allocator( sizeof(volatile TYPE) * N );
+	choosing = Allocator( sizeof(typeof(choosing[0])) * N );
+	ticket = Allocator( sizeof(typeof(ticket[0])) * N );
 	for ( int i = 0; i < N; i += 1 ) {					// initialize shared data
 		choosing[i] = ticket[i] = 0;
 	} // for

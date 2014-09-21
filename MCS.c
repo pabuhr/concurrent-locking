@@ -1,29 +1,8 @@
 // John M. Mellor-Crummey and Michael L. Scott, Algorithm for Scalable Synchronization on Shared-Memory Multiprocessors,
 // ACM Transactions on Computer Systems, 9(1), 1991, Fig. 6, p. 30
 
-#if defined( __sparc )
-// gcc atomic-intrinsic inserts unnecessary MEMBAR
-static inline void *SWAP32( volatile void *ptr, void *v ) {
-	__asm__ __volatile ("swap [%[ADR]],%[RV]"
-						: [RV] "+r" (v)
-						: [ADR] "r" (ptr)
-						: "memory" );
-	return v;
-}
-
-#define CAS32( ptr, cmp, set )					\
-	({  typeof(set) tt = (set);					\
-		__asm__ __volatile__ (					\
-			"cas [%2],%3,%0"					\
-			: "=&r" (tt)						\
-			: "0" (tt), "r" (ptr), "r" (cmp)	\
-			: "memory" );						\
-		tt ;									\
-	})
-#endif
-
 typedef struct mcs_node MCS_node;
-typedef struct mcs_node {
+typedef struct CALIGN mcs_node {
 	MCS_node *volatile next;
 	volatile TYPE spin;
 } *MCS_lock;
@@ -56,9 +35,10 @@ void mcs_unlock( MCS_lock *lock, MCS_node *node ) {
 } // mcs_unlock
 
 static MCS_lock lock CALIGN;
+static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
 
 static void *Worker( void *arg ) {
-	unsigned int id = (size_t)arg;
+	TYPE id = (size_t)arg;
 	uint64_t entry;
 #ifdef FAST
 	unsigned int cnt = 0, oid = id;

@@ -6,7 +6,7 @@ static volatile TYPE Q[2], R[2];
 #define plus( a, b ) ((a + b) % 2)
 
 static void *Worker( void *arg ) {
-	const unsigned int id = (size_t)arg;
+	const TYPE id = (size_t)arg;
 	uint64_t entry;
 
 	size_t rv = (size_t) &rv ; 

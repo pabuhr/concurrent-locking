@@ -1,11 +1,12 @@
 // Gadi Taubenfeld, Synchronization Algorithms and Concurrent Programming, Pearson/Prentice Hall, 2006, p. 38
 
-volatile TYPE **intents;								// triangular matrix of intents
-volatile TYPE **turns;									// triangular matrix of turns
-unsigned int depth;
+static volatile TYPE **intents CALIGN;					// triangular matrix of intents
+static volatile TYPE **turns CALIGN;					// triangular matrix of turns
+static unsigned int depth CALIGN;
+static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
 
 static void *Worker( void *arg ) {
-	unsigned int id = (size_t)arg;
+	TYPE id = (size_t)arg;
 	uint64_t entry;
 #ifdef FAST
 	unsigned int cnt = 0, oid = id;
@@ -15,7 +16,7 @@ static void *Worker( void *arg ) {
 		entry = 0;
 		while ( stop == 0 ) {
 #if defined( __sparc )
-			__asm__ volatile( "" : : : "memory" );
+			__asm__ __volatile__ ( "" : : : "memory" );
 #endif // __sparc
 			unsigned int node = id;
 			for ( int lv = 0; lv < depth; lv += 1 ) {	// entry protocol
@@ -50,15 +51,15 @@ static void *Worker( void *arg ) {
 void __attribute__((noinline)) ctor() {
 	depth = Clog2( N );									// maximal depth of binary tree
 	int width = 1 << depth;								// maximal width of binary tree
-	intents = Allocator( sizeof(volatile TYPE *) * depth );	// allocate matrix columns
-	turns = Allocator( sizeof(volatile TYPE *) * depth );
+	intents = Allocator( sizeof(typeof(intents[0])) * depth ); // allocate matrix columns
+	turns = Allocator( sizeof(typeof(turns[0])) * depth );
 	for ( int r = 0; r < depth; r += 1 ) {				// allocate matrix rows
 		int size = width >> r;							// maximal row size
-		intents[r] = Allocator( sizeof(TYPE) * size );
+		intents[r] = Allocator( sizeof(typeof(intents[0][0])) * size );
 		for ( int c = 0; c < size; c += 1 ) {			// initial all intents to dont-want-in
 			intents[r][c] = 0;
 		} // for
-		turns[r] = Allocator( sizeof(TYPE) * (size >> 1) );	// half maximal row size
+		turns[r] = Allocator( sizeof(typeof(turns[0][0])) * (size >> 1) ); // half maximal row size
 	} // for
 } // ctor
 

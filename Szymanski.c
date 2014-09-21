@@ -2,12 +2,12 @@
 // Proceedings of the 2nd International Conference on Supercomputing, 1988, Figure 2, Page 624.
 // Waiting after CS can be moved before it.
 
-volatile TYPE *flag;
+static volatile TYPE *flag CALIGN;
 
 #define await( E ) while ( ! (E) ) Pause()
 
 static void *Worker( void *arg ) {
-	unsigned int id = (size_t)arg;
+	TYPE id = (size_t)arg;
 	uint64_t entry;
 #ifdef FAST
 	unsigned int cnt = 0, oid = id;
@@ -61,7 +61,7 @@ static void *Worker( void *arg ) {
 } // Worker
 
 void ctor() {
-	flag = Allocator( sizeof(volatile TYPE) * N );
+	flag = Allocator( sizeof(typeof(flag[0])) * N );
 	for ( int i = 0; i < N; i += 1 ) {					// initialize shared data
 		flag[i] = 0;
 	} // for

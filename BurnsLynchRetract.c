@@ -2,10 +2,11 @@
 // Annual Allerton Conference on Communications, Control and Computing, 1980, p. 836
 
 enum Intent { DontWantIn, WantIn };
-volatile TYPE *intents;									// shared
+
+static volatile TYPE *intents CALIGN;					// shared
 
 static void *Worker( void *arg ) {
-	const unsigned int id = (size_t)arg;
+	const TYPE id = (size_t)arg;
 	uint64_t entry;
 #ifdef FAST
 	unsigned int cnt = 0, oid = id;
@@ -22,7 +23,7 @@ static void *Worker( void *arg ) {
 			Fence();									// force store before more loads
 			for ( int j = 0; j < id; j += 1 )
 				if ( intents[j] == WantIn ) goto L0;
-		  L1: for ( j = id + 1; j < N; j += 1 )
+		  L1: for ( int j = id + 1; j < N; j += 1 )
 				if ( intents[j] == WantIn ) { Pause(); goto L1; }
 			CriticalSection( id );						// critical section
 			intents[id] = DontWantIn;					// exit protocol
@@ -44,7 +45,7 @@ static void *Worker( void *arg ) {
 } // Worker
 
 void ctor() {
-	intents = Allocator( sizeof(volatile TYPE) * N );
+	intents = Allocator( sizeof(typeof(intents[0])) * N );
 	for ( int i = 0; i < N; i += 1 ) {					// initialize shared data
 		intents[i] = DontWantIn;
 	} // for
@@ -56,5 +57,5 @@ void dtor() {
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -std=gnu99 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=BurnsLynchRetractIntent Harness.c -lpthread -lm" //
+// compile-command: "gcc -Wall -std=gnu99 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=BurnsLynchRetract Harness.c -lpthread -lm" //
 // End: //

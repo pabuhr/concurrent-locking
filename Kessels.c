@@ -1,15 +1,16 @@
 // Joep L. W. Kessels, Arbitration Without Common Modifiable Variables, Acta Informatica, 17(2), 1982, pp. 140-141
 
-typedef struct {
+typedef struct CALIGN {
 	TYPE Q[2],
 #if defined( PETERSON )
-		R, PAD;
+		R;
 #else // default Kessels' read race
 	R[2];
 #endif // PETERSON
 } Token;
 
-static volatile Token *t;
+static volatile Token *t CALIGN;
+static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
 
 #define inv( c ) (1 - c)
 #define plus( a, b ) ((a + b) & 1)
@@ -34,7 +35,7 @@ static inline void binary_epilogue( TYPE c, volatile Token *t ) {
 } // binary_epilogue
 
 static void *Worker( void *arg ) {
-	unsigned int id = (size_t)arg;
+	TYPE id = (size_t)arg;
 	uint64_t entry;
 #ifdef FAST
 	unsigned int cnt = 0, oid = id;
@@ -46,7 +47,7 @@ static void *Worker( void *arg ) {
 		entry = 0;
 		while ( stop == 0 ) {
 #if defined( __sparc )
-			__asm__ volatile( "" : : : "memory" );
+			__asm__ __volatile__ ( "" : : : "memory" );
 #endif // __sparc
 			n = N + id;
 			while ( n > 1 ) {							// entry protocol
@@ -65,7 +66,7 @@ static void *Worker( void *arg ) {
 			} // while
 			CriticalSection( id );
 #if defined( __sparc )
-			__asm__ volatile( "" : : : "memory" );
+			__asm__ __volatile__ ( "" : : : "memory" );
 #endif // __sparc
 			for ( n = 1; n < N; n = n + n + e[n] ) {	// exit protocol
 //				n = n + n + e[n];
@@ -91,7 +92,7 @@ static void *Worker( void *arg ) {
 
 void ctor() {
 	// element 0 not used
-	t = Allocator( sizeof(volatile Token) * N );
+	t = Allocator( sizeof(typeof(t[0])) * N );
 	for ( int i = 0; i < N; i += 1 ) {
 		t[i].Q[0] = t[i].Q[1] = 0;
 	} // for

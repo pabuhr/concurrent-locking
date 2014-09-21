@@ -5,7 +5,7 @@ enum Intent { DontWantIn, WantIn };
 static volatile TYPE intents[2] = { DontWantIn, DontWantIn }, last;
 
 static void *Worker( void *arg ) {
-    const unsigned int id = (size_t)arg;
+    const TYPE id = (size_t)arg;
     uint64_t entry;
 
 	int other = 1 - id;

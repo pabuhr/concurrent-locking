@@ -1,10 +1,11 @@
 // James E. Burns, Symmetry in Systems of Asynchronous Processes. 22nd Annual
 // Symposium on Foundations of Computer Science, 1981, Figure 2, p 170.
 
-volatile TYPE *flag, turn;
+static volatile TYPE *flag CALIGN, turn CALIGN;
+static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
 
 static void *Worker( void *arg ) {
-	unsigned int id = (size_t)arg;
+	TYPE id = (size_t)arg;
 	uint64_t entry;
 #ifdef FAST
 	unsigned int cnt = 0, oid = id;
@@ -16,7 +17,7 @@ static void *Worker( void *arg ) {
 		entry = 0;
 		while ( stop == 0 ) {
 #if defined( __sparc )
-			__asm__ volatile( "" : : : "memory" );
+			__asm__ __volatile__ ( "" : : : "memory" );
 #endif // __sparc
 		  L0: flag[id] = 1;								// entry protocol
 			turn = id;									// RACE
@@ -54,7 +55,7 @@ static void *Worker( void *arg ) {
 } // Worker
 
 void ctor() {
-	flag = Allocator( sizeof(volatile TYPE) * N );
+	flag = Allocator( sizeof(typeof(flag[0])) * N );
 	for ( int i = 0; i < N; i += 1 ) {					// initialize shared data
 		flag[i] = 0;
 	} // for

@@ -1,7 +1,7 @@
-pthread_mutex_t lock;
+pthread_mutex_t lock CALIGN;
 
 static void *Worker( void *arg ) {
-	unsigned int id = (size_t)arg;
+	TYPE id = (size_t)arg;
 	uint64_t entry;
 
 	for ( int r = 0; r < RUNS; r += 1 ) {

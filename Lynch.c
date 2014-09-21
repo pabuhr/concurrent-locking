@@ -7,7 +7,7 @@ static int depth, width, mask;
 static inline TYPE min( TYPE a, TYPE b ) { return a < b ? a : b; }
 
 static void *Worker( void *arg ) {
-	unsigned int id = (size_t)arg;
+	TYPE id = (size_t)arg;
 	uint64_t entry;
 #ifdef FAST
 	unsigned int cnt = 0, oid = id;
@@ -53,11 +53,11 @@ void ctor() {
 	depth = Clog2( N );									// maximal depth of binary tree
 	width = 1 << depth;									// maximal width of binary tree
 	mask = width - 1;									// 1 bits for masking
-	intents = Allocator( sizeof(volatile TYPE) * N );
+	intents = Allocator( sizeof(typeof(intents[0])) * N );
 	for ( int i = 0; i < N; i += 1 ) {					// initialize shared data
 		intents[i] = 0;
 	} // for
-	turns = Allocator( sizeof(volatile TYPE) * width );
+	turns = Allocator( sizeof(typeof(turns[0])) * width );
 } // ctor
 
 void dtor() {
