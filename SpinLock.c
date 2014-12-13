@@ -8,14 +8,21 @@ static volatile TYPE lock
 #endif
 
 void spin_lock( volatile TYPE *lock ) {
+#ifndef NOEXPBACK
 	enum { SPIN_START = 4, SPIN_END = 64 * 1024, };
 	unsigned int spin = SPIN_START;
+#endif // ! NOEXPBACK
 
-	for ( ;; ) {
+	for ( unsigned int i = 0;; i += 1 ) {
 	  if ( *lock == 0 && __sync_lock_test_and_set( lock, 1 ) == 0 ) break;
-		for ( unsigned int i = 0; i < spin; i += 1 ) Pause();	// exponential spin
-		spin += spin;									// powers of 2
+#ifndef NOEXPBACK
+		for ( unsigned int s = 0; s < spin; s += 1 ) Pause(); // exponential spin
+//		spin += spin;									// powers of 2
+		if ( i % 80 ) spin += spin;						// slowly increase by powers of 2
 		if ( spin > SPIN_END ) spin = SPIN_START;		// prevent overflow
+#else
+	    Pause();
+#endif // ! NOEXPBACK
 	} // for
 } // spin_lock
 

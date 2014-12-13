@@ -4,8 +4,8 @@
 enum { N = 8 };
 
 struct Taubenfeld : rl::test_suite<Taubenfeld, N> {
-	std::atomic<int> intents[N][N];						// triangular matrix of intents
-	std::atomic<int> turns[N][N];						// triangular matrix of turns
+	std::atomic<unsigned int> intents[N][N];			// triangular matrix of intents
+	std::atomic<unsigned int> turns[N][N];				// triangular matrix of turns
 	int depth;
 
 	rl::var<int> data;
@@ -22,19 +22,17 @@ struct Taubenfeld : rl::test_suite<Taubenfeld, N> {
 	} // before
 
 	void thread( int id ) {
-		int node, lr;
-
-		node = id;
-		for ( int l = 0; l < depth; l += 1 ) {			// entry protocol
-			lr = node & 1;								// round id for intent
-			node = node >> 1;							// round id for turn
-			intents[l][2 * node + lr]($) = 1;			// declare intent
-			turns[l][node]($) = lr;						// RACE
-			while ( ! ( intents[l][2 * node + (1 - lr)]($) == 0 || turns[l][node]($) == 1 - lr ) ) Pause();
+		unsigned int node = id;
+		for ( int lv = 0; lv < depth; lv += 1 ) {		// entry protocol
+			unsigned int lr = node & 1;					// round id for intent
+			node >>= 1;									// round id for turn
+			intents[lv][2 * node + lr]($) = 1;			// declare intent
+			turns[lv][node]($) = lr;					// RACE
+			while ( intents[lv][2 * node + (1 - lr)]($) == 1 && turns[lv][node]($) == lr ) Pause();
 		} // for
 		data($) = id + 1;								// critical section
-		for ( int l = depth - 1; l >= 0; l -= 1 ) {		// exit protocol
-			intents[l][id / (1 << l)]($) = 0;			// retract all intents in reverse order
+		for ( int lv = depth - 1; lv >= 0; lv -= 1 ) {	// exit protocol
+			intents[lv][id / (1 << lv)]($) = 0;			// retract all intents in reverse order
 		} // for
 	} // thread
 }; // Taubenfeld

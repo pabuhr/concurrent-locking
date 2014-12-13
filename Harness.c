@@ -308,11 +308,11 @@ void affinity( pthread_t pthreadid, unsigned int tid ) {
 #endif // 0
 #if 1
 #ifdef FAST
-	enum { offset = 35 };								// random CPU in upper range
+	enum { OFFSET = 35 };								// random CPU in upper range
 #else
-	enum { offset = 32 };								// upper range of cores away from core 0
+	enum { OFFSET = 32 };								// upper range of cores away from core 0
 #endif // FAST
-	cpu = tid + offset;
+	cpu = tid + OFFSET;
 #endif // 0
 	//printf( "%d\n", cpu );
 	CPU_SET( cpu, &mask );

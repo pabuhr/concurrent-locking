@@ -1,3 +1,9 @@
+#include <stdbool.h>
+
+#define inv( c ) ( (c) ^ 1 )
+
+#include "Binary.c"
+
 #ifdef TB
 
 static volatile TYPE **intents CALIGN;					// triangular matrix of intents
@@ -7,12 +13,8 @@ static unsigned int depth CALIGN;
 #else
 
 typedef struct CALIGN {
-	TYPE Q[2], R;
-} Token;
-
-typedef struct CALIGN {
-	TYPE es;											// left/right opponent
 	Token *ns;											// pointer to path node from leaf to root
+	TYPE es;											// left/right opponent
 } Tuple;
 
 static Tuple **states CALIGN;							// handle N threads
@@ -21,32 +23,17 @@ static int *levels CALIGN;								// minimal level for binary tree
 //static int levels[64] = { -1 } CALIGN;					// minimal level for binary tree
 static Token *t CALIGN;
 
-#define inv( c ) (1 - c)
-
-static inline void binary_prologue( TYPE c, volatile Token *t ) {
-	TYPE other = inv( c );
-	t->Q[c] = 1;
-	t->R = c;											// RACE
-	Fence();											// force store before more loads
-	while ( t->Q[other] && t->R == c ) Pause();			// busy wait
-} // binary_prologue
-
-static inline void binary_epilogue( TYPE c, volatile Token *t ) {
-	t->Q[c] = 0;
-} // binary_epilogue
-
 #endif // TB
 
 //======================================================
 
-#include <stdbool.h>
-
 static volatile TYPE *b CALIGN;
-static volatile TYPE x CALIGN, y CALIGN, bintents[2] CALIGN = { false, false }, last CALIGN;
+static volatile TYPE x CALIGN, y CALIGN;
+//static volatile TYPE bintents[2] CALIGN = { false, false }, last CALIGN;
+static volatile Token B; // = { { 0, 0 }, 0 };
 static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
 
-#define await( E ) while ( ! (E) ) Pause()
-
+#if 0
 static inline void entryBinary( bool b ) {
 	bool other = ! b;
 	bintents[b] = true;
@@ -58,6 +45,7 @@ static inline void entryBinary( bool b ) {
 static inline void exitBinary( bool b ) {
 	bintents[b] = false;
 } // exitBinary
+#endif
 
 
 static inline void entrySlow(
@@ -74,7 +62,6 @@ static inline void entrySlow(
 	for ( unsigned int lv = 0; lv < depth; lv += 1 ) {	// entry protocol
 		ridi = id >> lv;								// round id for intent
 		ridt = ridi >> 1;								// round id for turn
-// Comment out the next 5 lines to improve performance on x86 for FAST
 		intents[lv][ridi] = 1;							// declare intent
 		turns[lv][ridt] = ridi;							// RACE
 		Fence();										// force store before more loads
@@ -82,7 +69,6 @@ static inline void entrySlow(
 //		ridi = ridi >> 1;
 	} // for
 #else
-// Comment out the next 3 lines to improve performance on x86 for FAST
 	for ( int s = 0; s <= level; s += 1 ) {				// entry protocol
 		binary_prologue( state[s].es, state[s].ns );
 	} // for
@@ -108,7 +94,7 @@ static inline void exitSlow(
 } // exitSlow
 
 
-static inline bool entryFast( TYPE id ) {
+static inline TYPE entryFast( TYPE id ) {
 #if 0
 	if ( FASTPATH( y == N ) ) {
 		b[id] = true;
@@ -160,12 +146,12 @@ static inline void exitFast( TYPE id ) {
 } // exitFast
 
 
-static inline bool entryComb( TYPE id
+static inline TYPE entryComb( TYPE id
 #ifndef TB
 							  , int level, Tuple *state
 #endif // TB
 	) {
-	bool b = entryFast( id );
+	TYPE b = entryFast( id );
 	if ( ! b ) {
 		entrySlow(
 #ifdef TB
@@ -175,16 +161,18 @@ static inline bool entryComb( TYPE id
 #endif // TB
 			);
 	} // if
-	entryBinary( b );
+	//entryBinary( b );
+	binary_prologue( b, &B );
 	return b;
 } // entryComb
 
-static inline void exitComb( TYPE id, bool b
+static inline void exitComb( TYPE id, TYPE b
 #ifndef TB
 							 , int level, Tuple *state
 #endif // ! TB
 	) {
-	exitBinary( b );
+	//exitBinary( b );
+	binary_epilogue( b, &B );
 	if ( b )
 		exitFast( id );
 	else
@@ -213,7 +201,7 @@ static void *Worker( void *arg ) {
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		entry = 0;
 		while ( stop == 0 ) {
-			bool b = entryComb( id
+			TYPE b = entryComb( id
 #ifndef TB
 								, level, state
 #endif // ! TB

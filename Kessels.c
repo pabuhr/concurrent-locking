@@ -5,28 +5,29 @@ typedef struct CALIGN {
 #if defined( PETERSON )
 		R;
 #else // default Kessels' read race
-	R[2];
+		R[2];
 #endif // PETERSON
 } Token;
 
 static volatile Token *t CALIGN;
 static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
 
-#define inv( c ) (1 - c)
+#define inv( c ) ( (c) ^ 1 )
 #define plus( a, b ) ((a + b) & 1)
 
 static inline void binary_prologue( TYPE c, volatile Token *t ) {
+	TYPE other = inv( c );
 #if defined( PETERSON )
 	t->Q[c] = 1;
 	t->R = c;
 	Fence();											// force store before more loads
-	while ( t->Q[inv( c )] && t->R == c ) Pause();		// busy wait
+	while ( t->Q[other] && t->R == c ) Pause();			// busy wait
 #else // default Kessels' read race
 	t->Q[c] = 1;
 	Fence();											// force store before more loads
-	t->R[c] = plus( t->R[inv(c)], c );
+	t->R[c] = plus( t->R[other], c );
 	Fence();											// force store before more loads
-	while ( t->Q[inv( c )] && t->R[c] == plus( t->R[inv( c )], c ) ) Pause(); // busy wait
+	while ( t->Q[other] && t->R[c] == plus( t->R[other], c ) ) Pause(); // busy wait
 #endif // PETERSON
 } // binary_prologue
 

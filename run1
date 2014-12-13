@@ -1,12 +1,6 @@
 #!/bin/sh -
 
-# In sudo:
-#   for pid in `cat /cpuset/tasks` ; do echo ${pid} > /cpuset/sys/tasks ; done
-#   echo $$ > /cpuset/cg32_64/tasks
-#   for pid in `cat /cpuset/sys/tasks` ; do echo ${pid} > /cpuset/tasks ; done
-#   echo 0-31 > /cpuset/sys/cpus
-#   echo 1 > /cpuset/exp/cpu_exclusive
-#   echo 1 > /cpuset/sys/cpu_exclusive
+# sudo echo $PID > /cpuset/exp/tasks
 
 # IRQs
 #   /proc/irq and /proc/interrupts
@@ -27,16 +21,26 @@
 #   ... for each even CPU (may work in pairs)
 #   cpufreq-set --cpu 0 --min 1000000
 
-Time=2 	# R x Time = length of experiment
+Time=20 	# R x Time = length of experiment
 N=32		# 1 to N threads tested
 
-# optional argument ${1} is the degree of the tree (d-ary) for Zhang
+while [ ${#} -gt 0 ] ; do		# process command-line arguments
+    case "${1}" in
+	"Time="* | "N="* )
+	    eval ${1}
+	    ;;
+	* )
+	    # optional argument D is the degree of the tree (d-ary) for Zhang
+	    Zhang=${1}
+    esac
+    shift				# remove argument
+done
 
 rm -rf core
 
 T=1
 while [ ${T} -le ${N} ] ; do
-    ./a.out ${T} ${Time} ${1} # Zhang d-ary
+    ./a.out ${T} ${Time} ${Zhang}	# Zhang d-ary
     if [ -f core ] ; then
 	echo core generated for ${T} ${Time}
 	break

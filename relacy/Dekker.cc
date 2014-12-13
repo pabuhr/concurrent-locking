@@ -18,7 +18,7 @@ struct Dekker : rl::test_suite<Dekker, N> {
 	} // before
 
 	void thread( int id ) {
-		int other = 1 - id;
+		int other = id ^ 1;
 
 		intents[id]($) = WantIn;						// declare intent
 		while ( intents[other]($) == WantIn ) {

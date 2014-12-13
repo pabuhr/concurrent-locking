@@ -2,7 +2,8 @@
 
 static volatile TYPE Q[2], R[2];
 
-#define inv( c ) ((c + 1) % 2)
+//#define inv( c ) ((c + 1) % 2)
+#define inv( c ) ( ! (c) )
 #define plus( a, b ) ((a + b) % 2)
 
 static void *Worker( void *arg ) {

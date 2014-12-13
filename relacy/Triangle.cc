@@ -16,7 +16,7 @@ struct Triangle : rl::test_suite<Triangle, N> {
 	static Tuple states[64][6];							// handle 64 threads with maximal tree depth of 6 nodes (lg 64)
 	static int levels[64];								// minimal level for binary tree
 
-#   define inv( c ) (1 - c)
+#   define inv( c ) ( (c) ^ 1 )
 
 	void binary_prologue( int c, Token *t ) {
 		t->Q[c]($) = 1;
@@ -28,6 +28,18 @@ struct Triangle : rl::test_suite<Triangle, N> {
 		t->Q[c]($) = 0;
 	} // binary_epilogue
 
+	void binary( int id ) {
+		binary_prologue( id, &B );
+		//bintents[id]($) = true;
+		//last($) = false;
+		//await( ! bintents[id]($) || last($) );
+
+		data($) = id;									// critical section
+
+		//bintents[id]($) = false;
+		binary_epilogue( id, &B );
+	} // binary
+
 //======================================================
 
 #   define await( E ) while ( ! (E) ) Pause()
@@ -36,7 +48,8 @@ struct Triangle : rl::test_suite<Triangle, N> {
 
 //======================================================
 
-	std::atomic<int> bintents[2], last;
+	//std::atomic<int> bintents[2], last;
+	Token B;
 
 //======================================================
 
@@ -58,7 +71,8 @@ struct Triangle : rl::test_suite<Triangle, N> {
 		} // for
 		y($) = N;
 
-		bintents[0]($) = bintents[1]($) = false;
+		//bintents[0]($) = bintents[1]($) = false;
+		B.Q[0]($) = B.Q[1]($) = false;
 	} // before
 
 	void thread( int id ) {
@@ -79,13 +93,9 @@ struct Triangle : rl::test_suite<Triangle, N> {
 				await( y($) != id || ! b[j]($) );
 			if ( y($) != id ) goto aside;
 		} // if
-		bintents[0]($) = true;
-		last($) = false;
-		await( ! bintents[1]($) || last($) );
 
-		data($) = id;									// critical section
+		binary( 0 );
 
-		bintents[0]($) = false;
 		y($) = N;										// exit protocol
 		b[id]($) = false;
 		goto fini;
@@ -94,13 +104,9 @@ struct Triangle : rl::test_suite<Triangle, N> {
 		for ( int s = 0; s <= level; s += 1 ) {			// entry protocol
 			binary_prologue( state[s].es, state[s].ns );
 		} // for
-		bintents[1]($) = true;
-		last($) = true;
-		await( ! bintents[0]($) || ! last($) );
 
-		data($) = id + 1;								// critical section
+		binary( 1 );
 
-		bintents[1]($) = false;
 		for ( int s = level; s >= 0; s -= 1 ) {			// exit protocol, reverse order
 			binary_epilogue( state[s].es, state[s].ns );
 		} // for

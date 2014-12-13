@@ -27,7 +27,7 @@ struct LamportFast : rl::test_suite<LamportFast, N> {
 			await( y($) == N );
 			Pause();
 			goto start;
-		}
+		} // if
 		y($) = id;
 		if ( x($) != id ) {
 			b[id]($) = false;
@@ -37,8 +37,8 @@ struct LamportFast : rl::test_suite<LamportFast, N> {
 //				await( y($) == N );
 				Pause();
 				goto start;
-			}
-		}
+			} // if
+		} // if
 		data($) = id;									// critical section
 		y($) = N;										// exit protocol
 		b[id]($) = false;

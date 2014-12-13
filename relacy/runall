@@ -1,6 +1,6 @@
 #!/bin/sh -
 
-algorithms="Aravind Burns2 BurnsLynchRetract DeBruijn Dekker Dijkstra Eisenberg Hehner Hesselink Kessels Knuth LamportRetract LamportBakery LamportFast Lycklama LycklamaBuhr Lynch Peterson Peterson2 PetersonBuhr PetersonT Szymanski Szymanski2 Szymanski3 Taubenfeld TaubenfeldBuhr Zhang2T ZhangYA ZhangdT"
+algorithms="Aravind Burns2 BurnsLynchRetract DeBruijn Dekker DekkerWHH Dijkstra Eisenberg Hehner Hesselink Kessels Knuth LamportRetract LamportBakery LamportFast Lycklama LycklamaBuhr Lynch Peterson Peterson2 PetersonBuhr PetersonT Szymanski Szymanski2 Szymanski3 Taubenfeld TaubenfeldBuhr Zhang2T ZhangYA ZhangdT Triangle TriangleMod"
 
 cflag="-Wall -Werror -O3 -DNDEBUG -I/u/pabuhr/software/relacy_2_4"
 
@@ -9,7 +9,7 @@ for algorithm in ${algorithms} ; do
     g++ ${algorithm}.cc ${cflag}
     ./a.out
     if [ -f core ] ; then
-	echo core generated for ${1}
+	echo core generated for ${algorithm}
 	break
     fi
 done

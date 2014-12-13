@@ -24,9 +24,10 @@ struct Kessels : rl::test_suite<Kessels, N> {
 #   define plus( a, b ) ((a + b) & 1)
 
 	void binary_prologue( int c, Token *t ) {
+		int other = inv( c );
 		t->Q[c]($) = 1;
-		t->R[c]($) = plus( t->R[inv(c)]($), c );
-		while ( t->Q[inv( c )]($) && t->R[c]($) == plus( t->R[inv( c )]($), c ) ) Pause(); // busy wait
+		t->R[c]($) = plus( t->R[other]($), c );
+		while ( t->Q[other]($) && t->R[c]($) == plus( t->R[other]($), c ) ) Pause(); // busy wait
 	} // binary_prologue
 
 	void binary_epilogue( int c, Token *t ) {

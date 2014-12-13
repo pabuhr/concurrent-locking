@@ -1,7 +1,9 @@
 // James E. Burns, Symmetry in Systems of Asynchronous Processes. 22nd Annual
 // Symposium on Foundations of Computer Science, 1981, Figure 2, p 170.
 
-static volatile TYPE *flag CALIGN, turn CALIGN;
+#include <stdbool.h>
+
+static volatile TYPE turn CALIGN, *flag CALIGN;
 static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
 
 static void *Worker( void *arg ) {
@@ -19,24 +21,24 @@ static void *Worker( void *arg ) {
 #if defined( __sparc )
 			__asm__ __volatile__ ( "" : : : "memory" );
 #endif // __sparc
-		  L0: flag[id] = 1;								// entry protocol
+		  L0: flag[id] = true;							// entry protocol
 			turn = id;									// RACE
 			Fence();									// force store before more loads
 		  L1: if ( FASTPATH( turn != id ) ) {
-				flag[id] = 0;
+				flag[id] = false;
 				Fence();								// force store before more loads
 			  L11: for ( j = 0; j < N; j += 1 )
-					if ( j != id && flag[j] != 0 ) { Pause(); goto L11; }
+					if ( j != id && flag[j] ) { Pause(); goto L11; }
 				goto L0;
 			} else {
-//				flag[id] = 1;
+//				flag[id] = true;
 //				Fence();								// force store before more loads
 			  L2: if ( FASTPATH( turn != id ) ) goto L1;
 				for ( j = 0; j < N; j += 1 )
-					if ( FASTPATH( j != id && flag[j] != 0 ) ) goto L2;
+					if ( FASTPATH( j != id && flag[j] ) ) goto L2;
 			} // if
 			CriticalSection( id );
-			flag[id] = 0;								// exit protocol
+			flag[id] = false;							// exit protocol
 #ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
 			cnt = cycleUp( cnt, NoStartPoints );
@@ -55,9 +57,9 @@ static void *Worker( void *arg ) {
 } // Worker
 
 void ctor() {
-	flag = Allocator( sizeof(typeof(flag[0])) * N );
+	flag = Allocator( N * sizeof(typeof(flag[0])) );
 	for ( int i = 0; i < N; i += 1 ) {					// initialize shared data
-		flag[i] = 0;
+		flag[i] = false;
 	} // for
 	//turn = 0;
 } // ctor

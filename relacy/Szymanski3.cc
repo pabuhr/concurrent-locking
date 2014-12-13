@@ -6,7 +6,7 @@ enum { N = 8 };
 // Boleslaw K. Szymanski, Mutual Exclusion Revisited, Proceedings of the 5th Jerusalem Conference on Information
 // Technology, 1990, Figure 4, Page 115.
 
-struct Szymanski : rl::test_suite<Szymanski, N> {
+struct Szymanski3 : rl::test_suite<Szymanski3, N> {
 	std::atomic<int> a[N], w[N], s[N], p[N];
 
 	rl::var<int> data;
@@ -62,12 +62,12 @@ struct Szymanski : rl::test_suite<Szymanski, N> {
 		data($) = id + 1;								// critical section
 		s[id]($) = false;
 	} // thread
-}; // Szymanski
+}; // Szymanski3
 
 int main() {
     rl::test_params p;
 	SetParms( p );
-	rl::simulate<Szymanski>( p );
+	rl::simulate<Szymanski3>( p );
 } // main
 
 // Local Variables: //

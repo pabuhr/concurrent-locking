@@ -53,7 +53,7 @@ void __attribute__((noinline)) ctor() {
 	int width = 1 << depth;								// maximal width of binary tree
 	intents = Allocator( sizeof(typeof(intents[0])) * depth ); // allocate matrix columns
 	turns = Allocator( sizeof(typeof(turns[0])) * depth );
-	for ( int r = 0; r < depth; r += 1 ) {				// allocate matrix rows
+	for ( unsigned int r = 0; r < depth; r += 1 ) {		// allocate matrix rows
 		int size = width >> r;							// maximal row size
 		intents[r] = Allocator( sizeof(typeof(intents[0][0])) * size );
 		for ( int c = 0; c < size; c += 1 ) {			// initial all intents to dont-want-in

@@ -13,7 +13,7 @@ struct Burns2 : rl::test_suite<Burns2, N> {
 
 	void before() {
 		for ( int i = 0; i < N; i += 1 ) {				// initialize shared data
-			flag[i]($) = 0;
+			flag[i]($) = false;
 		} // for
 		turn($) = 0;
 	} // before
@@ -21,21 +21,21 @@ struct Burns2 : rl::test_suite<Burns2, N> {
 	void thread( int id ) {
 		int j;
 
-	  L0: flag[id]($) = 1;								// entry protocol
+	  L0: flag[id]($) = true;							// entry protocol
 		turn($) = id;									// RACE
 	  L1: if ( turn($) != id ) {
-			flag[id]($) = 0;
+			flag[id]($) = false;
 		  L11: for ( j = 0; j < N; j += 1 )
 				if ( j != id && flag[j]($) != 0 ) { Pause(); goto L11; }
 			goto L0;
 		} else {
-//			flag[id]($) = 1;
+//			flag[id]($) = true;
 		  L2: if ( turn($) != id ) goto L1;
 			for ( j = 0; j < N; j += 1 )
 				if ( j != id && flag[j]($) != 0 ) { Pause(); goto L2; }
 		} // if
 		data($) = id + 1;								// critical section
-		flag[id]($) = 0;								// exit protocol
+		flag[id]($) = false;							// exit protocol
 	} // thread
 }; // Burns2
 

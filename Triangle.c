@@ -1,3 +1,9 @@
+#include <stdbool.h>
+
+#define inv( c ) ( (c) ^ 1 )
+
+#include "Binary.c"
+
 #ifdef TB
 
 static volatile TYPE **intents CALIGN;					// triangular matrix of intents
@@ -7,12 +13,8 @@ static unsigned int depth CALIGN;
 #else
 
 typedef struct CALIGN {
-	TYPE Q[2], R;
-} Token;
-
-typedef struct CALIGN {
-	TYPE es;											// left/right opponent
 	Token *ns;											// pointer to path node from leaf to root
+	TYPE es;											// left/right opponent
 } Tuple;
 
 static Tuple **states CALIGN;							// handle N threads
@@ -21,31 +23,28 @@ static int *levels CALIGN;								// minimal level for binary tree
 //static int levels[64] = { -1 } CALIGN;					// minimal level for binary tree
 static Token *t CALIGN;
 
-#define inv( c ) (1 - c)
-
-static inline void binary_prologue( TYPE c, volatile Token *t ) {
-	TYPE other = inv( c );
-	t->Q[c] = 1;
-	t->R = c;											// RACE
-	Fence();											// force store before more loads
-	while ( t->Q[other] && t->R == c ) Pause();			// busy wait
-} // binary_prologue
-
-static inline void binary_epilogue( TYPE c, volatile Token *t ) {
-	t->Q[c] = 0;
-} // binary_epilogue
-
 #endif // TB
 
 //======================================================
 
-#include <stdbool.h>
-
 static volatile TYPE *b CALIGN;
-static volatile TYPE x CALIGN, y CALIGN, bintents[2] CALIGN = { false, false }, last CALIGN;
+static volatile TYPE x CALIGN, y CALIGN;
+//static volatile TYPE bintents[2] CALIGN = { false, false }, last CALIGN;
+static volatile Token B; // = { { 0, 0 }, 0 };
 static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
 
-#define await( E ) while ( ! (E) ) Pause()
+static inline void binary( int id ) {
+	binary_prologue( id, &B );
+	//bintents[id] = true;
+	//last = false;
+	//Fence();									// force store before more loads
+	//await( ! bintents[1] || last );
+
+	CriticalSection( id );
+
+	binary_epilogue( id, &B );
+	//bintents[id] = false;
+} // binary
 
 static void *Worker( void *arg ) {
 	TYPE id = (size_t)arg;
@@ -107,89 +106,35 @@ static void *Worker( void *arg ) {
 				if ( FASTPATH( y != id ) ) goto aside;
 			} // if
 #endif
-			bintents[0] = true;
-#ifndef DEKKER
-			last = false;
-#endif // ! DEKKER
-			Fence();									// force store before more loads
-#ifndef DEKKER
-			await( ! bintents[1] || last );
-#else
-			while ( bintents[1] ) {
-				if ( ! last ) {
-					bintents[0] = false;
-					Fence();							// force store before more loads
-					while ( ! last ) Pause();			// low priority busy wait
-					bintents[0] = true;
-					Fence();							// force store before more loads
-				} else {
-					Pause();
-				} // if
-			} // while
-#endif // ! DEKKER
 
-			CriticalSection( id );
+			binary( 0 );
 
-#ifdef DEKKER
-			last = false;
-#endif // DEKKER
-			bintents[0] = false;
-			y = N;
+			y = N;										// exit protocol
 			b[id] = false;
 			goto fini;
 
 		  aside:
-#ifdef TB
 #if defined( __sparc )
 			__asm__ __volatile__ ( "" : : : "memory" );
 #endif // __sparc
+#ifdef TB
 //			ridi = id;
-			for ( unsigned int lv = 0; lv < depth; lv += 1 ) {	// entry protocol
+			for ( unsigned int lv = 0; lv < depth; lv += 1 ) { // entry protocol
 				ridi = id >> lv;						// round id for intent
 				ridt = ridi >> 1;						// round id for turn
-// Comment out the next 5 lines to improve performance on x86 for FAST
 				intents[lv][ridi] = 1;					// declare intent
 				turns[lv][ridt] = ridi;					// RACE
 				Fence();								// force store before more loads
 				while ( intents[lv][ridi ^ 1] == 1 && turns[lv][ridt] == ridi ) Pause();
-//				ridi = ridi >> 1;
+//				ridi >>= 1;
 			} // for
 #else
-#if defined( __sparc )
-			__asm__ __volatile__ ( "" : : : "memory" );
-#endif // __sparc
-			for ( int s = 0; s <= level; s += 1 ) { // entry protocol
+			for ( int s = 0; s <= level; s += 1 ) {		// entry protocol
 				binary_prologue( state[s].es, state[s].ns );
 			} // for
 #endif // TB
 
-			bintents[1] = true;
-#ifndef DEKKER
-			last = true;
-#endif // ! DEKKER
-			Fence();									// force store before more loads
-#ifndef DEKKER
-			await( ! bintents[0] || ! last );
-#else
-			while ( bintents[0] ) {
-				if ( last ) {
-					bintents[1] = false;
-					Fence();							// force store before more loads
-					while ( last ) Pause();				// low priority busy wait
-					bintents[1] = true;
-					Fence();							// force store before more loads
-				} else {
-					Pause();
-				} // if
-			} // while
-#endif // ! DEKKER
-
-			CriticalSection( id );
-
-#ifdef DEKKER
-			last = true;
-#endif // DEKKER
-			bintents[1] = false;
+			binary( 1 );
 
 #ifdef TB
 			for ( int lv = depth - 1; lv >= 0; lv -= 1 ) { // exit protocol

@@ -1,5 +1,5 @@
-// G. L. Peterson, Myths About the Mutual Exclusion Problem, Information Processing Letters, 1981, 12(3), Fig. 1, p. 115
-// Separate code for each thread is unified using an array.
+// Yih-Kuen Tsay, Deriving a Scalable Algorithm for Mutual Exclusion,
+// Distributed Computing, Lecture Notes in Computer Science Volume 1499, 1998, pp 393-407 
 
 enum Intent { DontWantIn, WantIn };
 static volatile TYPE intents[2] = { DontWantIn, DontWantIn }, last;
@@ -20,9 +20,11 @@ static void *Worker( void *arg ) {
 			intents[id] = WantIn;						// entry protocol
 			last = id;									// RACE
 			Fence();									// force store before more loads
-			while ( intents[other] == WantIn && last == id ) Pause(); // busy wait
+			if ( intents[other] != DontWantIn )			// local spin
+				while ( last == id ) Pause();			// busy wait
 			CriticalSection( id );
 			intents[id] = DontWantIn;					// exit protocol
+			last = id;
 
 #ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
@@ -55,5 +57,5 @@ void __attribute__((noinline)) dtor() {
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -std=gnu99 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=Peterson2 Harness.c -lpthread -lm" //
+// compile-command: "gcc -Wall -std=gnu99 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=Tsay Harness.c -lpthread -lm" //
 // End: //

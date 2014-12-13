@@ -43,19 +43,19 @@ struct PetersonT : rl::test_suite<PetersonT, N> {
 		depth = Log2( N );
 		int width = 1 << depth;
 		mask = width - 1;
-	    for ( int i = 0; i < N; i += 1 ) {			// initialize shared data
+	    for ( int i = 0; i < N; i += 1 ) {				// initialize shared data
 			Q[i]($) = 0;
 	    } // for
 	} // before
 
 	void thread( int id ) {
 		Tuple opp, temp;
-		for ( int k = 1; k <= depth; k += 1 ) {			// entry protocol, round
+		for ( uint16_t k = 1; k <= depth; k += 1 ) {	// entry protocol, round
 			opp.atom = QMAX( 1, id, k );
-			temp.atom = L(opp) == k ? (Tuple){ {k, bit(id,k) ^ R(opp)} }.atom : (Tuple){ {k, 1} }.atom;
+			temp.atom = L(opp) == k ? (Tuple){ {k, (uint16_t)(bit(id,k) ^ R(opp))} }.atom : (Tuple){ {k, 1} }.atom;
 			Q[id]($) = temp.atom;
 			opp.atom = QMAX( 2, id, k );
-			temp.atom = L(opp) == k ? (Tuple){ {k, bit(id,k) ^ R(opp)} }.atom : Q[id]($);
+			temp.atom = L(opp) == k ? (Tuple){ {k, (uint16_t)(bit(id,k) ^ R(opp))} }.atom : Q[id]($);
 			Q[id]($) = temp.atom;
 //		  wait:	opp.atom = QMAX( id, k );
 //			if ( (L(opp) == k && (bit(id,k) ^ EQ(opp, temp))) || L(opp) > k ) { Pause(); goto wait; }

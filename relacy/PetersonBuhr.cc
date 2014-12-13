@@ -43,14 +43,14 @@ struct PetersonBuhr : rl::test_suite<PetersonBuhr, N> {
 	} // binary_epilogue
 
 	void thread( int id ) {
-		int s, level = levels[id];
+		int level = levels[id];
 		Tuple *state = states[id];
 
-		for ( s = 0; s <= level; s += 1 ) {				// entry protocol
+		for ( int s = 0; s <= level; s += 1 ) {			// entry protocol
 			binary_prologue( state[s].es, state[s].ns );
 		} // for
 		data($) = id + 1;								// critical section
-		for ( s = level; s >= 0; s -= 1 ) {				// exit protocol, reverse order
+		for ( int s = level; s >= 0; s -= 1 ) {			// exit protocol, reverse order
 			binary_epilogue( state[s].es, state[s].ns );
 		} // for
 	} // thead
