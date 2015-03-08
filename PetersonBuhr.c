@@ -29,14 +29,14 @@ static void *Worker( void *arg ) {
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		entry = 0;
 		while ( stop == 0 ) {
-			for ( int s = 0; s <= level; s += 1 ) {		// entry protocol
-				binary_prologue( state[s].es, state[s].ns );
+			for ( int lv = 0; lv <= level; lv += 1 ) {		// entry protocol
+				binary_prologue( state[lv].es, state[lv].ns );
 			} // for
 
 			CriticalSection( id );
 
-			for ( int s = level; s >= 0; s -= 1 ) {		// exit protocol, reverse order
-				binary_epilogue( state[s].es, state[s].ns );
+			for ( int lv = level; lv >= 0; lv -= 1 ) {	// exit protocol, retract reverse order
+				binary_epilogue( state[lv].es, state[lv].ns );
 			} // for
 #ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
@@ -69,6 +69,11 @@ void __attribute__((noinline)) ctor() {
 	levels[0] = -1;										// default for N=1
 	for ( int id = 0; id < N; id += 1 ) {
 		t[id].Q[0] = t[id].Q[1] = 0;
+#if defined( KESSELS2 )
+		t[id].R[0] = t[id].R[1] = 0;
+#else
+		t[id].R = 0;
+#endif // KESSELS2
 		unsigned int start = N + id, level = Log2( start );
 		states[id] = Allocator( level * sizeof(typeof(states[0][0])) );
 		levels[id] = level - 1;

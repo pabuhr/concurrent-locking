@@ -2,13 +2,17 @@
 // Separate code for each thread is unified using an array.
 
 enum Intent { DontWantIn, WantIn };
-static volatile TYPE intents[2] = { DontWantIn, DontWantIn }, last;
+static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
+static volatile TYPE intents[2] CALIGN = { DontWantIn, DontWantIn }, last CALIGN;
+static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
+
+#define inv( c ) ((c) ^ 1)
 
 static void *Worker( void *arg ) {
     TYPE id = (size_t)arg;
     uint64_t entry;
 
-	int other = 1 - id;									// int is better than TYPE
+	int other = inv( id );								// int is better than TYPE
 
 #ifdef FAST
 	unsigned int cnt = 0, oid = id;
@@ -20,20 +24,19 @@ static void *Worker( void *arg ) {
 			intents[id] = WantIn;						// entry protocol
 			last = id;									// RACE
 			Fence();									// force store before more loads
-			while ( intents[other] == WantIn && last == id ) Pause(); // busy wait
+			while ( intents[other] != DontWantIn && last == id ) Pause(); // busy wait
 			CriticalSection( id );
 			intents[id] = DontWantIn;					// exit protocol
-
 #ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
-			other = 1 - id;
+			other = inv( id );
 			cnt = cycleUp( cnt, NoStartPoints );
 #endif // FAST
 			entry += 1;
 		} // while
 #ifdef FAST
 		id = oid;
-		other = 1 - id;
+		other = inv( id );
 #endif // FAST
 		entries[r][id] = entry;
 		__sync_fetch_and_add( &Arrived, 1 );
@@ -44,8 +47,8 @@ static void *Worker( void *arg ) {
 } // Worker
 
 void __attribute__((noinline)) ctor() {
-	if ( N < 1 || N > 2 ) {
-		printf( "\nUsage: N=%d must be 1 or 2\n", N );
+	if ( N != 2 ) {
+		printf( "\nUsage: N=%d must be 2\n", N );
 		exit( EXIT_FAILURE);
 	} // if
 } // ctor

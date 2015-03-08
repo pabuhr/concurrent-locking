@@ -6,6 +6,7 @@ static volatile TYPE lock
 #else
     #error unsupported architecture
 #endif
+static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
 
 void spin_lock( volatile TYPE *lock ) {
 #ifndef NOEXPBACK
@@ -13,12 +14,12 @@ void spin_lock( volatile TYPE *lock ) {
 	unsigned int spin = SPIN_START;
 #endif // ! NOEXPBACK
 
-	for ( unsigned int i = 0;; i += 1 ) {
+	for ( unsigned int i = 1;; i += 1 ) {
 	  if ( *lock == 0 && __sync_lock_test_and_set( lock, 1 ) == 0 ) break;
 #ifndef NOEXPBACK
-		for ( unsigned int s = 0; s < spin; s += 1 ) Pause(); // exponential spin
-//		spin += spin;									// powers of 2
-		if ( i % 80 ) spin += spin;						// slowly increase by powers of 2
+		for ( volatile unsigned int s = 0; s < spin; s += 1 ) Pause(); // exponential spin
+		//spin += spin;									// powers of 2
+		if ( i % 64 == 0 ) spin += spin;				// slowly increase by powers of 2
 		if ( spin > SPIN_END ) spin = SPIN_START;		// prevent overflow
 #else
 	    Pause();

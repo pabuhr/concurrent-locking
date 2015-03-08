@@ -45,7 +45,7 @@ static inline void entryBinary( bool b ) {
 static inline void exitBinary( bool b ) {
 	bintents[b] = false;
 } // exitBinary
-#endif
+#endif // 0
 
 
 static inline void entrySlow(
@@ -256,7 +256,7 @@ void __attribute__((noinline)) ctor2() {
 	levels = Allocator( sizeof(typeof(levels[0])) * N );
 	levels[0] = -1;										// default for N=1
 	for ( TYPE id = 0; id < N; id += 1 ) {
-		t[id].Q[0] = t[id].Q[1] = 0;
+		t[id].Q[0] = t[id].Q[1] = t[id].R = 0;
 		unsigned int start = N + id, level = Log2( start );
 		states[id] = Allocator( sizeof(typeof(states[0][0])) * level );
 		levels[id] = level - 1;

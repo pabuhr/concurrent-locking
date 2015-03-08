@@ -1,6 +1,6 @@
 #!/bin/sh -
 
-algorithms="Aravind Burns2 BurnsLynchRetract DeBruijn Dekker DekkerWHH Dijkstra Eisenberg Hehner Hesselink Kessels Knuth LamportRetract LamportBakery LamportFast Lycklama LycklamaBuhr Lynch Peterson Peterson2 PetersonBuhr PetersonT Szymanski Szymanski2 Szymanski3 Taubenfeld TaubenfeldBuhr Zhang2T ZhangYA ZhangdT Triangle TriangleMod"
+algorithms="Aravind Burns2 BurnsLynchRetract DeBruijn Dekker DekkerRW Dijkstra Eisenberg Hehner Hesselink Kessels Knuth LamportRetract LamportBakery LamportFast Lycklama LycklamaBuhr Lynch Peterson Peterson2 PetersonBuhr PetersonT Szymanski Szymanski2 Szymanski3 Taubenfeld TaubenfeldBuhr Zhang2T ZhangYA ZhangdT Triangle TriangleMod"
 
 cflag="-Wall -Werror -O3 -DNDEBUG -I/u/pabuhr/software/relacy_2_4"
 

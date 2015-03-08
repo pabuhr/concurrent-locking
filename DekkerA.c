@@ -1,14 +1,22 @@
-// Peter A. Buhr and Ashif S. Harji, Concurrent Urban Legends, Concurrency and Computation: Practice and Experience,
-// 2005, 17(9), Figure 3, p. 1151
+#ifdef FAST
+// Want same meaning for FASTPATH for both experiments.
+#undef FASTPATH
+#define FASTPATH(x) __builtin_expect(!!(x), 1)
+#endif // FAST
 
 enum Intent { DontWantIn, WantIn };
+static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
 static volatile TYPE intents[2] CALIGN = { DontWantIn, DontWantIn }, last CALIGN = 0;
+static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
+
+#define inv( c ) ((c) ^ 1)
+#define await( E ) while ( ! (E) ) Pause()
 
 static void *Worker( void *arg ) {
 	TYPE id = (size_t)arg;
 	uint64_t entry;
 
-	int other = id ^ 1;									// int is better than TYPE
+	int other = inv( id );								// int is better than TYPE
 
 #ifdef FAST
 	unsigned int cnt = 0, oid = id;
@@ -17,15 +25,16 @@ static void *Worker( void *arg ) {
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		entry = 0;
 		while ( stop == 0 ) {
+			for ( ;; ) {
 #ifdef FLICKER
-			for ( int i = 0; i < 100; i += 1 ) intents[id] = i % 2; // flicker
+				for ( int i = 0; i < 100; i += 1 ) intents[id] = i % 2; // flicker
 #endif // FLICKER
-			intents[id] = WantIn;
-			// Necessary to prevent the read of intents[other] from floating above the assignment
-			// intents[id] = WantIn, when the hardware determines the two subscripts are different.
-			Fence();									// force store before more loads
-			while ( intents[other] == WantIn ) {
-				if ( last == id ) {
+				intents[id] = WantIn;
+				// Necessary to prevent the read of intents[other] from floating above the assignment
+				// intents[id] = WantIn, when the hardware determines the two subscripts are different.
+				Fence();								// force store before more loads
+			  if ( FASTPATH( intents[other] == DontWantIn ) ) break;
+				if ( FASTPATH( last != id ) ) {
 #ifdef FLICKER
 					for ( int i = 0; i < 100; i += 1 ) intents[id] = i % 2; // flicker
 #endif // FLICKER
@@ -35,16 +44,9 @@ static void *Worker( void *arg ) {
 					// and because of eventual consistency (writes eventually become visible),
 					// the fence is conservative.
 					Fence();							// force store before more loads
-					while ( last == id ) Pause();		// low priority busy wait
-#ifdef FLICKER
-					for ( int i = 1; i < 100; i += 1 ) intents[id] = i % 2; // flicker
-#endif // FLICKER
-					intents[id] = WantIn;
-					Fence();							// force store before more loads
-//				} else {
-//					Pause();
+					await( last != id );				// low priority busy wait
 				} // if
-			} // while
+			} // for
 			CriticalSection( id );
 #ifdef FLICKER
 			for ( int i = id; i < 100; i += 1 ) last = i % 2; // flicker
@@ -57,14 +59,14 @@ static void *Worker( void *arg ) {
 
 #ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
-			other = 1 - id;
+			other = inv( id );
 			cnt = cycleUp( cnt, NoStartPoints );
 #endif // FAST
 			entry += 1;
 		} // while
 #ifdef FAST
 		id = oid;
-		other = 1 - id;
+		other = inv( id );
 #endif // FAST
 		entries[r][id] = entry;
 		__sync_fetch_and_add( &Arrived, 1 );
@@ -75,8 +77,8 @@ static void *Worker( void *arg ) {
 } // Worker
 
 void __attribute__((noinline)) ctor() {
-	if ( N < 1 || N > 2 ) {
-		printf( "\nUsage: N=%d must be 1 or 2\n", N );
+	if ( N != 2 ) {
+		printf( "\nUsage: N=%d must be 2\n", N );
 		exit( EXIT_FAILURE);
 	} // if
 } // ctor
@@ -86,5 +88,5 @@ void __attribute__((noinline)) dtor() {
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -std=gnu99 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=Dekker Harness.c -lpthread -lm" //
+// compile-command: "gcc -Wall -std=gnu99 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=DekkerA Harness.c -lpthread -lm" //
 // End: //

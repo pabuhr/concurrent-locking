@@ -59,6 +59,7 @@ void __attribute__((noinline)) ctor() {
 		for ( int c = 0; c < size; c += 1 ) {			// initial all intents to dont-want-in
 			intents[r][c] = 0;
 		} // for
+		//printf( "depth %d width %d size %d size >> 1 %d\n", depth, width, size, size >> 1 );
 		turns[r] = Allocator( sizeof(typeof(turns[0][0])) * (size >> 1) ); // half maximal row size
 	} // for
 } // ctor

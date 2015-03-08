@@ -21,12 +21,13 @@
 #   ... for each even CPU (may work in pairs)
 #   cpufreq-set --cpu 0 --min 1000000
 
+T=1
+N=32		# T to N threads tested
 Time=20 	# R x Time = length of experiment
-N=32		# 1 to N threads tested
 
 while [ ${#} -gt 0 ] ; do		# process command-line arguments
     case "${1}" in
-	"Time="* | "N="* )
+	"Time="* | "N="* | "T="* )
 	    eval ${1}
 	    ;;
 	* )
@@ -38,7 +39,6 @@ done
 
 rm -rf core
 
-T=1
 while [ ${T} -le ${N} ] ; do
     ./a.out ${T} ${Time} ${Zhang}	# Zhang d-ary
     if [ -f core ] ; then

@@ -33,5 +33,5 @@ complete).
 
 The project authors are:
 
-Peter Buhr <pabuhr@uwaterloo.ca>, David Dice <dave.dice@oracle.com> (advised),
+Peter Buhr <pabuhr@uwaterloo.ca>, David Dice <dave.dice@oracle.com> (adviser),
 and Wim H. Hesselink <w.h.hesselink@rug.nl>

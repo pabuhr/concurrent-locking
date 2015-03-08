@@ -1,6 +1,12 @@
 #!/bin/sh -
 
+# Experiments for: High-Performance N-Thread Software Solutions for Mutual Exclusion, Peter A. Buhr,
+# David Dice and Wim H. Hesselink, Concurrency and Computation: Practice and Experience,
+# http://dx.doi.org/10.1002/cpe.3263
+
 algorithms="Communicate Aravind Burns2 DeBruijn Dijkstra Eisenberg Hehner Hesselink Kessels Knuth LamportRetract LamportBakery LamportFast LycklamaBuhr Lynch Peterson PetersonT PetersonBuhr Szymanski Taubenfeld TaubenfeldBuhr Arbiter MCS SpinLock PthreadLock ZhangYA Zhang2T ZhangdT"
+outdir=`hostname`
+mkdir -p ${outdir}
 
 if [ ${#} -ne 0 ] ; then
     algorithms="${@}"
@@ -9,9 +15,9 @@ fi
 cflag="-Wall -Werror -std=gnu99 -g -O3 -DNDEBUG -fno-reorder-functions -DPIN" # -DFAST
 
 runalgorithm() {
-    echo ${1}${2}
+    echo "${outdir}/${1}${2}"
     gcc ${cflag} -DAlgorithm=${1} Harness.c -lpthread -lm
-    ./run1 ${2} > ${1}${2}
+    ./run1 "${2}" > "${outdir}/${1}${2}"
     if [ -f core ] ; then
 	echo core generated for ${1}
 	break

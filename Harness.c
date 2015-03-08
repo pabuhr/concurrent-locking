@@ -70,9 +70,11 @@ static inline void *CAS32( volatile void *ptr, void *cmp, void *set ) {
 #ifdef FAST
 // unlikely
 #define FASTPATH(x) __builtin_expect(!!(x), 0)
+#define SLOWPATH(x) __builtin_expect(!!(x), 1)
 #else
 // likely
 #define FASTPATH(x) __builtin_expect(!!(x), 1)
+#define SLOWPATH(x) __builtin_expect(!!(x), 0)
 #endif // FASTPATH
 //#else
 //#define FASTPATH(x) (x)

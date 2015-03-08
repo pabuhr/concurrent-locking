@@ -1,12 +1,10 @@
-// Edsger W. Dijkstra. Cooperating Sequential Processes. Technical Report,
-// Technological University, Eindhoven, Netherlands 1965, pp. 58-59.
-
 enum Intent { DontWantIn, WantIn };
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
-static volatile TYPE cc[2] CALIGN = { DontWantIn, DontWantIn }, turn CALIGN = 0;
+static volatile TYPE cc[2] CALIGN = { DontWantIn, DontWantIn }, last CALIGN = 0;
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 #define inv( c ) ((c) ^ 1)
+#define await( E ) while ( ! (E) ) Pause()
 
 static void *Worker( void *arg ) {
 	TYPE id = (size_t)arg;
@@ -21,17 +19,34 @@ static void *Worker( void *arg ) {
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		entry = 0;
 		while ( stop == 0 ) {
-		  A1: cc[id] = WantIn;
-			Fence();
-		  L1: if ( FASTPATH( cc[other] == WantIn ) ) {
-				if ( turn != id ) { Pause(); goto L1; }
-				cc[id] = DontWantIn;
-				Fence();
-			  B1: if ( turn == id ) { Pause(); goto B1; }
-				goto A1;
-			}
+			for ( ;; ) {
+#ifdef FLICKER
+				for ( int i = 0; i < 100; i += 1 ) cc[id] = i % 2; // flicker
+#endif // FLICKER
+				cc[id] = WantIn;						// declare intent
+				Fence();								// force store before more loads
+			  if ( cc[other] == DontWantIn ) break;
+			  if ( last != id ) {
+					await( cc[other] == DontWantIn );
+				  	break;
+				} // if
+#ifdef FLICKER
+				for ( int i = 0; i < 100; i += 1 ) cc[id] = i % 2; // flicker
+#endif // FLICKER
+				cc[id] = DontWantIn;					// retract intent
+				Fence();								// force store before more loads
+				await( cc[other] == DontWantIn || last != id ); // low priority busy wait
+			} // for
 			CriticalSection( id );
-			turn = id;
+			if ( last != id ) {
+#ifdef FLICKER
+				for ( int i = id; i < 100; i += 1 ) last = i % 2; // flicker
+#endif // FLICKER
+				last = id;
+			} // if
+#ifdef FLICKER
+			for ( int i = 0; i < 100; i += 1 ) cc[id] = i % 2; // flicker
+#endif // FLICKER
 			cc[id] = DontWantIn;
 
 #ifdef FAST
@@ -65,5 +80,5 @@ void __attribute__((noinline)) dtor() {
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -std=gnu99 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=DekkerOrig Harness.c -lpthread -lm" //
+// compile-command: "gcc -Wall -std=gnu99 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=DekkerRW Harness.c -lpthread -lm" //
 // End: //
