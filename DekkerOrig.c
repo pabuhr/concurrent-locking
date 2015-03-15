@@ -26,14 +26,12 @@ static void *Worker( void *arg ) {
 		  L1: if ( FASTPATH( cc[other] == WantIn ) ) {
 				if ( turn != id ) { Pause(); goto L1; }
 				cc[id] = DontWantIn;
-				Fence();
 			  B1: if ( turn == id ) { Pause(); goto B1; }
 				goto A1;
 			}
 			CriticalSection( id );
 			turn = id;
 			cc[id] = DontWantIn;
-
 #ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
 			other = inv( id );

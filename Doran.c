@@ -39,7 +39,6 @@ static void *Worker( void *arg ) {
 					for ( int i = 0; i < 100; i += 1 ) intents[id] = i % 2; // flicker
 #endif // FLICKER
 					intents[id] = DontWantIn;			// retract intent
-					Fence();							// force store before more loads
 					await( last != id );				// low priority busy wait
 #ifdef FLICKER
 					for ( int i = 1; i < 100; i += 1 ) intents[id] = i % 2; // flicker

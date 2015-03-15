@@ -30,7 +30,6 @@ static inline void binary_prologue( TYPE c, volatile Token *t ) {
   L1: if ( FASTPATH( t->Q[other] ) ) {
 		if ( t->R != c ) { Pause(); goto L1; }
 		t->Q[c] = 0;
-		Fence();										// force store before more loads
 	  B1: if ( t->R == c ) { Pause(); goto B1; }		// low priority busy wait
 		goto A1;
 	} // if
@@ -39,9 +38,8 @@ static inline void binary_prologue( TYPE c, volatile Token *t ) {
 		t->Q[c] = 1;
 		Fence();										// force store before more loads
 	  if ( FASTPATH( ! t->Q[other] ) ) break;
-		if ( FASTPATH( t->R == c ) ) {
+		if ( t->R == c ) {
 			t->Q[c] = 0;
-			Fence();									// force store before more loads
 			while ( t->R == c ) Pause();				// low priority busy wait
 		} // if
 	} // for
@@ -55,7 +53,6 @@ static inline void binary_prologue( TYPE c, volatile Token *t ) {
 			break;
 		} // if
 		t->Q[c] = 0;
-		Fence();										// force store before more loads
 		while ( t->R == c ) Pause();					// low priority busy wait
 	} // for
 #elif defined( DORAN )
@@ -64,7 +61,6 @@ static inline void binary_prologue( TYPE c, volatile Token *t ) {
 	if ( FASTPATH( t->Q[other] ) ) {
 		if ( t->R == c ) {
 			t->Q[c] = 0;
-			Fence();									// force store before more loads
 			while ( t->R == c ) Pause();				// low priority busy wait
 			t->Q[c] = 1;
 			Fence();									// force store before more loads
@@ -81,7 +77,6 @@ static inline void binary_prologue( TYPE c, volatile Token *t ) {
 			break;
 		} // if
 		t->Q[c] = 0;
-		Fence();
 		while ( t->Q[other] && t->R == c ) Pause();
 	} // for
 #elif defined( TSAY )

@@ -28,24 +28,19 @@ static void *Worker( void *arg ) {
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		entry = 0;
 		while ( stop == 0 ) {
+#ifdef FLICKER
+			for ( int i = 0; i < 100; i += 1 ) intents[id] = i % 2; // flicker
+#endif // FLICKER
 			intents[id] = WantIn;
 			// Necessary to prevent the read of intents[other] from floating above the assignment
 			// intents[id] = WantIn, when the hardware determines the two subscripts are different.
 			Fence();									// force store before more loads
 			while ( intents[other] == WantIn ) {
-#ifdef FLICKER
-				for ( int i = 0; i < 100; i += 1 ) intents[id] = i % 2; // flicker
-#endif // FLICKER
 				if ( FASTPATH( last == id ) ) {
 #ifdef FLICKER
 					for ( int i = 0; i < 100; i += 1 ) intents[id] = i % 2; // flicker
 #endif // FLICKER
 					intents[id] = DontWantIn;
-					// Optional fence to prevent LD of "last" from being lifted above store of
-					// intends[id]=DontWantIn. Because a thread only writes its own id into "last",
-					// and because of eventual consistency (writes eventually become visible),
-					// the fence is conservative.
-					Fence();							// force store before more loads
 					while( last == id ) Pause();		// low priority busy wait
 #ifdef FLICKER
 					for ( int i = 0; i < 100; i += 1 ) intents[id] = i % 2; // flicker

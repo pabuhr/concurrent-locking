@@ -34,7 +34,6 @@ static void *Worker( void *arg ) {
 				for ( int i = 0; i < 100; i += 1 ) cc[id] = i % 2; // flicker
 #endif // FLICKER
 				cc[id] = DontWantIn;					// retract intent
-				Fence();								// force store before more loads
 				await( cc[other] == DontWantIn || last != id ); // low priority busy wait
 			} // for
 			CriticalSection( id );

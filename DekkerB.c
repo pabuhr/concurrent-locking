@@ -42,11 +42,6 @@ static void *Worker( void *arg ) {
 				for ( int i = 0; i < 100; i += 1 ) intents[id] = i % 2; // flicker
 #endif // FLICKER
 				intents[id] = DontWantIn;
-				// Optional fence to prevent LD of "last" from being lifted above store of
-				// intends[id]=DontWantIn. Because a thread only writes its own id into "last",
-				// and because of eventual consistency (writes eventually become visible),
-				// the fence is conservative.
-				Fence();							// force store before more loads
 				await( last != id );				// low priority busy wait
 			} // for
 			CriticalSection( id );
