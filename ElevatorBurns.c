@@ -12,7 +12,7 @@ static inline void mutexB( TYPE id ) {
 	for ( int kk = 0; kk < id; kk += 1 ) {
 		if ( b[kk] || first == id ) {
 			b[id] = false;
-			Fence();									// force store before more loads
+//			Fence();									// force store before more loads
 			await( first == id );
 			return;
 		} // if
@@ -66,7 +66,7 @@ static void *Worker( void *arg ) {
 void __attribute__((noinline)) ctor() {
 	b = Allocator( N * sizeof(typeof(b[0])) );
 	announce = Allocator( N * sizeof(typeof(announce[0])) );
-	for ( TYPE id = 0; id < N; id += 1 ) {		// initialize shared data
+	for ( TYPE id = 0; id < N; id += 1 ) {				// initialize shared data
 		announce[id] = b[id] = false;
 	} // for
 	first = N;

@@ -56,10 +56,6 @@ static volatile TYPE *b CALIGN, x CALIGN, y CALIGN, occupied CALIGN;
 static volatile TYPE lock CALIGN;
 #endif // SIG
 
-#ifdef QNE
-static volatile TYPE qne CALIGN;						// invariant: implies queue nonempty
-#endif // QNE
-
 #define await( E ) while ( ! (E) ) Pause()
 
 #ifdef CAS
@@ -124,21 +120,6 @@ static void *Worker( void *arg ) {
 			Fence();									// force store before more loads
 #endif // ! CAS
 
-#ifdef QNE
-#ifdef CAS
-			Fence();									// force store before more loads
-#endif // CAS
-
-			if ( FASTPATH( qne ) ) {
-#ifdef SIG
-				await( *tSigId );
-#else
-				await( lock == id );
-#endif // SIG
-
-			} else
-#endif // QNE
-
 				if ( FASTPATH( muentry( id ) ) ) {
 #ifndef CAS
 					Fence();							// force store before more loads
@@ -181,24 +162,11 @@ static void *Worker( void *arg ) {
 				} // if
 			}  // for
 			if ( FASTPATH( QnotEmpty( &queue ) ) ) {
-#ifdef QNE
-				TYPE thread = Qdequeue( &queue );
-				qne = QnotEmpty( &queue );
-
-#ifdef SIG
-				tstate[thread].sig = true;
-#else
-				lock = thread;
-#endif // SIG
-
-#else // ! QNE
-
 #ifdef SIG
 				tstate[Qdequeue( &queue )].sig = true;
 #else
 				lock = Qdequeue( &queue );
 #endif // SIG
-#endif // QNE
 			} else
 #ifdef SIG
 				*tSigN = true;
@@ -255,10 +223,6 @@ void __attribute__((noinline)) ctor() {
 	y = N;
 	occupied = false;
 #endif // CAS
-
-#ifdef QNE
-	qne = false;
-#endif // QNE
 } // ctor
 
 void __attribute__((noinline)) dtor() {
