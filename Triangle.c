@@ -33,6 +33,8 @@ static volatile TYPE x CALIGN, y CALIGN;
 static volatile Token B; // = { { 0, 0 }, 0 };
 static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
 
+#define await( E ) while ( ! (E) ) Pause()
+
 static inline void binary( int id ) {
 	binary_prologue( id, &B );
 	//bintents[id] = true;
@@ -101,8 +103,8 @@ static void *Worker( void *arg ) {
 			if ( FASTPATH( x != id ) ) {
 				b[id] = false;
 				Fence();								// force store before more loads
-				for ( int j = 0; j < N; j += 1 )
-					await( y != id || ! b[j] );
+				for ( int j = 0; y == id && j < N ; j += 1 )
+					await( ! b[j] );
 				if ( FASTPATH( y != id ) ) goto aside;
 			} // if
 #endif

@@ -2,6 +2,8 @@
 
 #include <stdbool.h>
 
+//======================================================
+
 typedef TYPE QElem_t;
 
 typedef struct CALIGN {
@@ -35,37 +37,41 @@ static inline void Qdtor( Queue *queue ) {
 
 Queue queue CALIGN;
 
+//======================================================
+
 typedef struct CALIGN {									// performance gain when fields juxtaposed
 	TYPE apply;
-#ifdef SIG
-	TYPE sig;
-#endif // SIG
+#ifdef FLAG
+	TYPE fast;
+#endif // FLAG
 } Tstate;
 
+static volatile TYPE fast CALIGN;
 static volatile Tstate *tstate CALIGN;
 //static volatile TYPE *apply CALIGN;
 static volatile TYPE *val CALIGN;
 
 #ifndef CAS
-static volatile TYPE *b CALIGN, x CALIGN, y CALIGN, occupied CALIGN;
+static volatile TYPE *b CALIGN, x CALIGN, y CALIGN;
 #endif // ! CAS
 
-#ifdef SIG
-//static volatile TYPE *sig CALIGN;
+#ifdef FLAG
+//static volatile TYPE *fast CALIGN;
 #else
 static volatile TYPE lock CALIGN;
-#endif // SIG
+#endif // FLAG
 
 #define await( E ) while ( ! (E) ) Pause()
 
 #ifdef CAS
-static volatile TYPE mu CALIGN;
-#define muentry(x) __sync_bool_compare_and_swap( &mu, N, (x) )
+// Paper uses true/false versus id/N, but id/N matches with non-CAS interface.
+#define muentry( x ) __sync_bool_compare_and_swap( &(fast), (N), (x) )
 
 #else // ! CAS
 
 static inline bool muentry( TYPE id ) {
-	if ( FASTPATH( y != N ) ) return false;
+// Only needed in Triangle algorithm
+//	if ( FASTPATH( y != N ) ) return false;
 	b[id] = true;
 	x = id;
 	Fence();											// force store before more loads
@@ -78,13 +84,11 @@ static inline bool muentry( TYPE id ) {
 	if ( FASTPATH( x != id ) ) {
 		b[id] = false;
 		Fence();										// force store before more loads
-		for ( int j = 0; j < N; j += 1 )
-			await( y != id || ! b[j] );
+		for ( int j = 0; y == id && j < N; j += 1 )
+			await( ! b[j] );
 		if ( FASTPATH( y != id ) ) return false;
 	} // if
-	bool leader;
-	if ( ! occupied ) occupied = leader = true;			// leader selected
-	else leader = false;
+	bool leader = ! fast ? fast = true, true : false;
 	y = N;
 	b[id] = false;
 	return leader;
@@ -99,10 +103,10 @@ static void *Worker( void *arg ) {
 
 	const unsigned int n = N + id, dep = Log2( n );
 	volatile typeof(tstate[0].apply) *tApplyId = &tstate[id].apply;
-#ifdef SIG
-	volatile typeof(tstate[0].sig) *tSigId = &tstate[id].sig;
-	volatile typeof(tstate[0].sig) *tSigN = &tstate[N].sig;
-#endif // SIG
+#ifdef FLAG
+	volatile typeof(tstate[0].fast) *tFastId = &tstate[id].fast;
+	volatile typeof(tstate[0].fast) *tFastN = &tstate[N].fast;
+#endif // FLAG
 
 #ifdef FAST
 	unsigned int cnt = 0, oid = id;
@@ -120,35 +124,35 @@ static void *Worker( void *arg ) {
 			Fence();									// force store before more loads
 #endif // ! CAS
 
-				if ( FASTPATH( muentry( id ) ) ) {
+			if ( FASTPATH( muentry( id ) ) ) {
 #ifndef CAS
-					Fence();							// force store before more loads
+				Fence();								// force store before more loads
 #endif // ! CAS
 
-#ifdef SIG
-					await( *tSigN || *tSigId );
-					*tSigN = false;
+#ifdef FLAG
+				await( *tFastN || *tFastId );
+				*tFastN = false;
 #else
-					await( lock == N || lock == id );
-					lock = id;
-#endif // SIG
+				await( lock == N || lock == id );
+				lock = id;
+#endif // FLAG
 
 #ifndef CAS
-					occupied = false;
+				fast = false;
 #else
-					mu = N;
+				fast = N;
 #endif // ! CAS
 
-				} else {
-#ifdef SIG
-					await( *tSigId );
+			} else {
+#ifdef FLAG
+				await( *tFastId );
 #else
-					await( lock == id );
-#endif // SIG
-				} // if
-#ifdef SIG
-			*tSigId = false;
-#endif // SIG
+				await( lock == id );
+#endif // FLAG
+			} // if
+#ifdef FLAG
+			*tFastId = false;
+#endif // FLAG
 			*tApplyId = false;
 
 			CriticalSection( id );
@@ -162,17 +166,17 @@ static void *Worker( void *arg ) {
 				} // if
 			}  // for
 			if ( FASTPATH( QnotEmpty( &queue ) ) ) {
-#ifdef SIG
-				tstate[Qdequeue( &queue )].sig = true;
+#ifdef FLAG
+				tstate[Qdequeue( &queue )].fast = true;
 #else
 				lock = Qdequeue( &queue );
-#endif // SIG
+#endif // FLAG
 			} else
-#ifdef SIG
-				*tSigN = true;
+#ifdef FLAG
+				*tFastN = true;
 #else
 				lock = N;
-#endif // SIG
+#endif // FLAG
 
 #ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
@@ -194,34 +198,34 @@ static void *Worker( void *arg ) {
 void __attribute__((noinline)) ctor() {
 	Qctor( &queue );
 	tstate = Allocator( (N+1) * sizeof(typeof(tstate[0])) );
-	for ( TYPE id = 0; id <= N; id += 1 ) {		// initialize shared data
+	for ( TYPE id = 0; id <= N; id += 1 ) {				// initialize shared data
 		tstate[id].apply = false;
-#ifdef SIG
-		tstate[id].sig = false;
-#endif // SIG
+#ifdef FLAG
+		tstate[id].fast = false;
+#endif // FLAG
 	} // for
 
-#ifdef SIG
-	tstate[N].sig = true;
+#ifdef FLAG
+	tstate[N].fast = true;
 #else
 	lock = N;
-#endif // SIG
+#endif // FLAG
 
 	val = Allocator( 2 * N * sizeof(typeof(val[0])) );
-	for ( TYPE id = 0; id < N; id += 1 ) {		// initialize shared data
+	for ( TYPE id = 0; id < N; id += 1 ) {				// initialize shared data
 		val[id] = N;
 		val[N + id] = id;
 	} // for
 
 #ifdef CAS
-	mu = N;
+	fast = N;
 #else
 	b = Allocator( N * sizeof(typeof(b[0])) );
-	for ( TYPE id = 0; id < N; id += 1 ) {		// initialize shared data
+	for ( TYPE id = 0; id < N; id += 1 ) {				// initialize shared data
 		b[id] = false;
 	} // for
 	y = N;
-	occupied = false;
+	fast = false;
 #endif // CAS
 } // ctor
 

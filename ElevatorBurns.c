@@ -12,7 +12,6 @@ static inline void mutexB( TYPE id ) {
 	for ( int kk = 0; kk < id; kk += 1 ) {
 		if ( b[kk] || first == id ) {
 			b[id] = false;
-//			Fence();									// force store before more loads
 			await( first == id );
 			return;
 		} // if

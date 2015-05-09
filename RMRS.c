@@ -88,7 +88,7 @@ static void *Worker( void *arg ) {
 			typeof(id) node = id;
 
 			// up hill
-			for ( int j = 0; j < toursize; j += 1 ) {
+			for ( int j = 0; j < toursize; j += 1 ) {	// tree register
 				tournament[j][node] = id;
 				node >>= 1;
 			} // for
@@ -132,7 +132,6 @@ static void *Worker( void *arg ) {
 			if ( FASTPATH( QnotEmpty( q ) ) ) {
 				thread = Qdequeue( q );
 				lock = thread;
-				// if ( id == 0 ) for ( volatile int i = 0; i < 1000; i += 1 );
 				arrState[thread].wait = false;
 			} else {
 				lock = FREE_LOCK;

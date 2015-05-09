@@ -33,6 +33,8 @@ static volatile TYPE x CALIGN, y CALIGN;
 static volatile Token B; // = { { 0, 0 }, 0 };
 static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
 
+#define await( E ) while ( ! (E) ) Pause()
+
 #if 0
 static inline void entryBinary( bool b ) {
 	bool other = ! b;
@@ -99,15 +101,15 @@ static inline TYPE entryFast( TYPE id ) {
 	if ( FASTPATH( y == N ) ) {
 		b[id] = true;
 		x = id;
-		Fence();											// force store before more loads
+		Fence();										// force store before more loads
 		if ( FASTPATH( y == N ) ) {
 			y = id;
-			Fence();											// force store before more loads
+			Fence();									// force store before more loads
 			if ( FASTPATH( x == id ) ) {
 				return true;
 			} else {
 				b[id] = false;
-				Fence();										// force store before more loads
+				Fence();								// force store before more loads
 				for ( int j = 0; j < N; j += 1 )
 					await( y != id || ! b[j] );
 				if ( FASTPATH( y == id ) )
@@ -132,8 +134,8 @@ static inline TYPE entryFast( TYPE id ) {
 	if ( FASTPATH( x != id ) ) {
 		b[id] = false;
 		Fence();										// force store before more loads
-		for ( int j = 0; j < N; j += 1 )
-			await( y != id || ! b[j] );
+		for ( int j = 0; y == id && j < N; j += 1 )
+			await( ! b[j] );
 		if ( FASTPATH( y != id ) ) return false;
 	} // if
 	return true;

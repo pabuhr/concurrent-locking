@@ -27,7 +27,7 @@ rm -rf core
 for algorithm in ${algorithms} ; do
     if [ ${algorithm} = "ElevatorQ" ] ; then
 	for cas in "" "CAS" ; do
-	    for sig in "" "SIG" ; do
+	    for sig in "" "FLAG" ; do
 		runalgorithm ${algorithm} ${cas} ${sig} ${qne}
 	    done
 	done
