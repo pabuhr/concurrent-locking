@@ -1,5 +1,7 @@
 #include <stdbool.h>
 
+//======================================================
+
 #define FREE_NODE N
 #define FREE_LOCK N
 
@@ -47,7 +49,7 @@ static inline Queue *Qctor( int maxElements ) {
 	queue->elements = malloc( queue->capacity * sizeof(typeof(queue->elements[0])) );
 	queue->inQueue = malloc( maxElements * sizeof(typeof(queue->inQueue[0])) );
 
-	for ( int i = 0; i < maxElements; i += 1 ) {
+	for ( unsigned int i = 0; i < maxElements; i += 1 ) {
 		queue->inQueue[i] = false;
 	} // for
 	return queue;
@@ -59,17 +61,21 @@ static inline void Qdtor( volatile Queue *queue ) {
 	free( (void *)queue );
 } // Qdtor
 
+//======================================================
+
 typedef struct CALIGN {
 	unsigned int enter;
 	unsigned int wait;
-} tState;
+} Tstate;
 
 static volatile Queue *q CALIGN;
 static volatile TYPE **tournament CALIGN;
-static volatile tState *arrState CALIGN;
-static volatile TYPE lock CALIGN;
-static volatile TYPE exits;
+static volatile Tstate *arrState CALIGN;
+static volatile TYPE first CALIGN;
+static volatile TYPE exits CALIGN;
 static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
+
+#define await( E ) while ( ! (E) ) Pause()
 
 static void *Worker( void *arg ) {
 	TYPE id = (size_t)arg;
@@ -85,25 +91,23 @@ static void *Worker( void *arg ) {
 		entry = 0;
 		while ( stop == 0 ) {
 			*tEnter = true;
-			typeof(id) node = id;
 
 			// up hill
+			typeof(id) node = id;
 			for ( int j = 0; j < toursize; j += 1 ) {	// tree register
 				tournament[j][node] = id;
 				node >>= 1;
 			} // for
 
-			typeof(id) t = __sync_val_compare_and_swap( &lock, FREE_LOCK, id );
-			if ( FASTPATH( t != FREE_LOCK ) ) {
+			if ( FASTPATH( ! __sync_bool_compare_and_swap( &first, FREE_LOCK, id ) ) ) {
 				typeof(exits) e = exits;
-				while ( exits - e < 2 && lock != FREE_LOCK && lock != id );
-				if ( FASTPATH( __sync_val_compare_and_swap( &lock, FREE_LOCK, id ) != FREE_LOCK ) ) {
-					while ( *tWait );
+				await( exits - e >= 2 || first == FREE_LOCK || first == id );
+				if ( FASTPATH( ! __sync_bool_compare_and_swap( &first, FREE_LOCK, id ) ) ) {
+					await( *tWait );
 				} // if
 			} // if
 
-			*tEnter = false;
-			*tWait = true;
+			*tEnter = *tWait = false;
 			exits += 1 ;
 			//Fence();									// force store before more loads
 
@@ -131,10 +135,10 @@ static void *Worker( void *arg ) {
 			} // for
 			if ( FASTPATH( QnotEmpty( q ) ) ) {
 				thread = Qdequeue( q );
-				lock = thread;
-				arrState[thread].wait = false;
+				first = thread;
+				arrState[thread].wait = true;
 			} else {
-				lock = FREE_LOCK;
+				first = FREE_LOCK;
 			} // if
 #ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
@@ -154,15 +158,16 @@ static void *Worker( void *arg ) {
 } // Worker
 
 void __attribute__((noinline)) ctor() {
+	q = Qctor( N );
+
 	arrState = malloc( N * sizeof(typeof(arrState[0])) );
 	for ( int i = 0; i < N; i += 1 ) {
-		arrState[i].enter = false;
-		arrState[i].wait  = true;
+		arrState[i].enter = arrState[i].wait = false;
 	} // for
 
 	toursize = Clog2( N ) + 1;
 	tournament = malloc( toursize * sizeof(typeof(tournament[0])) );
-	int levelSize = 1 << Clog2( N ); // 2^|log N|
+	int levelSize = 1 << Clog2( N );					// 2^|log N|
 
 	for ( int i = 0; i < toursize; i += 1 ) {
 		tournament[i] = malloc( levelSize * sizeof(typeof(tournament[0][0])) );
@@ -172,8 +177,8 @@ void __attribute__((noinline)) ctor() {
 		levelSize /= 2;
 	} // for
 
-	lock = FREE_LOCK;
-	q = Qctor( N );
+	first = FREE_LOCK;
+	exits = 0;
 } // ctor
 
 void __attribute__((noinline)) dtor() {
@@ -187,5 +192,5 @@ void __attribute__((noinline)) dtor() {
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -std=gnu99 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=RMRS Harness.c -lpthread -lm" //
+// compile-command: "gcc -Wall -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=RMRS Harness.c -lpthread -lm" //
 // End: //

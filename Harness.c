@@ -19,11 +19,15 @@
 #include <errno.h>										// errno
 #include <stdint.h>										// uintptr_t, UINTPTR_MAX
 #include <sys/time.h>
-#include <poll.h>										// poll
+//#include <poll.h>										// poll
 #include <malloc.h>										// memalign
 #include <unistd.h>										// getpid
 
+#if defined( __sparc )
+#define CACHE_ALIGN 4
+#else
 #define CACHE_ALIGN 64
+#endif // SPARC
 #define CALIGN __attribute__(( aligned (CACHE_ALIGN) ))
 
 // gcc atomic-intrinsic inserts unnecessary MEMBAR
@@ -118,6 +122,8 @@ static inline void *CAS32( volatile void *ptr, void *cmp, void *set ) {
 //------------------------------------------------------------------------------
 
 typedef uintptr_t TYPE;									// atomically addressable word-size
+typedef volatile TYPE ATYPE;							// atomic shared data
+
 enum { RUNS = 5 };
 
 static inline TYPE cycleUp( TYPE v, TYPE n ) { return ( ((v) >= (n - 1)) ? 0 : (v + 1) ); }
@@ -148,7 +154,7 @@ static inline int Clog2( int n ) {						// integer ceil( log2( n ) )
 //------------------------------------------------------------------------------
 
 static inline void CriticalSection( const TYPE id ) {
-	static volatile TYPE CurrTid CALIGN;				// shared, current thread id in critical section
+	static ATYPE CurrTid CALIGN;						// shared, current thread id in critical section
 
 	CurrTid = id;
 	Fence();
@@ -162,8 +168,8 @@ static inline void CriticalSection( const TYPE id ) {
 
 //------------------------------------------------------------------------------
 
-static volatile int stop CALIGN = 0;
-static volatile int Arrived CALIGN = 0;
+static ATYPE stop CALIGN = 0;
+static ATYPE Arrived CALIGN = 0;
 static int N CALIGN, Threads CALIGN, Time CALIGN, Degree CALIGN = -1;
 
 //------------------------------------------------------------------------------
@@ -196,10 +202,10 @@ void __attribute__((noinline)) startpoints() {
 		} // for
 	} // for
 #if 0
-    for ( unsigned int i = 0; i < NoStartPoints; i += 1 ) {
+	for ( unsigned int i = 0; i < NoStartPoints; i += 1 ) {
 		printf( "%d ", Startpoints[i] );
-    } // for
-    printf( "\n" );
+	} // for
+	printf( "\n" );
 #endif // 0
 } // startpoints
 
@@ -443,7 +449,8 @@ int main( int argc, char *argv[] ) {
 	} // for
 #else
 	for ( int r = 0; r < RUNS; r += 1 ) {
-		poll( NULL, 0, Time * 1000 );
+		//poll( NULL, 0, Time * 1000 );
+		sleep( Time );
 		stop = 1;										// reset
 		while ( Arrived != Threads ) Pause();
 		stop = 0;
@@ -523,5 +530,5 @@ int main( int argc, char *argv[] ) {
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -std=gnu99 -O3 Harness.c -lpthread -lm" //
+// compile-command: "gcc -Wall -std=gnu11 -O3 Harness.c -lpthread -lm" //
 // End: //

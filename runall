@@ -12,7 +12,7 @@ if [ ${#} -ne 0 ] ; then
     algorithms="${@}"
 fi
 
-cflag="-Wall -Werror -std=gnu99 -g -O3 -DNDEBUG -fno-reorder-functions -DPIN" # -DFAST
+cflag="-Wall -Werror -std=gnu11 -g -O3 -DNDEBUG -fno-reorder-functions -DPIN" # -DFAST
 
 runalgorithm() {
     echo "${outdir}/${1}${2}"

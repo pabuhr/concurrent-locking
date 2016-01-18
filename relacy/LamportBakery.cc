@@ -6,7 +6,7 @@ enum { N = 8 };
 // Leslie Lamport, A New Solution of Dijkstra's Concurrent Programming Problem, CACM, 1974, 17(8), p. 454
 
 struct LamportBakery : rl::test_suite<LamportBakery, N> {
-	std::atomic<int> choosing[N], ticket[N];
+	std::atomic<TYPE> choosing[N], ticket[N];
 
 	rl::var<int> data;
 
@@ -16,9 +16,9 @@ struct LamportBakery : rl::test_suite<LamportBakery, N> {
 		} // for
 	} // before
 
-	void thread( int id ) {
-		int max, v;
-		int j;
+	void thread( TYPE id ) {
+		TYPE max, v;
+		TYPE j;
 
 		choosing[id]($) = 1;							// entry protocol
 		max = 0;										// O(N) search for largest ticket

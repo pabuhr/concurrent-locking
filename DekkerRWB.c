@@ -1,15 +1,6 @@
-// Peter A. Buhr and Ashif S. Harji, Concurrent Urban Legends, Concurrency and Computation: Practice and Experience,
-// 2005, 17(9), Figure 3, p. 1151
-
-#ifdef FAST
-// Want same meaning for FASTPATH for both experiments.
-#undef FASTPATH
-#define FASTPATH(x) __builtin_expect(!!(x), 1)
-#endif // FAST
-
 enum Intent { DontWantIn, WantIn };
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
-static volatile TYPE intents[2] CALIGN = { DontWantIn, DontWantIn }, last CALIGN = 0;
+static volatile TYPE cc[2] CALIGN = { DontWantIn, DontWantIn }, last CALIGN = 0;
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 #define inv( c ) ((c) ^ 1)
@@ -29,39 +20,35 @@ static void *Worker( void *arg ) {
 		entry = 0;
 		while ( stop == 0 ) {
 #ifdef FLICKER
-			for ( int i = 0; i < 100; i += 1 ) intents[id] = i % 2; // flicker
+			for ( int i = 0; i < 100; i += 1 ) cc[id] = i % 2; // flicker
 #endif // FLICKER
-			intents[id] = WantIn;
-			// Necessary to prevent the read of intents[other] from floating above the assignment
-			// intents[id] = WantIn, when the hardware determines the two subscripts are different.
+			cc[id] = WantIn;							// declare intent
 			Fence();									// force store before more loads
-			while ( intents[other] == WantIn ) {
+			while ( cc[other] == WantIn ) {
 				if ( FASTPATH( last == id ) ) {
 #ifdef FLICKER
-					for ( int i = 0; i < 100; i += 1 ) intents[id] = i % 2; // flicker
+					for ( int i = 0; i < 100; i += 1 ) cc[id] = i % 2; // flicker
 #endif // FLICKER
-					intents[id] = DontWantIn;
-					while( last == id ) Pause();		// low priority busy wait
+					cc[id] = DontWantIn;
+					while( cc[other] == WantIn && last == id ) Pause();	// low priority busy wait
 #ifdef FLICKER
-					for ( int i = 0; i < 100; i += 1 ) intents[id] = i % 2; // flicker
+					for ( int i = 0; i < 100; i += 1 ) cc[id] = i % 2; // flicker
 #endif // FLICKER
-					intents[id] = WantIn;
-					// Necessary to prevent the read of intents[other] from floating above the assignment
-					// intents[id] = WantIn, when the hardware determines the two subscripts are different.
+					cc[id] = WantIn;					// declare intent
 					Fence();							// force store before more loads
-				} else {
-					Pause();
 				} // if
 			} // while
 			CriticalSection( id );
+			if ( last != id ) {
 #ifdef FLICKER
-			for ( int i = id; i < 100; i += 1 ) last = i % 2; // flicker
+				for ( int i = id; i < 100; i += 1 ) last = i % 2; // flicker
 #endif // FLICKER
-			last = id;									// exit protocol
+				last = id;
+			} // if
 #ifdef FLICKER
-			for ( int i = 0; i < 100; i += 1 ) intents[id] = i % 2; // flicker
+			for ( int i = 0; i < 100; i += 1 ) cc[id] = i % 2; // flicker
 #endif // FLICKER
-			intents[id] = DontWantIn;
+			cc[id] = DontWantIn;
 
 #ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
@@ -94,5 +81,5 @@ void __attribute__((noinline)) dtor() {
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=DekkerC Harness.c -lpthread -lm" //
+// compile-command: "gcc -Wall -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=DekkerRWB Harness.c -lpthread -lm" //
 // End: //

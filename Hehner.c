@@ -3,7 +3,7 @@
 
 enum { MAX_TICKET = INTPTR_MAX };
 
-static volatile TYPE *ticket CALIGN;
+static ATYPE *ticket CALIGN;
 
 static void *Worker( void *arg ) {
 	TYPE id = (size_t)arg;
@@ -71,5 +71,5 @@ void dtor() {
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -std=gnu99 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=Hehner Harness.c -lpthread -lm" //
+// compile-command: "gcc -Wall -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=Hehner Harness.c -lpthread -lm" //
 // End: //

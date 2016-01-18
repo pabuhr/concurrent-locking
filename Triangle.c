@@ -78,8 +78,8 @@ static void *Worker( void *arg ) {
 					} else {
 						b[id] = false;
 						Fence();						// force store before more loads
-						for ( int j = 0; j < N; j += 1 )
-							await( y != id || ! b[j] );
+						for ( int j = 0; y == id && j < N; j += 1 )
+							await( ! b[j] );
 						if ( FASTPATH( y == id ) )
 							goto cont;
 					} // if
@@ -235,5 +235,5 @@ void __attribute__((noinline)) dtor() {
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -std=gnu99 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=Triangle Harness.c -lpthread -lm" //
+// compile-command: "gcc -Wall -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=Triangle Harness.c -lpthread -lm" //
 // End: //

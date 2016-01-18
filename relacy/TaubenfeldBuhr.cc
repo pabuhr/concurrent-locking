@@ -4,8 +4,8 @@
 enum { N = 8 };
 
 struct TaubenfeldBuhr : rl::test_suite<TaubenfeldBuhr, N> {
-	std::atomic<unsigned int> intents[N][N];			// triangular matrix of intents
-	std::atomic<unsigned int> turns[N][N];				// triangular matrix of turns
+	std::atomic<TYPE> intents[N][N];					// triangular matrix of intents
+	std::atomic<TYPE> turns[N][N];						// triangular matrix of turns
 	unsigned int depth;
 
 	rl::var<int> data;

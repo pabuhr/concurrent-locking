@@ -3,16 +3,16 @@
 //#define inv( c ) ((c) ^ 1)
 
 typedef struct CALIGN {
-	TYPE Q[2] CALIGN;
+	TYPE Q[2];
 #if defined( __sparc ) && defined( TB )
 	int /* gcc on SPARC has an issue with unsigned affecting performance */
 #else
 	TYPE
 #endif // TB
 #if defined( KESSELS2 )
-	R[2] CALIGN;
+	R[2];
 #else
-	R CALIGN;
+	R;
 #endif // KESSELS
 } Token;
 

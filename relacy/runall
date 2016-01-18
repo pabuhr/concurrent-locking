@@ -4,13 +4,42 @@ algorithms="Aravind Burns2 BurnsLynchRetract DeBruijn Dekker DekkerRW Dijkstra E
 
 cflag="-Wall -Werror -O3 -DNDEBUG -I/u/pabuhr/software/relacy_2_4"
 
-rm -f core
-for algorithm in ${algorithms} ; do
-    g++ ${algorithm}.cc ${cflag}
+# rm -f core
+# for algorithm in ${algorithms} ; do
+#     g++ ${cflag} ${algorithm}.cc
+#     ./a.out
+#     if [ -f core ] ; then
+# 	echo core generated for ${algorithm}
+# 	break
+#     fi
+# done
+
+algorithms="ElevatorSimple ElevatorQueue RMRS"
+
+runalgorithm() {
+    echo "${1}${2}${3}${flag}"
+    g++ ${cflag} ${flag:+-D${flag}} ${2:+-D${2}} ${3:+-D${3}} ${4:+-D${4}} ${1}.cc
     ./a.out
     if [ -f core ] ; then
 	echo core generated for ${algorithm}
 	break
+    fi
+}
+
+rm -rf core
+for algorithm in ${algorithms} ; do
+    if [ ${algorithm} = "ElevatorSimple" ] ; then
+	for cas in "WCas1" "WCas2" ; do
+	    runalgorithm ${algorithm} ${cas}
+	done
+    elif [ ${algorithm} = "ElevatorQueue" ] ; then
+	for cas in "WCas1" "WCas2" "CAS" ; do
+	    for sig in "" "FLAG" ; do
+		runalgorithm ${algorithm} ${cas} ${sig}
+	    done
+	done
+    else
+	runalgorithm ${algorithm}
     fi
 done
 

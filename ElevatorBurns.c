@@ -1,8 +1,11 @@
 #include <stdbool.h>
 
-static volatile TYPE first CALIGN, *announce CALIGN;
+static volatile TYPE first CALIGN;
+static volatile TYPE *apply CALIGN;
 static volatile TYPE *b CALIGN;
-static volatile TYPE PAD CALIGN;						// protect further false sharing
+
+static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
+
 
 #define await( E ) while ( ! (E) ) Pause()
 
@@ -18,12 +21,13 @@ static inline void mutexB( TYPE id ) {
 	} // for
 	for ( int kk = id + 1; kk < N; kk += 1 ) {
 		await( ! b[kk] || first == id );
-		if ( first == id ) break;
+	  if ( first == id ) break;
 	} // for
 	await( first == id || first == N );
 	first = id;
 	b[id] = false;
 } // mutexB
+
 
 static void *Worker( void *arg ) {
 	TYPE id = (size_t)arg;
@@ -35,14 +39,14 @@ static void *Worker( void *arg ) {
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		entry = 0;
 		while ( stop == 0 ) {
-			announce[id] = true;
+			apply[id] = true;
 			mutexB( id );
-			announce[id] = false;
+			apply[id] = false;
 
 			CriticalSection( id );
 
 			typeof(id) kk = cycleUp( id, N );
-			while ( kk != id && ! announce[kk] )
+			while ( kk != id && ! apply[kk] )
 				kk = cycleUp( kk, N );
 			first = kk == id ? N : kk;
 #ifdef FAST
@@ -64,19 +68,19 @@ static void *Worker( void *arg ) {
 
 void __attribute__((noinline)) ctor() {
 	b = Allocator( N * sizeof(typeof(b[0])) );
-	announce = Allocator( N * sizeof(typeof(announce[0])) );
+	apply = Allocator( N * sizeof(typeof(apply[0])) );
 	for ( TYPE id = 0; id < N; id += 1 ) {				// initialize shared data
-		announce[id] = b[id] = false;
+		apply[id] = b[id] = false;
 	} // for
 	first = N;
 } // ctor
 
 void __attribute__((noinline)) dtor() {
-	free( (void *)announce );
+	free( (void *)apply );
 	free( (void *)b );
 } // dtor
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -std=gnu99 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=ElevatorBurns Harness.c -lpthread -lm" //
+// compile-command: "gcc -Wall -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=ElevatorBurns Harness.c -lpthread -lm" //
 // End: //
