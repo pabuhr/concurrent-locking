@@ -1,6 +1,6 @@
 #!/bin/sh -
 
-algorithms="LamportBakery Hehner LamportFast TaubenfeldBuhr ElevatorSimple ElevatorQueue RMRS MCS"
+algorithms="MCS TaubenfeldBuhr RMRS LamportBakery ElevatorBurns ElevatorSimple ElevatorQueue"
 outdir=`hostname`
 mkdir -p ${outdir}
 
@@ -25,11 +25,11 @@ runalgorithm() {
 rm -rf core
 for algorithm in ${algorithms} ; do
     if [ ${algorithm} = "ElevatorSimple" ] ; then
-	for cas in "WCas1" "WCas2" ; do
+	for cas in "CAS" "WCas1" "WCas2" ; do
 	    runalgorithm ${algorithm} ${cas}
 	done
     elif [ ${algorithm} = "ElevatorQueue" ] ; then
-	for cas in "WCas1" "WCas2" "CAS" ; do
+	for cas in "CAS" "WCas1" "WCas2" ; do
 	    for sig in "" "FLAG" ; do
 		runalgorithm ${algorithm} ${cas} ${sig}
 	    done

@@ -92,14 +92,14 @@ struct ElevatorQueue : rl::test_suite<ElevatorQueue, N> {
 
 	bool WCas( TYPE id ) {
 		b[id]($) = true;
-		for ( unsigned int kk = 0; kk < id; kk += 1 ) {
-			if ( b[kk]($) ) {
+		for ( typeof(id) thr = 0; thr < id; thr += 1 ) {
+			if ( b[thr]($) ) {
 				b[id]($) = false;
 				return false ;
 			} // if
 		} // for
-		for ( unsigned int kk = id + 1; kk < N; kk += 1 ) {
-			await( ! b[kk]($) );
+		for ( typeof(id) thr = id + 1; thr < N; thr += 1 ) {
+			await( ! b[thr]($) );
 		} // for
 		bool leader = ((! fast($)) ? fast($) = true : false);
 		b[id]($) = false;

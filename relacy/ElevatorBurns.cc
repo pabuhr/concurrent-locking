@@ -12,15 +12,15 @@ struct ElevatorBurns : rl::test_suite<ElevatorBurns, N> {
 
 	void mutexB( TYPE id ) {
 		b[id]($) = true;
-		for ( TYPE kk = 0; kk < id; kk += 1 ) {
-			if ( b[kk]($) || first($) == id ) {
+		for ( TYPE thr = 0; thr < id; thr += 1 ) {
+			if ( b[thr]($) || first($) == id ) {
 				b[id]($) = false;
 				await( first($) == id );
 				return;
 			} // if
 		} // for
-		for ( int kk = id + 1; kk < N; kk += 1 ) {
-			await( ! b[kk]($) || first($) == id );
+		for ( int thr = id + 1; thr < N; thr += 1 ) {
+			await( ! b[thr]($) || first($) == id );
 		  if ( first($) == id ) break;
 		} // for
 		await( first($) == id || first($) == N );
@@ -42,14 +42,13 @@ struct ElevatorBurns : rl::test_suite<ElevatorBurns, N> {
 	void thread( TYPE id ) {
 		apply[id]($) = true;
 		mutexB( id );
-		apply[id]($) = false;
 
 		data($) = id + 1;								// critical section
 
-		typeof(id) kk = cycleUp( id, N );
-		while ( kk != id && ! apply[kk]($) )
-			kk = cycleUp( kk, N );
-		first($) = kk == id ? N : kk;
+		typeof(id) thr;
+		for ( thr = cycleUp( id, N ); ! apply[thr]($); thr = cycleUp( thr, N ) );
+		apply[id]($) = false;							// must appear before setting first
+		first($) = thr == id ? N : thr;
 	} // thread
 }; // ElevatorBurns
 

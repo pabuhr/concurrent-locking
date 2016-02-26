@@ -10,6 +10,12 @@ struct ElevatorSimple : rl::test_suite<ElevatorSimple, N> {
 
 #   define await( E ) while ( ! (E) ) Pause()
 
+#ifdef CAS
+
+	bool WCas( TYPE ) { TYPE comp = false; return fast.compare_exchange_strong( comp, true, std::memory_order_seq_cst ); }
+
+#else // ! CAS
+
 #if defined( WCas1 )
 
 	bool WCas( TYPE id ) {
@@ -36,14 +42,14 @@ struct ElevatorSimple : rl::test_suite<ElevatorSimple, N> {
 
 	bool WCas( TYPE id ) {
 		b[id]($) = true;
-		for ( unsigned int kk = 0; kk < id; kk += 1 ) {
-			if ( b[kk]($) ) {
+		for ( typeof(id) thr = 0; thr < id; thr += 1 ) {
+			if ( b[thr]($) ) {
 				b[id]($) = false;
 				return false ;
 			} // if
 		} // for
-		for ( unsigned int kk = id + 1; kk < N; kk += 1 ) {
-			await( ! b[kk]($) );
+		for ( typeof(id) thr = id + 1; thr < N; thr += 1 ) {
+			await( ! b[thr]($) );
 		} // for
 		bool leader = ((! fast($)) ? fast($) = true : false);
 		b[id]($) = false;
@@ -53,6 +59,8 @@ struct ElevatorSimple : rl::test_suite<ElevatorSimple, N> {
 #else
     #error unsupported architecture
 #endif // WCas
+
+#endif // CAS
 
 	//======================================================
 
@@ -75,14 +83,13 @@ struct ElevatorSimple : rl::test_suite<ElevatorSimple, N> {
 		} else {
 			await( first($) == id );
 		} // if
-		apply[id]($) = false;
 
 		data($) = id + 1;								// critical section
 
-		typeof(id) kk = cycleUp( id, N );
-		while ( kk != id && ! apply[kk]($) )
-			kk = cycleUp( kk, N );
-		first($) = kk == id ? N : kk;
+		typeof(id) thr;
+		for ( thr = cycleUp( id, N ); ! apply[thr]($); thr = cycleUp( thr, N ) );
+		apply[id]($) = false;							// must appear before setting first
+		first($) = thr == id ? N : thr;
 	} // thread
 }; // ElevatorSimple
 

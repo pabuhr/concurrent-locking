@@ -1,33 +1,70 @@
 #include <stdbool.h>
 
-static volatile TYPE first CALIGN;
+static volatile TYPE fast CALIGN, first CALIGN;
 static volatile TYPE *apply CALIGN;
-static volatile TYPE *b CALIGN;
+static volatile TYPE *b CALIGN, x CALIGN, y CALIGN;
+//static volatile TYPE curr CALIGN;
 
 static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
 
 
 #define await( E ) while ( ! (E) ) Pause()
 
-static inline void mutexB( TYPE id ) {
+#ifdef CAS
+
+#define WCas( x ) __sync_bool_compare_and_swap( &(fast), false, true )
+
+#else // ! CAS
+
+#if defined( WCas1 )
+
+static inline bool WCas( TYPE id ) {
+	b[id] = true;
+	x = id;
+	Fence();											// force store before more loads
+	if ( FASTPATH( y != N ) ) {
+		b[id] = false;
+		return false;
+	} // if
+	y = id;
+	Fence();											// force store before more loads
+	if ( FASTPATH( x != id ) ) {
+		b[id] = false;
+		Fence();										// force store before more loads
+		for ( int j = 0; j < N; j += 1 )
+			await( ! b[j] );
+		if ( FASTPATH( y != id ) ) return false;
+	} // if
+	bool leader = ((! fast) ? fast = true : false);
+	y = N;
+	b[id] = false;
+	return leader;
+} // WCas
+
+#elif defined( WCas2 )
+
+static inline bool WCas( TYPE id ) {
 	b[id] = true;
 	Fence();											// force store before more loads
 	for ( typeof(id) thr = 0; thr < id; thr += 1 ) {
-		if ( FASTPATH( b[thr] || first == id ) ) {
+		if ( FASTPATH( b[thr] ) ) {
 			b[id] = false;
-			await( first == id );
-			return;
+			return false ;
 		} // if
 	} // for
 	for ( typeof(id) thr = id + 1; thr < N; thr += 1 ) {
-		await( ! b[thr] || first == id );
-//		if ( first == id ) { b[id] = false; return; }
-		if ( first == id ) break;
+		await( ! b[thr] );
 	} // for
-	await( first == id || first == N );
-	first = id;
+	bool leader = ((! fast) ? fast = true : false);
 	b[id] = false;
-} // mutexB
+	return leader;
+} // WCas
+
+#else
+    #error unsupported architecture
+#endif // WCas
+
+#endif // CAS
 
 
 static void *Worker( void *arg ) {
@@ -42,11 +79,20 @@ static void *Worker( void *arg ) {
 		entry = 0;
 		while ( stop == 0 ) {
 			apply[id] = true;
-			mutexB( id );
+			if ( FASTPATH( WCas( id ) ) ) {
+				Fence();								// force store before more loads
+				await( first == N || first == id );
+				first = id;
+				fast = false;
+			} else {
+				await( first == id );
+			} // if
 
 			CriticalSection( id );
 
 			for ( thr = cycleUp( id, N ); ! apply[thr]; thr = cycleUp( thr, N ) );
+//			for ( thr = cycleUp( curr, N ); ! apply[thr]; thr = cycleUp( thr, N ) );
+//			curr = thr;
 			apply[id] = false;							// must appear before setting first
 			first = (thr == id) ? N : thr;
 #ifdef FAST
@@ -72,7 +118,9 @@ void __attribute__((noinline)) ctor() {
 	for ( TYPE id = 0; id < N; id += 1 ) {				// initialize shared data
 		apply[id] = b[id] = false;
 	} // for
-	first = N;
+	y = first = N;
+//	curr = N;
+	fast = false;
 } // ctor
 
 void __attribute__((noinline)) dtor() {
@@ -82,5 +130,5 @@ void __attribute__((noinline)) dtor() {
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=ElevatorBurns Harness.c -lpthread -lm" //
+// compile-command: "gcc -Wall -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=ElevatorSimple -DWCas1 Harness.c -lpthread -lm" //
 // End: //
