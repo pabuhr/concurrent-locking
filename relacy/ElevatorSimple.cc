@@ -4,9 +4,23 @@
 enum { N = 8 };
 
 struct ElevatorSimple : rl::test_suite<ElevatorSimple, N> {
-	std::atomic<TYPE> fast, first;
-	std::atomic<TYPE> apply[N];
+	typedef struct CALIGN {								// performance gain when fields juxtaposed
+		std::atomic<TYPE> apply;
+#ifdef FLAG
+		std::atomic<TYPE> flag;
+#endif // FLAG
+	} Tstate;
+
+	std::atomic<TYPE> fast;
+	Tstate tstate[N + 1];
+
+#ifndef CAS
 	std::atomic<TYPE> b[N], x, y;
+#endif // ! CAS
+
+#ifndef FLAG
+	std::atomic<TYPE> first;
+#endif // FLAG
 
 #   define await( E ) while ( ! (E) ) Pause()
 
@@ -16,9 +30,9 @@ struct ElevatorSimple : rl::test_suite<ElevatorSimple, N> {
 
 #else // ! CAS
 
-#if defined( WCas1 )
+#if defined( WCasLF )
 
-	bool WCas( TYPE id ) {
+	bool WCas( TYPE id ) {								// based on Lamport-Fast algorithm
 		b[id]($) = true;
 		x($) = id;
 		if ( y($) != N ) {
@@ -38,9 +52,9 @@ struct ElevatorSimple : rl::test_suite<ElevatorSimple, N> {
 		return leader;
 	} // WCas
 
-#elif defined( WCas2 )
+#elif defined( WCasBL )
 
-	bool WCas( TYPE id ) {
+	bool WCas( TYPE id ) {								// based on Burns-Lamport algorithm
 		b[id]($) = true;
 		for ( typeof(id) thr = 0; thr < id; thr += 1 ) {
 			if ( b[thr]($) ) {
@@ -64,32 +78,70 @@ struct ElevatorSimple : rl::test_suite<ElevatorSimple, N> {
 
 	//======================================================
 
-	rl::var<int> data;
-
 	void before() {
-		for ( TYPE id = 0; id < N; id += 1 ) {			// initialize shared data
-			apply[id]($) = b[id]($) = false;
+		for ( TYPE id = 0; id <= N; id += 1 ) {				// initialize shared data
+			tstate[id].apply($) = false;
+#ifdef FLAG
+			tstate[id].flag($) = false;
+#endif // FLAG
 		} // for
-		y($) = first($) = N;
+
+#ifdef FLAG
+		tstate[N].flag($) = true;
+#else
+		first($) = N;
+#endif // FLAG
+
+#ifndef CAS
+		for ( TYPE id = 0; id < N; id += 1 ) {				// initialize shared data
+			b[id]($) = false;
+		} // for
+		y($) = N;
+#endif // CAS
 		fast($) = false;
 	} // before
 
+	rl::var<int> data;
+
 	void thread( TYPE id ) {
-		apply[id]($) = true;
+		typeof(tstate[0].apply) *applyId = &tstate[id].apply;
+#ifdef FLAG
+		typeof(tstate[0].flag) *flagId = &tstate[id].flag;
+		typeof(tstate[0].flag) *flagN = &tstate[N].flag;
+#endif // FLAG
+
+		(*applyId)($) = true;
 		if ( WCas( id ) ) {
+#ifdef FLAG
+			await( (*flagN)($) || (*flagId)($) );
+			(*flagN)($) = false;
+#else
 			await( first($) == N || first($) == id );
 			first($) = id;
+#endif // FLAG
 			fast($) = false;
 		} else {
+#ifdef FLAG
+			await( (*flagId)($) );
+#else
 			await( first($) == id );
+#endif // FLAG
 		} // if
+#ifdef FLAG
+		(*flagId)($) = false;
+#endif // FLAG
 
 		data($) = id + 1;								// critical section
 
 		typeof(id) thr;
-		for ( thr = cycleUp( id, N ); ! apply[thr]($); thr = cycleUp( thr, N ) );
-		apply[id]($) = false;							// must appear before setting first
-		first($) = thr == id ? N : thr;
+		for ( thr = cycleUp( id, N ); ! tstate[thr].apply($); thr = cycleUp( thr, N ) );
+		(*applyId)($) = false;							// must appear before setting first
+		if ( thr != id )
+#ifdef FLAG
+			tstate[thr].flag($) = true; else (*flagN)($) = true;
+#else
+			first($) = thr; else first($) = N;
+#endif // FLAG
 	} // thread
 }; // ElevatorSimple
 

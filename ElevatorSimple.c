@@ -1,9 +1,22 @@
 #include <stdbool.h>
 
-static volatile TYPE fast CALIGN, first CALIGN;
-static volatile TYPE *apply CALIGN;
+typedef struct CALIGN {									// performance gain when fields juxtaposed
+	TYPE apply;
+#ifdef FLAG
+	TYPE flag;
+#endif // FLAG
+} Tstate;
+
+static volatile TYPE fast CALIGN;
+static volatile Tstate *tstate CALIGN;
+
+#ifndef CAS
 static volatile TYPE *b CALIGN, x CALIGN, y CALIGN;
-//static volatile TYPE curr CALIGN;
+#endif // ! CAS
+
+#ifndef FLAG
+static volatile TYPE first CALIGN;
+#endif // FLAG
 
 static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
 
@@ -16,9 +29,9 @@ static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false shar
 
 #else // ! CAS
 
-#if defined( WCas1 )
+#if defined( WCasLF )
 
-static inline bool WCas( TYPE id ) {
+static inline bool WCas( TYPE id ) {					// based on Lamport-Fast algorithm
 	b[id] = true;
 	x = id;
 	Fence();											// force store before more loads
@@ -41,9 +54,9 @@ static inline bool WCas( TYPE id ) {
 	return leader;
 } // WCas
 
-#elif defined( WCas2 )
+#elif defined( WCasBL )
 
-static inline bool WCas( TYPE id ) {
+static inline bool WCas( TYPE id ) {					// based on Burns-Lamport algorithm
 	b[id] = true;
 	Fence();											// force store before more loads
 	for ( typeof(id) thr = 0; thr < id; thr += 1 ) {
@@ -70,39 +83,79 @@ static inline bool WCas( TYPE id ) {
 static void *Worker( void *arg ) {
 	TYPE id = (size_t)arg;
 	uint64_t entry;
+
+	volatile typeof(tstate[0].apply) *applyId = &tstate[id].apply;
+#ifdef FLAG
+	volatile typeof(tstate[0].flag) *flagId = &tstate[id].flag;
+	volatile typeof(tstate[0].flag) *flagN = &tstate[N].flag;
+#endif // FLAG
+
 #ifdef FAST
-	unsigned int cnt = 0, oid = id;
+	typeof(id) cnt = 0, oid = id;
 #endif // FAST
 	typeof(id) thr;
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		entry = 0;
 		while ( stop == 0 ) {
-			apply[id] = true;
+			*applyId = true;
 			if ( FASTPATH( WCas( id ) ) ) {
+#ifndef CAS
 				Fence();								// force store before more loads
+#endif // ! CAS
+
+#ifdef FLAG
+				await( *flagN || *flagId );
+				*flagN = false;
+#else
 				await( first == N || first == id );
 				first = id;
+#endif // FLAG
 				fast = false;
 			} else {
+#ifdef FLAG
+				await( *flagId );
+#else
 				await( first == id );
+#endif // FLAG
 			} // if
+#ifdef FLAG
+			*flagId = false;
+#endif // FLAG
 
 			CriticalSection( id );
 
-			for ( thr = cycleUp( id, N ); ! apply[thr]; thr = cycleUp( thr, N ) );
+			for ( thr = cycleUp( id, N ); ! tstate[thr].apply; thr = cycleUp( thr, N ) );
 //			for ( thr = cycleUp( curr, N ); ! apply[thr]; thr = cycleUp( thr, N ) );
 //			curr = thr;
-			apply[id] = false;							// must appear before setting first
-			first = (thr == id) ? N : thr;
+			*applyId = false;							// must appear before setting first
+			if ( FASTPATH( thr != id ) )
+#ifdef FLAG
+				tstate[thr].flag = true; else *flagN = true;
+#else
+				first = thr; else first = N;
+#endif // FLAG
+
 #ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
 			cnt = cycleUp( cnt, NoStartPoints );
+
+			applyId = &tstate[id].apply;				// must reset for new id
+#ifdef FLAG
+			flagId = &tstate[id].flag;
+			flagN = &tstate[N].flag;
+#endif // FLAG
 #endif // FAST
 			entry += 1;
 		} // while
 #ifdef FAST
 		id = oid;
+
+		applyId = &tstate[id].apply;					// must reset for new id
+#ifdef FLAG
+		flagId = &tstate[id].flag;
+		flagN = &tstate[N].flag;
+#endif // FLAG
 #endif // FAST
 		entries[r][id] = entry;
 		__sync_fetch_and_add( &Arrived, 1 );
@@ -113,22 +166,39 @@ static void *Worker( void *arg ) {
 } // Worker
 
 void __attribute__((noinline)) ctor() {
-	b = Allocator( N * sizeof(typeof(b[0])) );
-	apply = Allocator( N * sizeof(typeof(apply[0])) );
-	for ( TYPE id = 0; id < N; id += 1 ) {				// initialize shared data
-		apply[id] = b[id] = false;
+	tstate = Allocator( (N + 1) * sizeof(typeof(tstate[0])) );
+	for ( TYPE id = 0; id <= N; id += 1 ) {				// initialize shared data
+		tstate[id].apply = false;
+#ifdef FLAG
+		tstate[id].flag = false;
+#endif // FLAG
 	} // for
-	y = first = N;
+
+#ifdef FLAG
+	tstate[N].flag = true;
+#else
+	first = N;
+#endif // FLAG
+
+#ifndef CAS
+	b = Allocator( N * sizeof(typeof(b[0])) );
+	for ( TYPE id = 0; id < N; id += 1 ) {				// initialize shared data
+		b[id] = false;
+	} // for
+	y = N;
+#endif // CAS
 //	curr = N;
 	fast = false;
 } // ctor
 
 void __attribute__((noinline)) dtor() {
-	free( (void *)apply );
+#ifndef CAS
 	free( (void *)b );
+#endif // ! CAS
+	free( (void *)tstate );
 } // dtor
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=ElevatorSimple -DWCas1 Harness.c -lpthread -lm" //
+// compile-command: "gcc -Wall -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=ElevatorSimple -DWCasLF Harness.c -lpthread -lm" //
 // End: //

@@ -1,6 +1,7 @@
 #!/bin/sh -
 
-algorithms="MCS TaubenfeldBuhr RMRS LamportBakery ElevatorBurns ElevatorSimple ElevatorQueue"
+#algorithms="MCS TaubenfeldBuhr RMRS LamportBakery ElevatorBurns ElevatorSimple ElevatorQueue"
+algorithms="ElevatorSimple ElevatorQueue"
 outdir=`hostname`
 mkdir -p ${outdir}
 
@@ -11,10 +12,10 @@ fi
 cflag="-Wall -Werror -std=gnu11 -g -O3 -DNDEBUG -fno-reorder-functions -DPIN" #
 
 runalgorithm() {
-    for flag in "" "FAST" ; do
-	echo "${outdir}/${1}${2}${3}${flag}"
-	gcc ${cflag} ${flag:+-D${flag}} ${2:+-D${2}} ${3:+-D${3}} ${4:+-D${4}} -DAlgorithm=${1} Harness.c -lpthread -lm
-	./run1 > "${outdir}/${1}${2}${3}${flag}"
+    for contention in "" "FAST" ; do
+	echo "${outdir}/${1}${2}${3}${contention}"
+	gcc ${cflag} ${contention:+-D${contention}} ${2:+-D${2}} ${3:+-D${3}} ${4:+-D${4}} -DAlgorithm=${1} Harness.c -lpthread -lm
+	./run1 > "${outdir}/${1}${2}${3}${contention}"
 	if [ -f core ] ; then
 	    echo core generated for ${1}
 	    break
@@ -24,17 +25,15 @@ runalgorithm() {
 
 rm -rf core
 for algorithm in ${algorithms} ; do
-    if [ ${algorithm} = "ElevatorSimple" ] ; then
-	for cas in "CAS" "WCas1" "WCas2" ; do
-	    runalgorithm ${algorithm} ${cas}
-	done
-    elif [ ${algorithm} = "ElevatorQueue" ] ; then
-	for cas in "CAS" "WCas1" "WCas2" ; do
-	    for sig in "" "FLAG" ; do
-		runalgorithm ${algorithm} ${cas} ${sig}
+    if [ ${algorithm} = "ElevatorSimple" -o ${algorithm} = "ElevatorQueue" ] ; then
+	for cas in "CAS" "WCasLF" "WCasBL" ; do
+	    for flag in "" "FLAG" ; do
+		runalgorithm ${algorithm} ${cas} ${flag}
 	    done
 	done
     else
 	runalgorithm ${algorithm}
     fi
 done
+
+rm -f a.out

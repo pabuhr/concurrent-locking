@@ -46,17 +46,14 @@ typedef struct CALIGN {									// performance gain when fields juxtaposed
 
 static volatile TYPE fast CALIGN;
 static volatile Tstate *tstate CALIGN;
-//static volatile TYPE *apply CALIGN;
 static volatile TYPE *val CALIGN;
 
 #ifndef CAS
 static volatile TYPE *b CALIGN, x CALIGN, y CALIGN;
 #endif // ! CAS
 
-#ifdef FLAG
-//static volatile TYPE *fast CALIGN;
-#else
-static volatile TYPE lock CALIGN;
+#ifndef FLAG
+static volatile TYPE first CALIGN;
 #endif // FLAG
 
 static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
@@ -70,9 +67,9 @@ static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false shar
 
 #else // ! CAS
 
-#if defined( WCas1 )
+#if defined( WCasLF )
 
-static inline bool WCas( TYPE id ) {
+static inline bool WCas( TYPE id ) {					// based on Lamport-Fast algorithm
 	b[id] = true;
 	x = id;
 	Fence();											// force store before more loads
@@ -95,9 +92,9 @@ static inline bool WCas( TYPE id ) {
 	return leader;
 } // WCas
 
-#elif defined( WCas2 )
+#elif defined( WCasBL )
 
-static inline bool WCas( TYPE id ) {
+static inline bool WCas( TYPE id ) {					// based on Burns-Lamport algorithm
 	b[id] = true;
 	Fence();											// force store before more loads
 	for ( typeof(id) thr = 0; thr < id; thr += 1 ) {
@@ -133,7 +130,7 @@ static void *Worker( void *arg ) {
 #endif // FLAG
 
 #ifdef FAST
-	unsigned int cnt = 0, oid = id;
+	typeof(id) cnt = 0, oid = id;
 #endif // FAST
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
@@ -156,16 +153,15 @@ static void *Worker( void *arg ) {
 				await( *flagN || *flagId );
 				*flagN = false;
 #else
-				await( lock == N || lock == id );
-				lock = id;
+				await( first == N || first == id );
+				first = id;
 #endif // FLAG
-
 				fast = false;
 			} else {
 #ifdef FLAG
 				await( *flagId );
 #else
-				await( lock == id );
+				await( first == id );
 #endif // FLAG
 			} // if
 #ifdef FLAG
@@ -176,34 +172,40 @@ static void *Worker( void *arg ) {
 			CriticalSection( id );
 
 			// loop goes from child of root to leaf and inspects siblings
-			for ( int j = dep - 1; j >= 0; j -= 1 ) { // must be "signed"
+			for ( int j = dep - 1; j >= 0; j -= 1 ) {	// must be "signed"
 				typeof(val[0]) k = val[(n >> j) ^ 1];
 				if ( FASTPATH( tstate[k].apply ) ) {
 					tstate[k].apply = false;
 					Qenqueue( &queue, k );
 				} // if
 			}  // for
-			if ( FASTPATH( QnotEmpty( &queue ) ) ) {
+			if ( FASTPATH( QnotEmpty( &queue ) ) )
 #ifdef FLAG
-				tstate[Qdequeue( &queue )].flag = true;
+				tstate[Qdequeue( &queue )].flag = true; else *flagN = true;
 #else
-				lock = Qdequeue( &queue );
-#endif // FLAG
-			} else
-#ifdef FLAG
-				*flagN = true;
-#else
-				lock = N;
+				first = Qdequeue( &queue ); else first = N;
 #endif // FLAG
 
 #ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
 			cnt = cycleUp( cnt, NoStartPoints );
+
+			applyId = &tstate[id].apply;				// must reset
+#ifdef FLAG
+			flagId = &tstate[id].flag;
+			flagN = &tstate[N].flag;
+#endif // FLAG
 #endif // FAST
 			entry += 1;
 		} // while
 #ifdef FAST
 		id = oid;
+
+		applyId = &tstate[id].apply;					// must reset
+#ifdef FLAG
+		flagId = &tstate[id].flag;
+		flagN = &tstate[N].flag;
+#endif // FLAG
 #endif // FAST
 		entries[r][id] = entry;
 		__sync_fetch_and_add( &Arrived, 1 );
@@ -226,7 +228,7 @@ void __attribute__((noinline)) ctor() {
 #ifdef FLAG
 	tstate[N].flag = true;
 #else
-	lock = N;
+	first = N;
 #endif // FLAG
 
 	val = Allocator( 2 * N * sizeof(typeof(val[0])) );
@@ -235,23 +237,20 @@ void __attribute__((noinline)) ctor() {
 		val[N + id] = id;
 	} // for
 
-#ifdef CAS
-	fast = false;
-#else
+#ifndef CAS
 	b = Allocator( N * sizeof(typeof(b[0])) );
 	for ( TYPE id = 0; id < N; id += 1 ) {				// initialize shared data
 		b[id] = false;
 	} // for
 	y = N;
-	fast = false;
 #endif // CAS
+	fast = false;
 } // ctor
 
 void __attribute__((noinline)) dtor() {
 #ifndef CAS
 	free( (void *)b );
 #endif // ! CAS
-
 	free( (void *)val );
 	free( (void *)tstate );
 	Qdtor( &queue );
@@ -259,5 +258,5 @@ void __attribute__((noinline)) dtor() {
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=ElevatorQueue Harness.c -lpthread -lm" //
+// compile-command: "gcc -Wall -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=ElevatorQueue -DWCasLF Harness.c -lpthread -lm" //
 // End: //

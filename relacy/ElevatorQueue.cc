@@ -45,17 +45,14 @@ struct ElevatorQueue : rl::test_suite<ElevatorQueue, N> {
 
 	std::atomic<TYPE> fast;
 	Tstate tstate[N + 1];
-	//static volatile TYPE *apply CALIGN;
 	std::atomic<TYPE> val[2 * N];
 
 #ifndef CAS
 	std::atomic<TYPE> b[N], x, y;
 #endif // ! CAS
 
-#ifdef FLAG
-	//static volatile TYPE *fast CALIGN;
-#else
-	std::atomic<TYPE> lock;
+#ifndef FLAG
+	std::atomic<TYPE> first;
 #endif // FLAG
 
 #   define await( E ) while ( ! (E) ) Pause()
@@ -66,9 +63,9 @@ struct ElevatorQueue : rl::test_suite<ElevatorQueue, N> {
 
 #else // ! CAS
 
-#if defined( WCas1 )
+#if defined( WCasLF )
 
-	bool WCas( TYPE id ) {
+	bool WCas( TYPE id ) {								// based on Lamport-Fast algorithm
 		b[id]($) = true;
 		x($) = id;
 		if ( y($) != N ) {
@@ -88,9 +85,9 @@ struct ElevatorQueue : rl::test_suite<ElevatorQueue, N> {
 		return leader;
 	} // WCas
 
-#elif defined( WCas2 )
+#elif defined( WCasBL )
 
-	bool WCas( TYPE id ) {
+	bool WCas( TYPE id ) {								// based on Burns-Lamport algorithm
 		b[id]($) = true;
 		for ( typeof(id) thr = 0; thr < id; thr += 1 ) {
 			if ( b[thr]($) ) {
@@ -126,7 +123,7 @@ struct ElevatorQueue : rl::test_suite<ElevatorQueue, N> {
 #ifdef FLAG
 		tstate[N].flag($) = true;
 #else
-		lock($) = N;
+		first($) = N;
 #endif // FLAG
 
 		for ( TYPE id = 0; id < N; id += 1 ) {				// initialize shared data
@@ -134,15 +131,13 @@ struct ElevatorQueue : rl::test_suite<ElevatorQueue, N> {
 			val[N + id]($) = id;
 		} // for
 
-#ifdef CAS
-		fast($) = false;
-#else
+#ifndef CAS
 		for ( TYPE id = 0; id < N; id += 1 ) {				// initialize shared data
 			b[id]($) = false;
 		} // for
 		y($) = N;
-		fast($) = false;
 #endif // CAS
+		fast($) = false;
 	} // before
 
 	rl::var<int> data;
@@ -155,57 +150,47 @@ struct ElevatorQueue : rl::test_suite<ElevatorQueue, N> {
 		typeof(tstate[0].flag) *flagN = &tstate[N].flag;
 #endif // FLAG
 
-#ifdef FAST
-		unsigned int cnt = 0, oid = id;
-#endif // FAST
-
 		(*applyId)($) = true;
 		// loop goes from parent of leaf to child of root
 		for ( unsigned int j = (n >> 1); j > 1; j >>= 1 )
 			val[j]($) = id;
 
-			if ( WCas( id ) ) {
+		if ( WCas( id ) ) {
 #ifdef FLAG
-				await( (*flagN)($) || (*flagId)($) );
-				(*flagN)($) = false;
+			await( (*flagN)($) || (*flagId)($) );
+			(*flagN)($) = false;
 #else
-				await( lock($) == N || lock($) == id );
-				lock($) = id;
+			await( first($) == N || first($) == id );
+			first($) = id;
 #endif // FLAG
-				fast($) = false;
-			} else {
+			fast($) = false;
+		} else {
 #ifdef FLAG
-				await( (*flagId)($) );
+			await( (*flagId)($) );
 #else
-				await( lock($) == id );
+			await( first($) == id );
 #endif // FLAG
+		} // if
+#ifdef FLAG
+		(*flagId)($) = false;
+#endif // FLAG
+		(*applyId)($) = false;
+
+		data($) = id + 1;								// critical section
+
+		// loop goes from child of root to leaf and inspects siblings
+		for ( int j = dep - 1; j >= 0; j -= 1 ) {	// must be "signed"
+			TYPE k = val[(n >> j) ^ 1]($);
+			if ( tstate[k].apply($) ) {
+				tstate[k].apply($) = false;
+				Qenqueue( &queue, k );
 			} // if
+		}  // for
+		if ( QnotEmpty( &queue ) )
 #ifdef FLAG
-			(*flagId)($) = false;
-#endif // FLAG
-			(*applyId)($) = false;
-
-			data($) = id + 1;							// critical section
-
-			// loop goes from child of root to leaf and inspects siblings
-			for ( int j = dep - 1; j >= 0; j -= 1 ) { // must be "signed"
-				TYPE k = val[(n >> j) ^ 1]($);
-				if ( tstate[k].apply($) ) {
-					tstate[k].apply($) = false;
-					Qenqueue( &queue, k );
-				} // if
-			}  // for
-			if ( QnotEmpty( &queue ) ) {
-#ifdef FLAG
-				tstate[Qdequeue( &queue )].flag($) = true;
+			tstate[Qdequeue( &queue )].flag($) = true; else (*flagN)($) = true;
 #else
-				lock($) = Qdequeue( &queue );
-#endif // FLAG
-			} else
-#ifdef FLAG
-				(*flagN)($) = true;
-#else
-				lock($) = N;
+		first($) = Qdequeue( &queue ); else first($) = N;
 #endif // FLAG
 	} // thread
 }; // ElevatorQueue
