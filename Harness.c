@@ -63,22 +63,22 @@ static inline void *CAS32( volatile void *ptr, void *cmp, void *set ) {
 
 // pause to prevent excess processor bus usage
 #if defined( __sparc )
-#define Pause() __asm__ __volatile__ ( "rd %ccr,%g0" )
+	#define Pause() __asm__ __volatile__ ( "rd %ccr,%g0" )
 #elif defined( __i386 ) || defined( __x86_64 )
-#define Pause() __asm__ __volatile__ ( "pause" : : : )
+	#define Pause() __asm__ __volatile__ ( "pause" : : : )
 #else
-#error unsupported architecture
+	#error unsupported architecture
 #endif
 
 //#if defined( __i386 ) || defined( __x86_64 )
 #ifdef FAST
-// unlikely
-#define FASTPATH(x) __builtin_expect(!!(x), 0)
-#define SLOWPATH(x) __builtin_expect(!!(x), 1)
+	// unlikely
+	#define FASTPATH(x) __builtin_expect(!!(x), 0)
+	#define SLOWPATH(x) __builtin_expect(!!(x), 1)
 #else
-// likely
-#define FASTPATH(x) __builtin_expect(!!(x), 1)
-#define SLOWPATH(x) __builtin_expect(!!(x), 0)
+	// likely
+	#define FASTPATH(x) __builtin_expect(!!(x), 1)
+	#define SLOWPATH(x) __builtin_expect(!!(x), 0)
 #endif // FASTPATH
 //#else
 //#define FASTPATH(x) (x)
@@ -95,28 +95,28 @@ static inline void *CAS32( volatile void *ptr, void *cmp, void *set ) {
 // processors.  Solaris, the JVM, etc., all assume TSO where atomics have full fence semantics.
 
 #if defined(__sparc)
-#define Fence() __asm__ __volatile__ ( "membar #StoreLoad;" )
-// On x86, use either MFENCE; LOCK:ADDN 0,[SP]; or XCHGN to implement Fence().  See
-// https://blogs.oracle.com/dave/entry/instruction_selection_for_volatile_fences We could be slightly more clever and
-// merge the ST and FENCE into a single STFenced(Location,Value) primitive which is implemented via XCHG.  On SPARC
-// STFenced() is implemented via ST;MEMBAR.
+	#define Fence() __asm__ __volatile__ ( "membar #StoreLoad;" )
+	// On x86, use either MFENCE; LOCK:ADDN 0,[SP]; or XCHGN to implement Fence().  See
+	// https://blogs.oracle.com/dave/entry/instruction_selection_for_volatile_fences We could be slightly more clever
+	// and merge the ST and FENCE into a single STFenced(Location,Value) primitive which is implemented via XCHG.  On
+	// SPARC STFenced() is implemented via ST;MEMBAR.
 #elif defined(__x86_64) 
-//#define Fence() __asm__ __volatile__ ( "mfence" )
-#define Fence() __asm__ __volatile__ ( "lock; addq $0,(%%rsp);" ::: "cc" )
+	//#define Fence() __asm__ __volatile__ ( "mfence" )
+	#define Fence() __asm__ __volatile__ ( "lock; addq $0,(%%rsp);" ::: "cc" )
 #elif defined(__i386)
-#define Fence() __asm__ __volatile__ ( "lock; addl $0,(%%esp);" ::: "cc" )
+	#define Fence() __asm__ __volatile__ ( "lock; addl $0,(%%esp);" ::: "cc" )
 #else
-#error unsupported architecture
+	#error unsupported architecture
 #endif
 
 // memory allocator to align or not align storage
 #if defined( __sparc )
-//#define Allocator( size ) malloc( (size) )
-#define Allocator( size ) memalign( CACHE_ALIGN, (size) )
+	//#define Allocator( size ) malloc( (size) )
+	#define Allocator( size ) memalign( CACHE_ALIGN, (size) )
 #elif defined( __i386 ) || defined( __x86_64 )
-#define Allocator( size ) memalign( CACHE_ALIGN, (size) )
+	#define Allocator( size ) memalign( CACHE_ALIGN, (size) )
 #else
-#error unsupported architecture
+	#error unsupported architecture
 #endif
 
 //------------------------------------------------------------------------------

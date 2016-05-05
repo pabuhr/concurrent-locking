@@ -295,8 +295,8 @@ void __attribute__((noinline)) dtor2() {
 } // dtor2
 
 void __attribute__((noinline)) dtor() {
-	free( (void *)b );
 	dtor2();											// tournament deallocation
+	free( (void *)b );
 } // dtor
 
 // Local Variables: //
