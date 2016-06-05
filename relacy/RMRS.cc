@@ -110,7 +110,7 @@ struct RMRS : rl::test_suite<RMRS, N> {
 		} // for
 
 		toursize = Clog2( N ) + 1;
-		int levelSize = 1 << Clog2( N );				// 2^|log N|
+		int levelSize = 1 << (toursize - 1);			// 2^|log N|
 
 		for ( int i = 0; i < toursize; i += 1 ) {
 			for ( int j = 0; j < levelSize; j += 1 ) {

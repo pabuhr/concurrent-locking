@@ -28,9 +28,25 @@ struct ElevatorSimple : rl::test_suite<ElevatorSimple, N> {
 
 	bool WCas( TYPE ) { TYPE comp = false; return fast.compare_exchange_strong( comp, true, std::memory_order_seq_cst ); }
 
-#else // ! CAS
+#elif defined( WCasBL )
 
-#if defined( WCasLF )
+	bool WCas( TYPE id ) {								// based on Burns-Lamport algorithm
+		b[id]($) = true;
+		for ( typeof(id) thr = 0; thr < id; thr += 1 ) {
+			if ( b[thr]($) ) {
+				b[id]($) = false;
+				return false ;
+			} // if
+		} // for
+		for ( typeof(id) thr = id + 1; thr < N; thr += 1 ) {
+			await( ! b[thr]($) );
+		} // for
+		bool leader = ((! fast($)) ? fast($) = true : false);
+		b[id]($) = false;
+		return leader;
+	} // WCas
+
+#elif defined( WCasLF )
 
 	bool WCas( TYPE id ) {								// based on Lamport-Fast algorithm
 		b[id]($) = true;
@@ -52,29 +68,9 @@ struct ElevatorSimple : rl::test_suite<ElevatorSimple, N> {
 		return leader;
 	} // WCas
 
-#elif defined( WCasBL )
-
-	bool WCas( TYPE id ) {								// based on Burns-Lamport algorithm
-		b[id]($) = true;
-		for ( typeof(id) thr = 0; thr < id; thr += 1 ) {
-			if ( b[thr]($) ) {
-				b[id]($) = false;
-				return false ;
-			} // if
-		} // for
-		for ( typeof(id) thr = id + 1; thr < N; thr += 1 ) {
-			await( ! b[thr]($) );
-		} // for
-		bool leader = ((! fast($)) ? fast($) = true : false);
-		b[id]($) = false;
-		return leader;
-	} // WCas
-
 #else
     #error unsupported architecture
 #endif // WCas
-
-#endif // CAS
 
 	//======================================================
 

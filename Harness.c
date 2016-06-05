@@ -511,7 +511,7 @@ int main( int argc, char *argv[] ) {
 		sum += diff * diff;
 	} // for
 	double std = sqrt( sum / Threads );
-	printf( " %.1f %.1f %.1f%%", avg, std, std / avg * 100 );
+	printf( " %.1f %.1f %.1f%%", avg, std, avg == 0 ? 0.0 : std / avg * 100 );
 
 #ifdef CNT
 	uint64_t cnt1 = 0, cnt2 = 0, cnt3 = 0;

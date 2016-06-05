@@ -168,7 +168,6 @@ void __attribute__((noinline)) ctor() {
 	toursize = Clog2( N ) + 1;
 	tournament = malloc( toursize * sizeof(typeof(tournament[0])) );
 	int levelSize = 1 << (toursize - 1);				// 2^|log N|
-	printf( "%d %d\n", toursize, levelSize );
 
 	for ( int i = 0; i < toursize; i += 1 ) {
 		tournament[i] = malloc( levelSize * sizeof(typeof(tournament[0][0])) );

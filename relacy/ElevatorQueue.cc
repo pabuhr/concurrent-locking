@@ -61,9 +61,25 @@ struct ElevatorQueue : rl::test_suite<ElevatorQueue, N> {
 
 	bool WCas( TYPE ) { TYPE comp = false; return fast.compare_exchange_strong( comp, true, std::memory_order_seq_cst ); }
 
-#else // ! CAS
+#elif defined( WCasBL )
 
-#if defined( WCasLF )
+	bool WCas( TYPE id ) {								// based on Burns-Lamport algorithm
+		b[id]($) = true;
+		for ( typeof(id) thr = 0; thr < id; thr += 1 ) {
+			if ( b[thr]($) ) {
+				b[id]($) = false;
+				return false ;
+			} // if
+		} // for
+		for ( typeof(id) thr = id + 1; thr < N; thr += 1 ) {
+			await( ! b[thr]($) );
+		} // for
+		bool leader = ((! fast($)) ? fast($) = true : false);
+		b[id]($) = false;
+		return leader;
+	} // WCas
+
+#elif defined( WCasLF )
 
 	bool WCas( TYPE id ) {								// based on Lamport-Fast algorithm
 		b[id]($) = true;
@@ -85,35 +101,15 @@ struct ElevatorQueue : rl::test_suite<ElevatorQueue, N> {
 		return leader;
 	} // WCas
 
-#elif defined( WCasBL )
-
-	bool WCas( TYPE id ) {								// based on Burns-Lamport algorithm
-		b[id]($) = true;
-		for ( typeof(id) thr = 0; thr < id; thr += 1 ) {
-			if ( b[thr]($) ) {
-				b[id]($) = false;
-				return false ;
-			} // if
-		} // for
-		for ( typeof(id) thr = id + 1; thr < N; thr += 1 ) {
-			await( ! b[thr]($) );
-		} // for
-		bool leader = ((! fast($)) ? fast($) = true : false);
-		b[id]($) = false;
-		return leader;
-	} // WCas
-
 #else
     #error unsupported architecture
 #endif // WCas
-
-#endif // CAS
 
 	//======================================================
 
 	void before() {
 		Qctor( &queue );
-		for ( TYPE id = 0; id <= N; id += 1 ) {				// initialize shared data
+		for ( TYPE id = 0; id <= N; id += 1 ) {			// initialize shared data
 			tstate[id].apply($) = false;
 #ifdef FLAG
 			tstate[id].flag($) = false;
@@ -126,13 +122,13 @@ struct ElevatorQueue : rl::test_suite<ElevatorQueue, N> {
 		first($) = N;
 #endif // FLAG
 
-		for ( TYPE id = 0; id < N; id += 1 ) {				// initialize shared data
+		for ( TYPE id = 0; id < N; id += 1 ) {			// initialize shared data
 			val[id]($) = N;
 			val[N + id]($) = id;
 		} // for
 
 #ifndef CAS
-		for ( TYPE id = 0; id < N; id += 1 ) {				// initialize shared data
+		for ( TYPE id = 0; id < N; id += 1 ) {			// initialize shared data
 			b[id]($) = false;
 		} // for
 		y($) = N;
@@ -150,8 +146,8 @@ struct ElevatorQueue : rl::test_suite<ElevatorQueue, N> {
 		typeof(tstate[0].flag) *flagN = &tstate[N].flag;
 #endif // FLAG
 
-		(*applyId)($) = true;
 		// loop goes from parent of leaf to child of root
+		(*applyId)($) = true;
 		for ( unsigned int j = (n >> 1); j > 1; j >>= 1 )
 			val[j]($) = id;
 
@@ -179,7 +175,7 @@ struct ElevatorQueue : rl::test_suite<ElevatorQueue, N> {
 		data($) = id + 1;								// critical section
 
 		// loop goes from child of root to leaf and inspects siblings
-		for ( int j = dep - 1; j >= 0; j -= 1 ) {	// must be "signed"
+		for ( int j = dep - 1; j >= 0; j -= 1 ) {		// must be "signed"
 			TYPE k = val[(n >> j) ^ 1]($);
 			if ( tstate[k].apply($) ) {
 				tstate[k].apply($) = false;
@@ -203,5 +199,5 @@ int main() {
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "g++ -Wall -O3 -DNDEBUG -I/u/pabuhr/software/relacy_2_4 ElevatorQueue.cc" //
+// compile-command: "g++ -Wall -O3 -DNDEBUG -DCAS -I/u/pabuhr/software/relacy_2_4 ElevatorQueue.cc" //
 // End: //

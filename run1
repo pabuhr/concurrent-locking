@@ -23,7 +23,7 @@
 
 T=1
 N=32		# T to N threads tested
-Time=60 	# R x Time = length of experiment
+Time=10 	# R x Time = length of experiment
 
 case ${HOST} in				# set cpusets for appropriate computer
     "plg7" ) echo $$ > /cpuset/cg32_63/tasks ;;

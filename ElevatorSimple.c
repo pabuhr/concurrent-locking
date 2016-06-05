@@ -27,9 +27,26 @@ static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false shar
 
 #define WCas( x ) __sync_bool_compare_and_swap( &(fast), false, true )
 
-#else // ! CAS
+#elif defined( WCasBL )
 
-#if defined( WCasLF )
+static inline bool WCas( TYPE id ) {					// based on Burns-Lamport algorithm
+	b[id] = true;
+	Fence();											// force store before more loads
+	for ( typeof(id) thr = 0; thr < id; thr += 1 ) {
+		if ( FASTPATH( b[thr] ) ) {
+			b[id] = false;
+			return false ;
+		} // if
+	} // for
+	for ( typeof(id) thr = id + 1; thr < N; thr += 1 ) {
+		await( ! b[thr] );
+	} // for
+	bool leader = ((! fast) ? fast = true : false);
+	b[id] = false;
+	return leader;
+} // WCas
+
+#elif defined( WCasLF )
 
 static inline bool WCas( TYPE id ) {					// based on Lamport-Fast algorithm
 	b[id] = true;
@@ -54,30 +71,9 @@ static inline bool WCas( TYPE id ) {					// based on Lamport-Fast algorithm
 	return leader;
 } // WCas
 
-#elif defined( WCasBL )
-
-static inline bool WCas( TYPE id ) {					// based on Burns-Lamport algorithm
-	b[id] = true;
-	Fence();											// force store before more loads
-	for ( typeof(id) thr = 0; thr < id; thr += 1 ) {
-		if ( FASTPATH( b[thr] ) ) {
-			b[id] = false;
-			return false ;
-		} // if
-	} // for
-	for ( typeof(id) thr = id + 1; thr < N; thr += 1 ) {
-		await( ! b[thr] );
-	} // for
-	bool leader = ((! fast) ? fast = true : false);
-	b[id] = false;
-	return leader;
-} // WCas
-
 #else
     #error unsupported architecture
 #endif // WCas
-
-#endif // CAS
 
 
 static void *Worker( void *arg ) {
@@ -98,17 +94,17 @@ static void *Worker( void *arg ) {
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		entry = 0;
 		while ( stop == 0 ) {
-			*applyId = true;
-			if ( FASTPATH( WCas( id ) ) ) {
+			*applyId = true;							// entry protocol
+			if ( FASTPATH( WCas( id ) ) ) {				// true => leader
 #ifndef CAS
 				Fence();								// force store before more loads
 #endif // ! CAS
 
 #ifdef FLAG
-				await( *flagN || *flagId );
+				await( *flagId || *flagN );
 				*flagN = false;
 #else
-				await( first == N || first == id );
+				await( first == id || first == N );
 				first = id;
 #endif // FLAG
 				fast = false;
