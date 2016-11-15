@@ -4,11 +4,11 @@
 #include <stdint.h>										// uint*_t
 
 typedef union {
-	uint32_t atom;										// ensure atomic assignment
 	struct {
 		uint16_t level;									// current level in tournament
 		uint16_t state;									// intent to enter critical section
 	} tuple;
+	uint32_t atom;										// ensure atomic assignment
 } Tuple;
 
 #define L(t) ((t).tuple.level)
@@ -28,7 +28,7 @@ uint32_t QMAX( TYPE id, int k ) {
 		opp.atom = Q[i].atom;
 		if ( L(opp) >= k ) return opp.atom;
 	} // for
-	return (Tuple){ .tuple = {0, 0} }.atom;
+	return (Tuple){ .tuple = { .level = 0, .state = 0 } }.atom;
 } // QMAX
 
 static void *Worker( void *arg ) {
@@ -46,11 +46,11 @@ static void *Worker( void *arg ) {
 			for ( int k = 1; k <= depth; k += 1 ) {		// entry protocol, round
 				opp.atom = QMAX( id, k );
 				Fence();								// force store before more loads
-				Q[id].atom = L(opp) == k ? (Tuple){ .tuple = {k, bit(id,k) ^ R(opp)} }.atom : (Tuple){ .tuple = {k, 1} }.atom;
+				Q[id].atom = L(opp) == k ? (Tuple){ .tuple = { .level = k, .state = (uint16_t)(bit(id,k) ^ R(opp)) } }.atom : (Tuple){ .tuple = {k, 1} }.atom;
 				Fence();								// force store before more loads
 				opp.atom = QMAX( id, k );
 				Fence();								// force store before more loads
-				Q[id].atom = L(opp) == k ? (Tuple){ .tuple = {k, bit(id,k) ^ R(opp)} }.atom : Q[id].atom;
+				Q[id].atom = L(opp) == k ? (Tuple){ .tuple = { .level = k, .state = (uint16_t)(bit(id,k) ^ R(opp)) } }.atom : Q[id].atom;
 #if 0
 			  wait:	opp.atom = QMAX( id, k );
 				Fence();								// force store before more loads
@@ -62,10 +62,10 @@ static void *Worker( void *arg ) {
 					Pause();
 					opp.atom = QMAX( id, k );
 				} // while
-#endif
+#endif // 0
 			} // for
 			CriticalSection( id );
-			Q[id].atom = (Tuple){ .tuple = {0, 0} }.atom; // exit protocol
+			Q[id].atom = (Tuple){ .tuple = { .level = 0, .state = 0 } }.atom; // exit protocol
 #ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
 			cnt = cycleUp( cnt, NoStartPoints );
@@ -89,7 +89,7 @@ void ctor() {
 	mask = width - 1;									// 1 bits for masking
 	Q = Allocator( sizeof(typeof(Q[0])) * N );
 	for ( int i = 0; i < N; i += 1 ) {					// initialize shared data
-		Q[i].atom = (Tuple){ .tuple = {0, 0} }.atom;
+		Q[i].atom = (Tuple){ .tuple = { .level = 0, .state = 0 } }.atom;
 	} // for
 } // ctor
 

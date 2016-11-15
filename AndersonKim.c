@@ -88,10 +88,10 @@ static inline void exitSlow(
 
 typedef union {
 	struct {
-		uint16_t indx;
 		uint16_t free;
+		uint16_t indx;
 	} tuple;
-	uint32_t atom;
+	uint32_t atom;										// can be 64, use 32 for SPARC
 } Ytype;
 
 static volatile TYPE X CALIGN;
@@ -145,11 +145,12 @@ static inline void SLOW2( TYPE id, Ytype y
 	Fence();											// force store before more loads
 	y.atom = Reset.atom;
 	Obstacle[id] = 0;
-	Reset.atom = (Ytype){ .tuple = { 0, y.tuple.indx } }.atom;
+	Reset.atom = (Ytype){ .tuple = { .free = 0, .indx = y.tuple.indx } }.atom;
 	Fence();											// force store before more loads
 	if ( ! Name_Taken[ y.tuple.indx ] && ! Obstacle[ y.tuple.indx ] ) {
-		Reset.atom = (Ytype){ .tuple = { 1, (uint16_t)((y.tuple.indx + 1) % N) } }.atom;
-		Y.atom = (Ytype){ .tuple = { 1, (uint16_t)((y.tuple.indx + 1) % N) } }.atom;
+		uint16_t temp = (uint16_t)(y.tuple.indx + 1 < N ? y.tuple.indx + 1 : 0);
+		Reset.atom = (Ytype){ .tuple = { .free = 1, .indx = temp } }.atom;
+		Y.atom = (Ytype){ .tuple = { .free = 1, .indx = temp } }.atom;
 	} // if
 	binary_epilogue( 0, &B );
 	exitSlow(
@@ -213,11 +214,12 @@ static void *Worker( void *arg ) {
 						binary_prologue( 1, &B );
 						CriticalSection( id );
 						Obstacle[id] = 0;
-						Reset.atom = (Ytype){ .tuple = { 0, y.tuple.indx } }.atom;
+						Reset.atom = (Ytype){ .tuple = { .free = 0, .indx = y.tuple.indx } }.atom;
 						Fence();						// force store before more loads
 						if ( ! Obstacle[ y.tuple.indx ] ) {
-							Reset.atom = (Ytype){ .tuple = { 1, (uint16_t)((y.tuple.indx + 1) % N) } }.atom;
-							Y.atom = (Ytype){ .tuple = { 1, (uint16_t)((y.tuple.indx + 1) % N) } }.atom;
+							uint16_t temp = (uint16_t)(y.tuple.indx + 1 < N ? y.tuple.indx + 1 : 0);
+							Reset.atom = (Ytype){ .tuple = { .free = 1, .indx = temp } }.atom;
+							Y.atom = (Ytype){ .tuple = { .free = 1, .indx = temp } }.atom;
 						} // if
 						Name_Taken[y.tuple.indx] = 0;
 						binary_epilogue( 1, &B );
@@ -225,7 +227,6 @@ static void *Worker( void *arg ) {
 					} // if
 				} // if
 			} // if
-
 
 #ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
@@ -293,8 +294,8 @@ void __attribute__((noinline)) ctor() {
 	for ( int i = 0; i < N; i += 1 ) {					// initialize shared data
 		Name_Taken[i] = Obstacle[i] = 0;
 	} // for
-	Y.atom = (Ytype){ .tuple = { 1, 0 } }.atom;
-	Reset.atom = (Ytype){ .tuple = { 1, 0 } }.atom;
+	Y.atom = (Ytype){ .tuple = { .free = 1, .indx = 0 } }.atom;
+	Reset.atom = (Ytype){ .tuple = { .free = 1, .indx = 0 } }.atom;
 	Infast = 0;
 	ctor2();											// tournament allocation/initialization
 } // ctor

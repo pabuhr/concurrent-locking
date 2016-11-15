@@ -38,10 +38,10 @@ struct AndersonKim : rl::test_suite<AndersonKim, N> {
 
 	typedef union {
 		struct {
-			uint16_t indx;
 			uint16_t free;
+			uint16_t indx;
 		} tuple;
-		uint32_t atom;
+		uint32_t atom;										// can be 64, use 32 for SPARC
 	} Ytype;
 
 	std::atomic<int> X;
@@ -65,8 +65,8 @@ struct AndersonKim : rl::test_suite<AndersonKim, N> {
 		for ( int i = 0; i < N; i += 1 ) {				// initialize shared data
 			Name_Taken[i]($) = Obstacle[i]($) = 0;
 		} // for
-		Y($) = (Ytype){ { 1, 0 } }.atom;
-		Reset($) = (Ytype){ { 1, 0 } }.atom;
+		Y($) = (Ytype){ .tuple = { .free = 1, .indx = 0 } }.atom;
+		Reset($) = (Ytype){ .tuple = { .free = 1, .indx = 0 } }.atom;
 		Infast($) = 0;
 	} // before
 
@@ -99,10 +99,11 @@ struct AndersonKim : rl::test_suite<AndersonKim, N> {
 		X($) = id;
 		y.atom = Reset($);
 		Obstacle[id]($) = 0;
-		Reset($) = (Ytype){ .tuple = { 0, y.tuple.indx } }.atom;
+		Reset($) = (Ytype){ .tuple = { .free = 0, .indx = y.tuple.indx } }.atom;
 		if ( ! Name_Taken[ y.tuple.indx ]($) && ! Obstacle[ y.tuple.indx ]($) ) {
-			Reset($) = (Ytype){ .tuple = { 1, (uint16_t)((y.tuple.indx + 1) % N) } }.atom;
-			Y($) = (Ytype){ .tuple = { 1, (uint16_t)((y.tuple.indx + 1) % N) } }.atom;
+			uint16_t temp = (uint16_t)(y.tuple.indx + 1 < N ? y.tuple.indx + 1 : 0);
+			Reset($) = (Ytype){ .tuple = { .free = 1, .indx = temp } }.atom;
+			Y($) = (Ytype){ .tuple = { .free = 1, .indx = temp } }.atom;
 		} // if
 		binary_epilogue( 0, &B );
 		exitSlow( level, state );
@@ -133,10 +134,11 @@ struct AndersonKim : rl::test_suite<AndersonKim, N> {
 					binary_prologue( 1, &B );
 					CS($) = id + 1;						// critical section
 					Obstacle[id]($) = 0;
-					Reset($) = (Ytype){ .tuple = { 0, y.tuple.indx } }.atom;
+					Reset($) = (Ytype){ .tuple = { .free = 0, .indx = y.tuple.indx } }.atom;
 					if ( ! Obstacle[ y.tuple.indx ]($) ) {
-						Reset($) = (Ytype){ .tuple = { 1, (uint16_t)((y.tuple.indx + 1) % N) } }.atom;
-						Y($) = (Ytype){ .tuple = { 1, (uint16_t)((y.tuple.indx + 1) % N) } }.atom;
+						uint16_t temp = (uint16_t)(y.tuple.indx + 1 < N ? y.tuple.indx + 1 : 0);
+						Reset($) = (Ytype){ .tuple = { .free = 1, .indx = temp } }.atom;
+						Y($) = (Ytype){ .tuple = { .free = 1, .indx = temp } }.atom;
 					} // if
 					Name_Taken[y.tuple.indx]($) = 0;
 					binary_epilogue( 1, &B );
