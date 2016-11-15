@@ -353,7 +353,7 @@ static struct cnts **counters CALIGN;
 static void shuffle( unsigned int set[], const int size ) {
 	unsigned int p1, p2, temp;
 
-	for ( int i = 0; i < 200; i +=1 ) {				// shuffle array S times
+	for ( int i = 0; i < 200; i +=1 ) {					// shuffle array S times
 		p1 = rand() % size;
 		p2 = rand() % size;
 		temp = set[p1];
