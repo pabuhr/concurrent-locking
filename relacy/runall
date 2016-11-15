@@ -1,6 +1,6 @@
 #!/bin/sh -
 
-algorithms="Aravind Burns2 BurnsLynchRetract DeBruijn Dekker DekkerRW Dijkstra Eisenberg Hehner Hesselink Kessels Knuth LamportRetract LamportBakery LamportFast Lycklama LycklamaBuhr Lynch Peterson Peterson2 PetersonBuhr PetersonT Szymanski Szymanski2 Szymanski3 Taubenfeld TaubenfeldBuhr Zhang2T ZhangYA ZhangdT Triangle TriangleMod"
+algorithms="AndersonKim Aravind Burns2 BurnsLynchRetract DeBruijn DekkerA DekkerB DekkerC DekkerOrig DekkerRW Dijkstra Doran Eisenberg ElevatorBurns ElevatorQueue ElevatorSimple ElevatorSimple.noflag Hehner Hesselink Kessels Knuth LamportBakery LamportFast LamportRetract Lycklama LycklamaBuhr Lynch Peterson Peterson2 PetersonBuhr PetersonT RMRS Szymanski Szymanski2 Szymanski3 Taubenfeld TaubenfeldBuhr Triangle TriangleMod Zhang2T ZhangYA ZhangdT"
 
 cflag="-Wall -Werror -O3 -DNDEBUG -I/u/pabuhr/software/relacy_2_4"
 
@@ -28,7 +28,7 @@ runalgorithm() {
 
 rm -rf core
 for algorithm in ${algorithms} ; do
-    if [ ${algorithm} = "ElevatorSimple" -o ${algorithm} = "ElevatorQueue" ] ; then
+    if [ ${algorithm} = "ElevatorSimple" -o ${algorithm} = "ElevatorSimple.noflag" -o ${algorithm} = "ElevatorQueue" ] ; then
 	for cas in "CAS" "WCasBL" "WCasLF" ; do
 	    for flag in "" "FLAG" ; do
 		runalgorithm ${algorithm} ${cas} ${flag}
