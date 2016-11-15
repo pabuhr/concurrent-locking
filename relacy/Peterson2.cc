@@ -13,7 +13,7 @@ struct Peterson2 : rl::test_suite<Peterson2, N> {
 	std::atomic<int> intents[N];
 	std::atomic<int> last;
 
-	rl::var<int> data;
+	rl::var<int> CS;									// shared resource for critical section
 
 	void before() {
 		intents[0]($) = intents[1]($) = DontWantIn;
@@ -26,7 +26,7 @@ struct Peterson2 : rl::test_suite<Peterson2, N> {
 		intents[id]($) = WantIn;						// declare intent
 		last($).store(id);								// write race
 		while ( intents[other]($) == WantIn && last($) == id ) Pause();
-		data($) = id + 1;								// critical section
+		CS($) = id + 1;									// critical section
 		intents[id]($) = DontWantIn;					// retract intent
 	} // thread
 }; // Peterson2

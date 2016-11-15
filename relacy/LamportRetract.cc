@@ -10,7 +10,7 @@ struct LamportRetract : rl::test_suite<LamportRetract, N> {
 	enum Intent { DontWantIn, WantIn };
 	std::atomic<int> intents[N];
 
-	rl::var<int> data;
+	rl::var<int> CS;									// shared resource for critical section
 
 	void before() {
 		for ( int i = 0; i < N; i += 1 ) {				// initialize shared data
@@ -32,7 +32,7 @@ struct LamportRetract : rl::test_suite<LamportRetract, N> {
 		} // for
 		for ( j = id + 1; j < N; j += 1 )
 			while ( intents[j]($) == WantIn ) Pause();
-		data($) = id + 1;								// critical section
+		CS($) = id + 1;									// critical section
 		intents[id]($) = DontWantIn;					// exit protocol
 	} // thread
 }; // LamportRetract

@@ -10,13 +10,13 @@ struct Hesselink : rl::test_suite<Hesselink, N> {
 	static const int R = 3;
 	std::atomic<int> intents[N], turn[N * R];
 
-	rl::var<int> data;
+	rl::var<int> CS;									// shared resource for critical section
 
 	void before() {
 		for ( int i = 0; i < N; i += 1 ) {				// initialize shared data
 			intents[i]($) = 0;
 		} // for
-		for ( int i = 0; i < N * R; i += 1 ) {				// initialize shared data
+		for ( int i = 0; i < N * R; i += 1 ) {			// initialize shared data
 			turn[i]($) = 0;
 		} // for
 	} // before
@@ -26,12 +26,12 @@ struct Hesselink : rl::test_suite<Hesselink, N> {
 		int j, nx = 0;
 
 		intents[id]($) = 1;								// phase 1, FCFS
-		for ( j = 0; j < Range; j += 1 )			// copy turn values
+		for ( j = 0; j < Range; j += 1 )				// copy turn values
 			copy[j] = turn[j]($);
 		turn[id * R + nx]($) = 1;						// advance turn
 		intents[id]($) = 0;
 		for ( j = 0; j < Range; j += 1 )
-			if ( copy[j] != 0 ) {					// want in ?
+			if ( copy[j] != 0 ) {						// want in ?
 				while ( turn[j]($) != 0 ) Pause();
 //				copy[j] = 0;
 			} // if
@@ -42,10 +42,10 @@ struct Hesselink : rl::test_suite<Hesselink, N> {
 				while ( intents[j]($) != 0 ) Pause();
 				goto L;
 			} // if
-		for ( j = id + 1; j < N; j += 1 )			// B-L entry protocol, stage 2
+		for ( j = id + 1; j < N; j += 1 )				// B-L entry protocol, stage 2
 			while ( intents[j]($) != 0 ) Pause();
-		data($) = id + 1;								// critical section
-		intents[id]($) = 0;							// B-L exit protocol
+		CS($) = id + 1;									// critical section
+		intents[id]($) = 0;								// B-L exit protocol
 		turn[id * R + nx]($) = 0;
 		nx = cycleUp( nx, R );
 	} // thread

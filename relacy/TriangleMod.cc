@@ -28,18 +28,6 @@ struct TriangleMod : rl::test_suite<TriangleMod, N> {
 		t->Q[c]($) = 0;
 	} // binary_epilogue
 
-	void binary( int id ) {
-		binary_prologue( id, &B );
-		//bintents[id]($) = true;
-		//last($) = false;
-		//await( ! bintents[id]($) || last($) );
-
-		data($) = id;									// critical section
-
-		//bintents[id]($) = false;
-		binary_epilogue( id, &B );
-	} // binary
-
 //======================================================
 
 #   define await( E ) while ( ! (E) ) Pause()
@@ -48,12 +36,11 @@ struct TriangleMod : rl::test_suite<TriangleMod, N> {
 
 //======================================================
 
-	//std::atomic<int> bintents[2], last;
 	Token B;
 
 //======================================================
 
-	rl::var<int> data;
+	rl::var<int> CS;									// shared resource for critical section
 
 	void before() {
 		for ( unsigned int id = 0; id < N; id += 1 ) {
@@ -71,23 +58,8 @@ struct TriangleMod : rl::test_suite<TriangleMod, N> {
 		} // for
 		y($) = N;
 
-		//bintents[0]($) = bintents[1]($) = false;
 		B.Q[0]($) = B.Q[1]($) = false;
 	} // before
-
-
-#if 0
-	void entryBinary( bool b ) {
-		bool other = ! b;
-		bintents[b]($) = true;
-		last($) = b;									// RACE
-		while ( bintents[other]($) && last($) == b ) Pause();
-	} // entryBinary
-
-	void exitBinary( bool b ) {
-		bintents[b]($) = false;
-	} // exitBinary
-#endif
 
 
 	void entrySlow( int level, Tuple *state ) {
@@ -152,7 +124,7 @@ struct TriangleMod : rl::test_suite<TriangleMod, N> {
 		Tuple *state = states[id];
 
 		bool b = entryComb( id, level, state );
-		data($) = id;									// critical section
+		CS($) = id + 1;									// critical section
 		exitComb( id, b, level, state );
 	} // thread
 }; // TriangleMod

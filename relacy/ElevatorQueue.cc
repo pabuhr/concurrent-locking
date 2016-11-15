@@ -136,7 +136,7 @@ struct ElevatorQueue : rl::test_suite<ElevatorQueue, N> {
 		fast($) = false;
 	} // before
 
-	rl::var<int> data;
+	rl::var<int> CS;									// shared resource for critical section
 
 	void thread( TYPE id ) {
 		const unsigned int n = N + id, dep = Log2( n );
@@ -172,7 +172,7 @@ struct ElevatorQueue : rl::test_suite<ElevatorQueue, N> {
 #endif // FLAG
 		(*applyId)($) = false;
 
-		data($) = id + 1;								// critical section
+		CS($) = id + 1;									// critical section
 
 		// loop goes from child of root to leaf and inspects siblings
 		for ( int j = dep - 1; j >= 0; j -= 1 ) {		// must be "signed"

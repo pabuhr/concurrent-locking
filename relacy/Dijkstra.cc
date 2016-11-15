@@ -8,7 +8,7 @@ enum { N = 8 };
 struct Dijkstra : rl::test_suite<Dijkstra, N> {
 	std::atomic<int> b[N+1], c[N+1], turn;
 
-	rl::var<int> data;
+	rl::var<int> CS;									// shared resource for critical section
 
 	void before() {
 		for ( int i = 0; i <= N; i += 1 ) {				// initialize shared data
@@ -30,7 +30,7 @@ struct Dijkstra : rl::test_suite<Dijkstra, N> {
 		c[id]($) = false;
 		for ( j = 1; j <= N; j += 1 )
 			if ( j != id && c[j]($) == 0 ) goto L;
-		data($) = id + 1;								// critical section
+		CS($) = id + 1;									// critical section
 		c[id]($) = true;								// exit protocol
 		b[id]($) = true;
 		turn($) = false;

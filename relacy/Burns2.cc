@@ -9,7 +9,7 @@ enum { N = 8 };
 struct Burns2 : rl::test_suite<Burns2, N> {
 	std::atomic<int> flag[N], turn;
 
-	rl::var<int> data;
+	rl::var<int> CS;									// shared resource for critical section
 
 	void before() {
 		for ( int i = 0; i < N; i += 1 ) {				// initialize shared data
@@ -34,7 +34,7 @@ struct Burns2 : rl::test_suite<Burns2, N> {
 			for ( j = 0; j < N; j += 1 )
 				if ( j != id && flag[j]($) != 0 ) { Pause(); goto L2; }
 		} // if
-		data($) = id + 1;								// critical section
+		CS($) = id + 1;									// critical section
 		flag[id]($) = false;							// exit protocol
 	} // thread
 }; // Burns2

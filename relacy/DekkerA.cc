@@ -7,7 +7,7 @@ struct Dekker : rl::test_suite<Dekker, N> {
 	enum Intent { DontWantIn, WantIn };
 	std::atomic<int> intents[N], last;
 
-	rl::var<int> data;
+	rl::var<int> CS;									// shared resource for critical section
 
 	void before() {
 		intents[0]($) = intents[1]($) = DontWantIn;
@@ -25,7 +25,7 @@ struct Dekker : rl::test_suite<Dekker, N> {
 				while ( last($) == id ) Pause();		// low priority busy wait
 			} // if
 		} // for
-		data($) = id + 1;								// critical section
+		CS($) = id + 1;									// critical section
 		last($) = id;
 		intents[id]($) = DontWantIn;					// retract intent
 	} // thread

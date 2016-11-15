@@ -10,7 +10,7 @@ struct Knuth : rl::test_suite<Knuth, N> {
 	enum Intent { DontWantIn, WantIn, EnterCS };
 	std::atomic<int> control[N], turn;
 
-	rl::var<int> data;
+	rl::var<int> CS;									// shared resource for critical section
 
 	void before() {
 		for ( int i = 0; i < N; i += 1 ) {				// initialize shared data
@@ -29,7 +29,7 @@ struct Knuth : rl::test_suite<Knuth, N> {
 		for ( j = N - 1; j >= 0; j -= 1 )
 			if ( j != id && control[j]($) == EnterCS ) { Pause(); goto L0; }
 //		turn($) = id;
-		data($) = id + 1;								// critical section
+		CS($) = id + 1;									// critical section
 		// cycle through threads
 		turn($) = cycleDown( id, N );					// exit protocol
 		control[id]($) = DontWantIn;

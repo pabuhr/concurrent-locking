@@ -10,7 +10,7 @@ struct BurnsLynchRetract : rl::test_suite<BurnsLynchRetract, N> {
 	enum Intent { DontWantIn, WantIn };
 	std::atomic<int> intents[N];
 
-	rl::var<int> data;
+	rl::var<int> CS;									// shared resource for critical section
 
 	void before() {
 		for ( int i = 0; i < N; i += 1 ) {				// initialize shared data
@@ -29,7 +29,7 @@ struct BurnsLynchRetract : rl::test_suite<BurnsLynchRetract, N> {
 			if ( intents[j]($) == WantIn ) goto L0;
 	  L1: for ( j = id + 1; j < N; j += 1 )
 			if ( intents[j]($) == WantIn ) { Pause(); goto L1; }
-		data($) = id + 1;								// critical section
+		CS($) = id + 1;									// critical section
 		intents[id]($) = DontWantIn;					// exit protocol
 	} // thread
 }; // BurnsLynchRetract

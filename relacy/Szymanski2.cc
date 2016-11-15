@@ -9,7 +9,7 @@ enum { N = 8 };
 struct Szymanski2 : rl::test_suite<Szymanski2, N> {
 	std::atomic<int> a[N], w[N], s[N];
 
-	rl::var<int> data;
+	rl::var<int> CS;									// shared resource for critical section
 
 	void before() {
 		for ( int i = 0; i < N; i += 1 ) {				// initialize shared data
@@ -43,7 +43,7 @@ struct Szymanski2 : rl::test_suite<Szymanski2, N> {
 			} // if
 		} // while
 		for ( j = 0; j < id; j += 1 ) while( w[j]($) || s[j]($) );
-		data($) = id + 1;								// critical section
+		CS($) = id + 1;									// critical section
 		s[id]($) = false;
 	} // thread
 }; // Szymanski2

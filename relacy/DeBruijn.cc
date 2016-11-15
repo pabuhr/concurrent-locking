@@ -10,7 +10,7 @@ struct DeBruijn : rl::test_suite<DeBruijn, N> {
 	enum Intent { DontWantIn, WantIn, EnterCS };
 	std::atomic<int> control[N], turn;
 
-	rl::var<int> data;
+	rl::var<int> CS;									// shared resource for critical section
 
 	void before() {
 		for ( int i = 0; i < N; i += 1 ) {				// initialize shared data
@@ -28,7 +28,7 @@ struct DeBruijn : rl::test_suite<DeBruijn, N> {
 		control[id]($) = EnterCS;
 		for ( j = N - 1; j >= 0; j -= 1 )
 			if ( j != id && control[j]($) == EnterCS ) { Pause(); goto L0; }
-		data($) = id + 1;								// critical section
+		CS($) = id + 1;											  // critical section
 		// cycle through threads
 		if ( control[turn($)]($) == DontWantIn || turn($) == id ) // exit protocol
 			turn($) = cycleDown( turn($), N );

@@ -9,7 +9,7 @@ enum { N = 8 };
 struct Hehner : rl::test_suite<Hehner, N> {
 	std::atomic<int> ticket[N];
 
-	rl::var<int> data;
+	rl::var<int> CS;									// shared resource for critical section
 
 	void before() {
 		for ( int i = 0; i < N; i += 1 ) {				// initialize shared data
@@ -34,7 +34,7 @@ struct Hehner : rl::test_suite<Hehner, N> {
 		for ( j = 0; j < N; j += 1 )					// check other tickets
 			while ( ticket[j]($) < max ||				// busy wait if choosing or
 					( ticket[j]($) == max && j < id ) ) Pause(); //  greater ticket value or lower priority
-		data($) = id + 1;								// critical section
+		CS($) = id + 1;									// critical section
 		ticket[id]($) = INT_MAX;						// exit protocol
 	} // thread
 }; // Hehner

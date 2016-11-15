@@ -16,7 +16,7 @@ struct Zhang2T : rl::test_suite<Zhang2T, N> {
 	std::atomic<int> x[N][N], c[N][N];
 	int lN;
 
-	rl::var<int> data;
+	rl::var<int> CS;									// shared resource for critical section
 
 	void before() {
 		lN = N;
@@ -59,7 +59,7 @@ struct Zhang2T : rl::test_suite<Zhang2T, N> {
 			l /= 2;
 			j += 1;
 		}
-		data($) = id + 1;								// critical section
+		CS($) = id + 1;									// critical section
 		j = high;
 		//int pow2 = pow( Degree, high );
 		int pow2 = 1 << high;

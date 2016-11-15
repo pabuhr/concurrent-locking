@@ -10,7 +10,7 @@ enum { N = 8 };
 struct ZhangYA : rl::test_suite<ZhangYA, N> {
 	std::atomic<int> c[N][N + 1], p[N][N + 1], t[N][N + 1];
 
-	rl::var<int> data;
+	rl::var<int> CS;									// shared resource for critical section
 
 	void before() {
 		for ( int i = 0; i < N; i += 1 ) {
@@ -43,7 +43,7 @@ struct ZhangYA : rl::test_suite<ZhangYA, N> {
 				} // if
 			} // if
 		} // for
-		data($) = id + 1;								// critical section
+		CS($) = id + 1;									// critical section
 		for ( j = high - 1; j >= 0; j -= 1 ) {
 			c[j][id / (1 << j)]($) = -1;
 			rival = t[j][id / (1 << (j + 1))]($);

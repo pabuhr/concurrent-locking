@@ -8,7 +8,7 @@ enum { N = 2 };
 struct Dekker : rl::test_suite<Dekker, N> {
 	std::atomic<int> cc[N], last;
 
-	rl::var<int> data;
+	rl::var<int> CS;									// shared resource for critical section
 
 	void before() {
 		cc[0]($) = cc[1]($) = 0;
@@ -29,7 +29,7 @@ struct Dekker : rl::test_suite<Dekker, N> {
 			await( cc[other]($) == 0 || last($) != id );
 		} // for
 
-		data($) = id + 1;								// critical section
+		CS($) = id + 1;									// critical section
 
 		if ( last($) != id ) {
 			last($) = id;

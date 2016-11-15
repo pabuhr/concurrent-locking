@@ -10,7 +10,7 @@ enum { N = 8 };
 struct LycklamaBuhr : rl::test_suite<LycklamaBuhr, N> {
 	std::atomic<int> c[N], v[N], intents[N], turn[N];
 
-	rl::var<int> data;
+	rl::var<int> CS;									// shared resource for critical section
 
 	void before() {
 		for ( int i = 0; i < N; i += 1 ) {				// initialize shared data
@@ -39,7 +39,7 @@ struct LycklamaBuhr : rl::test_suite<LycklamaBuhr, N> {
 			} // if
 		for ( j = id + 1; j < N; j += 1 )			// stage 3, low priority search
 			while ( intents[j]($) != 0 ) Pause();
-		data($) = id + 1;								// critical section
+		CS($) = id + 1;									// critical section
 		v[id]($) = intents[id]($) = 0;					// exit protocol
 	} // thread
 }; // LycklamaBuhr

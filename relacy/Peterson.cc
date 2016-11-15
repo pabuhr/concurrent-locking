@@ -8,7 +8,7 @@ enum { N = 8 };
 struct Peterson : rl::test_suite<Peterson, N> {
 	std::atomic<int> Q[N+1], turns[N];
 
-	rl::var<int> data;
+	rl::var<int> CS;									// shared resource for critical section
 
 	void before() {
 	    for ( int i = 0; i <= N; i += 1 ) {				// initialize shared data
@@ -24,7 +24,7 @@ struct Peterson : rl::test_suite<Peterson, N> {
 		  L: for ( int k = 1; k <= N; k += 1 )			// find loser
 				if ( k != id && Q[k]($) >= rd && turns[rd]($) == id ) { Pause(); goto L; }
 		} // for
-		data($) = id + 1;								// critical section
+		CS($) = id + 1;									// critical section
 		Q[id]($) = 0;									// exit protocol
 	} // thread
 }; // Peterson

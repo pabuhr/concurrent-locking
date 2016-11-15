@@ -10,7 +10,7 @@ struct Doran : rl::test_suite<Doran, N> {
 	enum Intent { DontWantIn, WantIn };
 	std::atomic<int> intents[N], last;
 
-	rl::var<int> data;
+	rl::var<int> CS;									// shared resource for critical section
 
 	void before() {
 		intents[0]($) = intents[1]($) = DontWantIn;
@@ -29,7 +29,7 @@ struct Doran : rl::test_suite<Doran, N> {
 			}
 			while ( intents[other]($) == WantIn ) Pause(); // high priority busy wait
 		}
-		data($) = id + 1;								// critical section
+		CS($) = id + 1;									// critical section
 		last($) = id;
 		intents[id]($) = DontWantIn;					// retract intent
 	} // thread

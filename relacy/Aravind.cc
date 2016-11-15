@@ -9,7 +9,7 @@ enum { N = 8 };
 struct Aravind : rl::test_suite<Aravind, N> {
 	std::atomic<int> intents[N], turn[N];
 
-	rl::var<int> data;
+	rl::var<int> CS;									// shared resource for critical section
 
 	void before() {
 		for ( int i = 0; i < N; i += 1 ) {				// initialize shared data
@@ -39,7 +39,7 @@ struct Aravind : rl::test_suite<Aravind, N> {
 		for ( j = id + 1; j < N; j += 1 )				// B-L entry protocol, stage 2
 			while ( intents[j]($) != 0 ) Pause();
 //		turn[id]($) = 0;								// original position
-		data($) = id + 1;								// critical section
+		CS($) = id + 1;									// critical sectio
 		intents[id]($) = 0;								// B-L exit protocol
 		turn[id]($) = 0;
 		t = t < 3 ? t + 1 : 1;							// [1..3]

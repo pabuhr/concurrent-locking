@@ -97,7 +97,7 @@ struct ElevatorSimple : rl::test_suite<ElevatorSimple, N> {
 		fast($) = false;
 	} // before
 
-	rl::var<int> data;
+	rl::var<int> CS;									// shared resource for critical section
 
 	void thread( TYPE id ) {
 		typeof(tstate[0].apply) *applyId = &tstate[id].apply;
@@ -127,7 +127,7 @@ struct ElevatorSimple : rl::test_suite<ElevatorSimple, N> {
 		(*flagId)($) = false;
 #endif // FLAG
 
-		data($) = id + 1;								// critical section
+		CS($) = id + 1;									// critical section
 
 		typeof(id) thr;
 		for ( thr = cycleUp( id, N ); ! tstate[thr].apply($); thr = cycleUp( thr, N ) );

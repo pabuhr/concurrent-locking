@@ -10,7 +10,7 @@ struct Eisenberg : rl::test_suite<Eisenberg, N> {
 	enum Intent { DontWantIn, WantIn, EnterCS };
 	std::atomic<int> control[N], HIGH;
 
-	rl::var<int> data;
+	rl::var<int> CS;									// shared resource for critical section
 
 	void before() {
 		for ( int i = 0; i < N; i += 1 ) {				// initialize shared data
@@ -32,7 +32,7 @@ struct Eisenberg : rl::test_suite<Eisenberg, N> {
 			if ( j != id && control[j]($) == EnterCS ) goto L0;
 		if ( control[HIGH($)]($) != DontWantIn && HIGH($) != id ) goto L0;
 		HIGH($) = id;									// its now ok to enter
-		data($) = id + 1;								// critical section
+		CS($) = id + 1;									// critical section
 		// look for any thread that wants in other than this thread
 //		for ( j = cycleUp( id + 1, N );; j = cycleUp( j, N ) ) // exit protocol
 		for ( j = cycleUp( HIGH($) + 1, N );; j = cycleUp( j, N ) ) // exit protocol

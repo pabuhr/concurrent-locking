@@ -12,7 +12,7 @@ struct Lynch : rl::test_suite<Lynch, N> {
 	int depth, width, mask;
 	std::atomic<int> intents[N], turns[N];				// maximal width of binary tree
 
-	rl::var<int> data;
+	rl::var<int> CS;									// shared resource for critical section
 
 	void before() {
 		depth = Log2( N );
@@ -37,7 +37,7 @@ struct Lynch : rl::test_suite<Lynch, N> {
 			for ( int i = low; i <= high; i += 1 )	// busy wait
 				while ( intents[i]($) >= k && turns[comp]($) == role ) Pause();
 		} // for
-		data($) = id + 1;								// critical section
+		CS($) = id + 1;									// critical section
 		intents[id]($) = 0;								// exit protocol
 	} // thread
 }; // Lynch

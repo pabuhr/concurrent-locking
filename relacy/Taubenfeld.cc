@@ -8,7 +8,7 @@ struct Taubenfeld : rl::test_suite<Taubenfeld, N> {
 	std::atomic<unsigned int> turns[N][N];				// triangular matrix of turns
 	int depth;
 
-	rl::var<int> data;
+	rl::var<int> CS;									// shared resource for critical section
 
 	void before() {
 		depth = Clog2( N );								// maximal depth of binary tree
@@ -30,7 +30,7 @@ struct Taubenfeld : rl::test_suite<Taubenfeld, N> {
 			turns[lv][node]($) = lr;					// RACE
 			while ( intents[lv][2 * node + (1 - lr)]($) == 1 && turns[lv][node]($) == lr ) Pause();
 		} // for
-		data($) = id + 1;								// critical section
+		CS($) = id + 1;									// critical section
 		for ( int lv = depth - 1; lv >= 0; lv -= 1 ) {	// exit protocol
 			intents[lv][id / (1 << lv)]($) = 0;			// retract all intents in reverse order
 		} // for

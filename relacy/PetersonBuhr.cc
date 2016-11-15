@@ -16,7 +16,7 @@ struct PetersonBuhr : rl::test_suite<PetersonBuhr, N> {
 	static Tuple states[64][6];							// handle 64 threads with maximal tree depth of 6 nodes (lg 64)
 	static int levels[64];								// minimal level for binary tree
 
-	rl::var<int> data;
+	rl::var<int> CS;									// shared resource for critical section
 
 	void before() {
 		for ( unsigned int id = 0; id < N; id += 1 ) {
@@ -49,7 +49,7 @@ struct PetersonBuhr : rl::test_suite<PetersonBuhr, N> {
 		for ( int s = 0; s <= level; s += 1 ) {			// entry protocol
 			binary_prologue( state[s].es, state[s].ns );
 		} // for
-		data($) = id + 1;								// critical section
+		CS($) = id + 1;									// critical section
 		for ( int s = level; s >= 0; s -= 1 ) {			// exit protocol, reverse order
 			binary_epilogue( state[s].es, state[s].ns );
 		} // for

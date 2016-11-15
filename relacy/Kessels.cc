@@ -11,7 +11,7 @@ struct Kessels : rl::test_suite<Kessels, N> {
 	};
 	Token t[N];
 
-	rl::var<int> data;
+	rl::var<int> CS;									// shared resource for critical section
 
 	void before() {
 		for ( unsigned int id = 0; id < N; id += 1 ) {
@@ -52,7 +52,7 @@ struct Kessels : rl::test_suite<Kessels, N> {
 			n = n / 2;
 #endif
 		} // while
-		data($) = id + 1;								// critical section
+		CS($) = id + 1;									// critical section
 		for ( n = 1; n < N; n = n + n + e[n] ) {		// exit protocol
 //			n = n + n + e[n];
 //			binary_epilogue( n & 1, &t[n >> 1] );

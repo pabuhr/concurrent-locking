@@ -10,7 +10,7 @@ enum { N = 8 };
 struct Szymanski : rl::test_suite<Szymanski, N> {
 	std::atomic<int> flag[N];
 
-	rl::var<int> data;
+	rl::var<int> CS;									// shared resource for critical section
 
 #   define await( E ) while ( ! (E) ) Pause()
 
@@ -40,7 +40,7 @@ struct Szymanski : rl::test_suite<Szymanski, N> {
 //			await( flag[j]($) < 2 || flag[j]($) > 3 );	//    to pass through door 2
 		for ( j = 0; j < id; j += 1 )					// service threads in priority order
 			await( flag[j]($) < 2 );
-		data($) = id + 1;								// critical section
+		CS($) = id + 1;									// critical section
 		for ( j = id + 1; j < N; j += 1 )				// wait for all threads in waiting room
 			await( flag[j]($) < 2 || flag[j]($) > 3 );	//    to pass through door 2
 		flag[id]($) = 0;

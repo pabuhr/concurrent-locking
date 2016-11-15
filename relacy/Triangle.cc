@@ -34,7 +34,7 @@ struct Triangle : rl::test_suite<Triangle, N> {
 		//last($) = false;
 		//await( ! bintents[id]($) || last($) );
 
-		data($) = id;									// critical section
+		CS($) = id + 1;									// critical section
 
 		//bintents[id]($) = false;
 		binary_epilogue( id, &B );
@@ -53,7 +53,7 @@ struct Triangle : rl::test_suite<Triangle, N> {
 
 //======================================================
 
-	rl::var<int> data;
+	rl::var<int> CS;									// shared resource for critical section
 
 	void before() {
 		for ( unsigned int id = 0; id < N; id += 1 ) {
@@ -94,7 +94,7 @@ struct Triangle : rl::test_suite<Triangle, N> {
 			if ( y($) != id ) goto aside;
 		} // if
 
-		binary( 0 );
+		binary( 1 );
 
 		y($) = N;										// exit protocol
 		b[id]($) = false;
@@ -105,7 +105,7 @@ struct Triangle : rl::test_suite<Triangle, N> {
 			binary_prologue( state[s].es, state[s].ns );
 		} // for
 
-		binary( 1 );
+		binary( 0 );
 
 		for ( int s = level; s >= 0; s -= 1 ) {			// exit protocol, reverse order
 			binary_epilogue( state[s].es, state[s].ns );

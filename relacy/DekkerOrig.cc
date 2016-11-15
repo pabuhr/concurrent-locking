@@ -10,7 +10,7 @@ struct DekkerOrig : rl::test_suite<DekkerOrig, N> {
 	enum Intent { DontWantIn, WantIn };
 	std::atomic<int> cc[N], turn;
 
-	rl::var<int> data;
+	rl::var<int> CS;									// shared resource for critical section
 
 	void before() {
 	    cc[0]($) = cc[1]($) = DontWantIn;
@@ -27,7 +27,7 @@ struct DekkerOrig : rl::test_suite<DekkerOrig, N> {
 		  B1: if ( turn($) == id ) goto B1;
 			goto A1;
 		}
-		data($) = id + 1;								// critical section
+		CS($) = id + 1;									// critical section
 		turn($) = id;
 		cc[id]($) = DontWantIn;							// retract intent
 	} // thread

@@ -2,8 +2,8 @@
 
 #define CACHE_ALIGN 64
 #define CALIGN __attribute__(( aligned (CACHE_ALIGN) ))
-typedef uintptr_t TYPE;					// atomically addressable word-size
-typedef volatile TYPE ATYPE;				// atomic shared data
+typedef uintptr_t TYPE;									// atomically addressable word-size
+typedef volatile TYPE ATYPE;							// atomic shared data
 //typedef int TYPE;
 
 #define Pause() rl::yield(1, $)
@@ -16,10 +16,10 @@ typedef volatile TYPE ATYPE;				// atomic shared data
 				  ( sizeof(n) == 16 ) ? __builtin_clzll( n ) :	\
 				  -1 ) )
 
-static inline int Clog2( int n ) {			// integer ceil( log2( n ) )
+static inline int Clog2( int n ) {						// integer ceil( log2( n ) )
 	if ( n <= 0 ) return -1;
 	int ln = Log2( n );
-	return ln + ( (n - (1 << ln)) != 0 );		// check for any 1 bits to the right of the most significant bit
+	return ln + ( (n - (1 << ln)) != 0 );				// check for any 1 bits to the right of the most significant bit
 }
 
 static inline TYPE cycleUp( TYPE v, TYPE n ) { return ( ((v) >= (n - 1)) ? 0 : (v + 1) ); }
@@ -123,7 +123,7 @@ struct RMRS : rl::test_suite<RMRS, N> {
 		exits($) = 0;
 	} // before
 
-	rl::var<int> data;
+	rl::var<int> CS;									// shared resource for critical section
 
 	void thread( TYPE id ) {
 		typeof(arrState[0].enter) *enter = &arrState[id].enter;
@@ -152,7 +152,7 @@ struct RMRS : rl::test_suite<RMRS, N> {
 		(*enter)($) = (*wait)($) = true;
 		exits($) += 1 ;
 
-		data($) = id + 1;								// critical section
+		CS($) = id + 1;									// critical section
 
 		// down hill
 		TYPE thread = tournament[toursize - 1][0]($);

@@ -10,7 +10,7 @@ struct LamportFast : rl::test_suite<LamportFast, N> {
 
 	std::atomic<int> b[N], x, y;
 
-	rl::var<int> data;
+	rl::var<int> CS;									// shared resource for critical section
 
 	void before() {
 		for ( int i = 0; i < N; i += 1 ) {				// initialize shared data
@@ -39,7 +39,7 @@ struct LamportFast : rl::test_suite<LamportFast, N> {
 				goto start;
 			} // if
 		} // if
-		data($) = id;									// critical section
+		CS($) = id + 1;									// critical section
 		y($) = N;										// exit protocol
 		b[id]($) = false;
 	} // thread

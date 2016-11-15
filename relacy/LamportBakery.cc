@@ -8,7 +8,7 @@ enum { N = 8 };
 struct LamportBakery : rl::test_suite<LamportBakery, N> {
 	std::atomic<TYPE> choosing[N], ticket[N];
 
-	rl::var<int> data;
+	rl::var<int> CS;									// shared resource for critical section
 
 	void before() {
 		for ( int i = 0; i < N; i += 1 ) {				// initialize shared data
@@ -36,7 +36,7 @@ struct LamportBakery : rl::test_suite<LamportBakery, N> {
 					( ticket[j]($) < max ||				//  greater ticket value or lower priority
 					  ( ticket[j]($) == max && j < id ) ) ) Pause();
 		} // for
-		data($) = id + 1;								// critical section
+		CS($) = id + 1;									// critical section
 		ticket[id]($) = 0;								// exit protocol
 	} // thread
 }; // LamportBakery

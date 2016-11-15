@@ -15,7 +15,7 @@ struct ZhangdT : rl::test_suite<ZhangdT, N> {
 
 	std::atomic<int> x[N][N];
 
-	rl::var<int> data;
+	rl::var<int> CS;									// shared resource for critical section
 
 	void before() {
 		for ( int i = 0; i < N; i += 1 ) {				// initialize shared data
@@ -50,7 +50,7 @@ struct ZhangdT : rl::test_suite<ZhangdT, N> {
 			j += 1;
 			len = (len % Degree == 0) ? len / Degree : len / Degree + 1;
 		} // for
-		data($) = id + 1;								// critical section
+		CS($) = id + 1;									// critical section
 		//j = high;
 		int pow2 = pow( Degree, high );
 		while ( j > 0 ) {
