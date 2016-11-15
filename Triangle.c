@@ -109,7 +109,7 @@ static void *Worker( void *arg ) {
 			} // if
 #endif
 
-			binary( 0 );
+			binary( 1 );
 
 			y = N;										// exit protocol
 			b[id] = false;
@@ -119,6 +119,7 @@ static void *Worker( void *arg ) {
 #if defined( __sparc )
 			__asm__ __volatile__ ( "" : : : "memory" );
 #endif // __sparc
+
 #ifdef TB
 //			ridi = id;
 			for ( unsigned int lv = 0; lv < depth; lv += 1 ) { // entry protocol
@@ -136,7 +137,7 @@ static void *Worker( void *arg ) {
 			} // for
 #endif // TB
 
-			binary( 1 );
+			binary( 0 );
 
 #ifdef TB
 			for ( int lv = depth - 1; lv >= 0; lv -= 1 ) { // exit protocol
