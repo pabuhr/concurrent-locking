@@ -74,6 +74,7 @@ struct TriangleMod : rl::test_suite<TriangleMod, N> {
 		} // for
 	} // exitSlow
 
+//=========================================================================
 
 	bool entryFast( int id ) {
 		if ( y($) != N ) return false;
@@ -100,19 +101,19 @@ struct TriangleMod : rl::test_suite<TriangleMod, N> {
 
 
 	bool entryComb( unsigned int id, int level, Tuple *state ) {
-		bool b = entryFast( id );
-		if ( ! b ) {
+		bool fa = entryFast( id );
+		if ( ! fa ) {
 			entrySlow( level, state );
 		} // if
-		//entryBinary( b );
-		binary_prologue( b, &B );
-		return b;
+		//entryBinary( fa );
+		binary_prologue( fa, &B );
+		return fa;
 	} // entryComb
 
-	void exitComb( unsigned int id, bool b, int level, Tuple *state ) {
-		//exitBinary( b );
-		binary_epilogue( b, &B );
-		if ( b )
+	void exitComb( unsigned int id, bool fa, int level, Tuple *state ) {
+		//exitBinary( fa );
+		binary_epilogue( fa, &B );
+		if ( fa )
 			exitFast( id );
 		else
 			exitSlow( level, state );

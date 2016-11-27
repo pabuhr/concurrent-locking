@@ -35,20 +35,6 @@ static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false shar
 
 #define await( E ) while ( ! (E) ) Pause()
 
-#if 0
-static inline void entryBinary( bool b ) {
-	bool other = ! b;
-	bintents[b] = true;
-	last = b;											// RACE
-	Fence();											// force store before more loads
-	while ( bintents[other] && last == b ) Pause();
-} // entryBinary
-
-static inline void exitBinary( bool b ) {
-	bintents[b] = false;
-} // exitBinary
-#endif // 0
-
 
 static inline void entrySlow(
 #ifdef TB
@@ -95,6 +81,7 @@ static inline void exitSlow(
 #endif // TB
 } // exitSlow
 
+//=========================================================================
 
 static inline TYPE entryFast( TYPE id ) {
 #if 0
@@ -133,10 +120,14 @@ static inline TYPE entryFast( TYPE id ) {
 	Fence();											// force store before more loads
 	if ( FASTPATH( x != id ) ) {
 		b[id] = false;
+#ifdef ALT
+		return false;
+#else
 		Fence();										// force store before more loads
 		for ( int j = 0; y == id && j < N; j += 1 )
 			await( ! b[j] );
 		if ( FASTPATH( y != id ) ) return false;
+#endif // ALT
 	} // if
 	return true;
 #endif
@@ -153,8 +144,8 @@ static inline TYPE entryComb( TYPE id
 							  , int level, Tuple *state
 #endif // TB
 	) {
-	TYPE b = entryFast( id );
-	if ( ! b ) {
+	TYPE fa = entryFast( id );
+	if ( ! fa ) {
 		entrySlow(
 #ifdef TB
 			id
@@ -162,20 +153,28 @@ static inline TYPE entryComb( TYPE id
 			level, state
 #endif // TB
 			);
+#ifdef ALT
+		if ( y == id ) {
+			Fence();									// force store before more loads
+			for ( int j = 0; j < N; j += 1 )
+				await( y != id || ! b[j] );
+			if ( SLOWPATH( y == id ) ) y = N;
+		} // if
+#endif // ALT
 	} // if
-	//entryBinary( b );
-	binary_prologue( b, &B );
-	return b;
+	//entryBinary( fa );
+	binary_prologue( fa, &B );
+	return fa;
 } // entryComb
 
-static inline void exitComb( TYPE id, TYPE b
+static inline void exitComb( TYPE id, TYPE fa
 #ifndef TB
 							 , int level, Tuple *state
 #endif // ! TB
 	) {
-	//exitBinary( b );
-	binary_epilogue( b, &B );
-	if ( b )
+	//exitBinary( fa );
+	binary_epilogue( fa, &B );
+	if ( fa )
 		exitFast( id );
 	else
 		exitSlow(
@@ -203,6 +202,7 @@ static void *Worker( void *arg ) {
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		entry = 0;
 		while ( stop == 0 ) {
+
 			TYPE b = entryComb( id
 #ifndef TB
 								, level, state
@@ -214,12 +214,14 @@ static void *Worker( void *arg ) {
 					  , level, state
 #endif // ! TB
 				);
+
 #ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
 			cnt = cycleUp( cnt, NoStartPoints );
 #endif // FAST
 			entry += 1;
 		} // while
+
 #ifdef FAST
 		id = oid;
 #endif // FAST
@@ -230,6 +232,8 @@ static void *Worker( void *arg ) {
 	} // for
 	return NULL;
 } // Worker
+
+//=========================================================================
 
 void __attribute__((noinline)) ctor2() {
 #ifdef TB
