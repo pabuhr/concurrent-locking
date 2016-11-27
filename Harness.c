@@ -71,6 +71,8 @@ static inline void *CAS32( volatile void *ptr, void *cmp, void *set ) {
 #endif
 
 //#if defined( __i386 ) || defined( __x86_64 )
+#define LIKELY(x)   __builtin_expect(!!(x), 1)
+#define UNLIKELY(x) __builtin_expect(!!(x), 0)
 #ifdef FAST
 	// unlikely
 	#define FASTPATH(x) __builtin_expect(!!(x), 0)
@@ -380,13 +382,13 @@ int main( int argc, char *argv[] ) {
 	switch ( argc ) {
 	  case 4:
 		Degree = atoi( argv[3] );
-		if ( Degree < 2 ) goto usage;
+		if ( Degree < 2 ) goto USAGE;
 	  case 3:
 		Time = atoi( argv[2] );
 		N = atoi( argv[1] );
-		if ( Time < 1 || N < 1 ) goto usage;
+		if ( Time < 1 || N < 1 ) goto USAGE;
 		break;
-	  usage:
+	  USAGE:
 	  default:
 		printf( "Usage: %s %d (number of threads) %d (time in seconds threads spend entering critical section) %d (Zhang D-ary)\n",
 				argv[0], N, Time, Degree );
@@ -449,12 +451,13 @@ int main( int argc, char *argv[] ) {
 	} // for
 #else
 	for ( int r = 0; r < RUNS; r += 1 ) {
+		// threads start first experiment immediately
+		sleep( Time );									// delay for experiment duration
 		//poll( NULL, 0, Time * 1000 );
-		sleep( Time );
-		stop = 1;										// reset
-		while ( Arrived != Threads ) Pause();
-		stop = 0;
-		while ( Arrived != 0 ) Pause();
+		stop = 1;										// stop threads
+		while ( Arrived != Threads ) Pause();			// all threads stopped ?
+		stop = 0;										// start threads
+		while ( Arrived != 0 ) Pause();					// all threads started ?
 	} // for
 #endif // STRESSINTERVAL
 
