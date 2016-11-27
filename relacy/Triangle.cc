@@ -79,28 +79,28 @@ struct Triangle : rl::test_suite<Triangle, N> {
 		int level = levels[id];
 		Tuple *state = states[id];
 
-		if ( y($) != N ) goto aside;
+		if ( y($) != N ) goto ASIDE;
 		b[id]($) = true;								// entry protocol
 		x($) = id;
 		if ( y($) != N ) {
 			b[id]($) = false;
-			goto aside;
+			goto ASIDE;
 		} // if
 		y($) = id;
 		if ( x($) != id ) {
 			b[id]($) = false;
 			for ( int j = 0; y($) == id && j < N ; j += 1 )
 				await( ! b[j]($) );
-			if ( y($) != id ) goto aside;
+			if ( y($) != id ) goto ASIDE;
 		} // if
 
 		binary( 1 );
 
 		y($) = N;										// exit protocol
 		b[id]($) = false;
-		goto fini;
+		goto FINI;
 
-	  aside:
+	  ASIDE:
 		for ( int s = 0; s <= level; s += 1 ) {			// entry protocol
 			binary_prologue( state[s].es, state[s].ns );
 		} // for
@@ -110,7 +110,8 @@ struct Triangle : rl::test_suite<Triangle, N> {
 		for ( int s = level; s >= 0; s -= 1 ) {			// exit protocol, reverse order
 			binary_epilogue( state[s].es, state[s].ns );
 		} // for
-	  fini: ;
+
+	  FINI: ;
 	} // thread
 }; // Triangle
 

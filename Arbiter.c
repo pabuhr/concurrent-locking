@@ -16,10 +16,12 @@ static void *Worker( void *arg ) {
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		entry = 0;
 		while ( stop == 0 ) {
+
 			intents[id] = 1;							// entry protocol
 			while ( serving[id] == 0 ) Pause();			// busy wait
 			CriticalSection( id );
 			serving[id] = 0;							// exit protocol
+
 #ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
 			cnt = cycleUp( cnt, NoStartPoints );
@@ -43,15 +45,15 @@ void *Arbiter( void *arg ) {
 		for ( ;; ) {									// circular search => no starvation
 			id = cycleUp( id, N );
 		  if ( intents[id] == 1 ) break;				// want in ?
-	  if ( arbiter_stop == 1 ) goto Fini;
+	  if ( arbiter_stop == 1 ) goto FINI;
 			Pause();
 		} // for
 		intents[id] = 0;								// retract intent on behalf of worker
 		serving[id] = 1;								// wait for exit from critical section
 		while ( serving[id] == 1 ) Pause();				// busy wait
 	} // for
-  Fini: ;
-	return 0;
+  FINI: ;
+	return NULL;
 } // Arbiter
 
 void ctor() {

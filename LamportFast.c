@@ -19,14 +19,14 @@ static void *Worker( void *arg ) {
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		entry = 0;
 		while ( stop == 0 ) {
-		  start: b[id] = true;							// entry protocol
+		  START: b[id] = true;							// entry protocol
 			x = id;
 			Fence();									// force store before more loads
 			if ( FASTPATH( y != N ) ) {
 				b[id] = false;
 				Fence();								// force store before more loads
 				await( y == N );
-				goto start;
+				goto START;
 			} // if
 			y = id;
 			Fence();									// force store before more loads
@@ -37,7 +37,7 @@ static void *Worker( void *arg ) {
 					await( ! b[j] );
 				if ( FASTPATH( y != id ) ) {
 //					await( y == N );
-					goto start;
+					goto START;
 				} // if
 			} // if
 			CriticalSection( id );

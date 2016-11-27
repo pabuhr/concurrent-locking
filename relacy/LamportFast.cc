@@ -20,13 +20,13 @@ struct LamportFast : rl::test_suite<LamportFast, N> {
 	} // before
 
 	void thread( int id ) {
-	  start: b[id]($) = true;							// entry protocol
+	  START: b[id]($) = true;							// entry protocol
 		x($) = id;
 		if ( y($) != N ) {
 			b[id]($) = false;
 			await( y($) == N );
 			Pause();
-			goto start;
+			goto START;
 		} // if
 		y($) = id;
 		if ( x($) != id ) {
@@ -36,7 +36,7 @@ struct LamportFast : rl::test_suite<LamportFast, N> {
 			if ( y($) != id ) {
 //				await( y($) == N );
 				Pause();
-				goto start;
+				goto START;
 			} // if
 		} // if
 		CS($) = id + 1;									// critical section

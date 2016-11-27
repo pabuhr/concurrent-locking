@@ -74,29 +74,30 @@ static void *Worker( void *arg ) {
 					y = id;
 					Fence();							// force store before more loads
 					if ( FASTPATH( x == id ) ) {
-						goto cont;
+						goto CONT;
 					} else {
 						b[id] = false;
 						Fence();						// force store before more loads
 						for ( int j = 0; y == id && j < N; j += 1 )
 							await( ! b[j] );
 						if ( FASTPATH( y == id ) )
-							goto cont;
+							goto CONT;
 					} // if
 				} else {
 					b[id] = false;
 				} // if
 			} // if
-			goto aside;
-		  cont: ;
+			goto ASIDE;
+
+		  CONT: ;
 #else
-			if ( FASTPATH( y != N ) ) goto aside;
+			if ( FASTPATH( y != N ) ) goto ASIDE;
 			b[id] = true;								// entry protocol
 			x = id;
 			Fence();									// force store before more loads
 			if ( FASTPATH( y != N ) ) {
 				b[id] = false;
-				goto aside;
+				goto ASIDE;
 			} // if
 			y = id;
 			Fence();									// force store before more loads
@@ -105,7 +106,7 @@ static void *Worker( void *arg ) {
 				Fence();								// force store before more loads
 				for ( int j = 0; y == id && j < N ; j += 1 )
 					await( ! b[j] );
-				if ( FASTPATH( y != id ) ) goto aside;
+				if ( FASTPATH( y != id ) ) goto ASIDE;
 			} // if
 #endif
 
@@ -113,9 +114,9 @@ static void *Worker( void *arg ) {
 
 			y = N;										// exit protocol
 			b[id] = false;
-			goto fini;
+			goto FINI;
 
-		  aside:
+		  ASIDE:
 #if defined( __sparc )
 			__asm__ __volatile__ ( "" : : : "memory" );
 #endif // __sparc
@@ -148,7 +149,8 @@ static void *Worker( void *arg ) {
 				binary_epilogue( state[s].es, state[s].ns );
 			} // for
 #endif // TB
-		  fini:
+
+		  FINI: ;
 #ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
 			cnt = cycleUp( cnt, NoStartPoints );
@@ -230,8 +232,8 @@ void __attribute__((noinline)) dtor2() {
 } // dtor2
 
 void __attribute__((noinline)) dtor() {
-	free( (void *)b );
 	dtor2();											// tournament deallocation
+	free( (void *)b );
 } // dtor
 
 // Local Variables: //
