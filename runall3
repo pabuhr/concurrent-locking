@@ -26,7 +26,7 @@ runalgorithm() {
 rm -rf core
 for algorithm in ${algorithms} ; do
     if [ ${algorithm} = "ElevatorSimple" -o ${algorithm} = "ElevatorQueue" ] ; then
-	for cas in "CAS" "WCasLF" "WCasBL" ; do
+	for cas in "CAS" "WCasBL" "WCasLF" ; do
 	    for flag in "" "FLAG" ; do
 		runalgorithm ${algorithm} ${cas} ${flag}
 	    done
