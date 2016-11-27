@@ -36,16 +36,24 @@ struct AndersonKim : rl::test_suite<AndersonKim, N> {
 
 	rl::var<int> CS;									// shared resource for critical section
 
+#if __WORDSIZE == 64
+#define HALFSIZE uint32_t
+#define WHOLESIZE uint64_t
+#else  // SPARC
+#define HALFSIZE uint16_t
+#define WHOLESIZE uint32_t
+#endif // __WORDSIZE == 64
+
 	typedef union {
 		struct {
-			uint16_t free;
-			uint16_t indx;
+			HALFSIZE free;
+			HALFSIZE indx;
 		} tuple;
-		uint32_t atom;										// can be 64, use 32 for SPARC
+		WHOLESIZE atom;									// atomic assignment
 	} Ytype;
 
 	std::atomic<int> X;
-	std::atomic<uint32_t> Y, Reset;
+	std::atomic<WHOLESIZE> Y, Reset;
 	std::atomic<int> Name_Taken[N], Obstacle[N];
 	std::atomic<int> Infast;
 
@@ -63,11 +71,11 @@ struct AndersonKim : rl::test_suite<AndersonKim, N> {
 		B.Q[0]($) = B.Q[1]($) = false;
 
 		for ( int i = 0; i < N; i += 1 ) {				// initialize shared data
-			Name_Taken[i]($) = Obstacle[i]($) = 0;
+			Name_Taken[i]($) = Obstacle[i]($) = false;
 		} // for
-		Y($) = (Ytype){ .tuple = { .free = 1, .indx = 0 } }.atom;
-		Reset($) = (Ytype){ .tuple = { .free = 1, .indx = 0 } }.atom;
-		Infast($) = 0;
+		Y($) = (Ytype){ .tuple = { .free = true, .indx = 0 } }.atom;
+		Reset($) = (Ytype){ .tuple = { .free = true, .indx = 0 } }.atom;
+		Infast($) = false;
 	} // before
 
 
@@ -98,12 +106,12 @@ struct AndersonKim : rl::test_suite<AndersonKim, N> {
 		Y($) = 0;
 		X($) = id;
 		y.atom = Reset($);
-		Obstacle[id]($) = 0;
-		Reset($) = (Ytype){ .tuple = { .free = 0, .indx = y.tuple.indx } }.atom;
+		Obstacle[id]($) = false;
+		Reset($) = (Ytype){ .tuple = { .free = false, .indx = y.tuple.indx } }.atom;
 		if ( ! Name_Taken[ y.tuple.indx ]($) && ! Obstacle[ y.tuple.indx ]($) ) {
-			uint16_t temp = (uint16_t)(y.tuple.indx + 1 < N ? y.tuple.indx + 1 : 0);
-			Reset($) = (Ytype){ .tuple = { .free = 1, .indx = temp } }.atom;
-			Y($) = (Ytype){ .tuple = { .free = 1, .indx = temp } }.atom;
+			HALFSIZE temp = (HALFSIZE)(y.tuple.indx + 1 < N ? y.tuple.indx + 1 : 0);
+			Reset($) = (Ytype){ .tuple = { .free = true, .indx = temp } }.atom;
+			Y($) = (Ytype){ .tuple = { .free = true, .indx = temp } }.atom;
 		} // if
 		binary_epilogue( 0, &B );
 		exitSlow( level, state );
@@ -121,28 +129,28 @@ struct AndersonKim : rl::test_suite<AndersonKim, N> {
 			SLOW1( id, level, state	);
 		} else {
 			Y($) = 0;
-			Obstacle[id]($) = 1;
+			Obstacle[id]($) = true;
 			if ( X($) != id || Infast($) ) {
 				SLOW2( id, y, level, state );
 			} else {
-				Name_Taken[y.tuple.indx]($) = 1;
+				Name_Taken[y.tuple.indx]($) = true;
 				if ( Reset($) != y.atom ) {
-					Name_Taken[y.tuple.indx]($) = 0;
+					Name_Taken[y.tuple.indx]($) = false;
 					SLOW2( id, y, level, state );
 				} else {
-					Infast($) = 1;
+					Infast($) = true;
 					binary_prologue( 1, &B );
 					CS($) = id + 1;						// critical section
-					Obstacle[id]($) = 0;
-					Reset($) = (Ytype){ .tuple = { .free = 0, .indx = y.tuple.indx } }.atom;
+					Obstacle[id]($) = false;
+					Reset($) = (Ytype){ .tuple = { .free = false, .indx = y.tuple.indx } }.atom;
 					if ( ! Obstacle[ y.tuple.indx ]($) ) {
-						uint16_t temp = (uint16_t)(y.tuple.indx + 1 < N ? y.tuple.indx + 1 : 0);
-						Reset($) = (Ytype){ .tuple = { .free = 1, .indx = temp } }.atom;
-						Y($) = (Ytype){ .tuple = { .free = 1, .indx = temp } }.atom;
+						HALFSIZE temp = (HALFSIZE)(y.tuple.indx + 1 < N ? y.tuple.indx + 1 : 0);
+						Reset($) = (Ytype){ .tuple = { .free = true, .indx = temp } }.atom;
+						Y($) = (Ytype){ .tuple = { .free = true, .indx = temp } }.atom;
 					} // if
-					Name_Taken[y.tuple.indx]($) = 0;
+					Name_Taken[y.tuple.indx]($) = false;
 					binary_epilogue( 1, &B );
-					Infast($) = 0;
+					Infast($) = false;
 				} // if
 			} // if
 		} // if

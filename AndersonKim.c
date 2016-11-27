@@ -82,16 +82,22 @@ static inline void exitSlow(
 #endif // TB
 } // exitSlow
 
-
 //=========================================================================
 
+#if __WORDSIZE == 64
+#define HALFSIZE uint32_t
+#define WHOLESIZE uint64_t
+#else  // SPARC
+#define HALFSIZE uint16_t
+#define WHOLESIZE uint32_t
+#endif // __WORDSIZE == 64
 
 typedef union {
 	struct {
-		uint16_t free;
-		uint16_t indx;
+		HALFSIZE free;
+		HALFSIZE indx;
 	} tuple;
-	uint32_t atom;										// can be 64, use 32 for SPARC
+	WHOLESIZE atom;
 } Ytype;
 
 static volatile TYPE X CALIGN;
@@ -144,13 +150,13 @@ static inline void SLOW2( TYPE id, Ytype y
 	X = id;
 	Fence();											// force store before more loads
 	y.atom = Reset.atom;
-	Obstacle[id] = 0;
-	Reset.atom = (Ytype){ .tuple = { .free = 0, .indx = y.tuple.indx } }.atom;
+	Obstacle[id] = false;
+	Reset.atom = (Ytype){ .tuple = { .free = false, .indx = y.tuple.indx } }.atom;
 	Fence();											// force store before more loads
 	if ( ! Name_Taken[ y.tuple.indx ] && ! Obstacle[ y.tuple.indx ] ) {
-		uint16_t temp = (uint16_t)(y.tuple.indx + 1 < N ? y.tuple.indx + 1 : 0);
-		Reset.atom = (Ytype){ .tuple = { .free = 1, .indx = temp } }.atom;
-		Y.atom = (Ytype){ .tuple = { .free = 1, .indx = temp } }.atom;
+		HALFSIZE temp = (HALFSIZE)(y.tuple.indx + 1 < N ? y.tuple.indx + 1 : 0);
+		Reset.atom = (Ytype){ .tuple = { .free = true, .indx = temp } }.atom;
+		Y.atom = (Ytype){ .tuple = { .free = true, .indx = temp } }.atom;
 	} // if
 	binary_epilogue( 0, &B );
 	exitSlow(
@@ -169,6 +175,7 @@ static void *Worker( void *arg ) {
 #ifdef FAST
 	unsigned int cnt = 0, oid = id;
 #endif // FAST
+
 #ifndef TB
 	int level = levels[id];
 	Tuple *state = states[id];
@@ -191,7 +198,7 @@ static void *Worker( void *arg ) {
 					    );
 			} else {
 				Y.atom = 0;
-				Obstacle[id] = 1;
+				Obstacle[id] = true;
 				Fence();								// force store before more loads
 				if ( FASTPATH( X != id || Infast ) ) {
 					SLOW2( id, y
@@ -200,30 +207,32 @@ static void *Worker( void *arg ) {
 #endif // ! TB
 						);
 				} else {
-					Name_Taken[y.tuple.indx] = 1;
+					Name_Taken[y.tuple.indx] = true;
 					Fence();							// force store before more loads
 					if ( FASTPATH( Reset.atom != y.atom ) ) {
-						Name_Taken[y.tuple.indx] = 0;
+						Name_Taken[y.tuple.indx] = false;
 						SLOW2( id, y
 #ifndef TB
 							   , level, state
 #endif // ! TB
 							);
 					} else {
-						Infast = 1;
+						Infast = true;
 						binary_prologue( 1, &B );
 						CriticalSection( id );
-						Obstacle[id] = 0;
-						Reset.atom = (Ytype){ .tuple = { .free = 0, .indx = y.tuple.indx } }.atom;
+						Obstacle[id] = false;
+						Reset.atom = (Ytype){ .tuple = { .free = false, .indx = y.tuple.indx } }.atom;
 						Fence();						// force store before more loads
-						if ( ! Obstacle[ y.tuple.indx ] ) {
-							uint16_t temp = (uint16_t)(y.tuple.indx + 1 < N ? y.tuple.indx + 1 : 0);
-							Reset.atom = (Ytype){ .tuple = { .free = 1, .indx = temp } }.atom;
-							Y.atom = (Ytype){ .tuple = { .free = 1, .indx = temp } }.atom;
+						// Obstacle[ y.tuple.indx ] is always false for minimal contentions, and almost always false for
+						// maximal contention => LIKELY for both minimal and maximal contention.
+						if ( LIKELY( ! Obstacle[ y.tuple.indx ] ) ) { // always
+							HALFSIZE temp = (HALFSIZE)(y.tuple.indx + 1 < N ? y.tuple.indx + 1 : 0);
+							Reset.atom = (Ytype){ .tuple = { .free = true, .indx = temp } }.atom;
+							Y.atom = (Ytype){ .tuple = { .free = true, .indx = temp } }.atom;
 						} // if
-						Name_Taken[y.tuple.indx] = 0;
+						Name_Taken[y.tuple.indx] = false;
 						binary_epilogue( 1, &B );
-						Infast = 0;
+						Infast = false;
 					} // if
 				} // if
 			} // if
@@ -234,6 +243,7 @@ static void *Worker( void *arg ) {
 #endif // FAST
 			entry += 1;
 		} // while
+
 #ifdef FAST
 		id = oid;
 #endif // FAST
@@ -245,9 +255,7 @@ static void *Worker( void *arg ) {
 	return NULL;
 } // Worker
 
-
 //=========================================================================
-
 
 void __attribute__((noinline)) ctor2() {
 #ifdef TB
@@ -292,11 +300,11 @@ void __attribute__((noinline)) ctor() {
 	Name_Taken = Allocator( sizeof(typeof(Name_Taken[0])) * N );
 	Obstacle = Allocator( sizeof(typeof(Obstacle[0])) * N );
 	for ( int i = 0; i < N; i += 1 ) {					// initialize shared data
-		Name_Taken[i] = Obstacle[i] = 0;
+		Name_Taken[i] = Obstacle[i] = false;
 	} // for
-	Y.atom = (Ytype){ .tuple = { .free = 1, .indx = 0 } }.atom;
-	Reset.atom = (Ytype){ .tuple = { .free = 1, .indx = 0 } }.atom;
-	Infast = 0;
+	Y.atom = (Ytype){ .tuple = { .free = true, .indx = 0 } }.atom;
+	Reset.atom = (Ytype){ .tuple = { .free = true, .indx = 0 } }.atom;
+	Infast = false;
 	ctor2();											// tournament allocation/initialization
 } // ctor
 
