@@ -9,12 +9,21 @@ enum { N = 8 };
 #include <stdint.h>										// uint*
 
 struct PetersonT : rl::test_suite<PetersonT, N> {
+
+#if __WORDSIZE == 64
+#define HALFSIZE uint32_t
+#define WHOLESIZE uint64_t
+#else  // SPARC
+#define HALFSIZE uint16_t
+#define WHOLESIZE uint32_t
+#endif // __WORDSIZE == 64
+
 	typedef union {
 		struct {
-			uint16_t level;								// current level in tournament
-			uint16_t state;								// intent to enter critical section
+			HALFSIZE level;								// current level in tournament
+			HALFSIZE state;								// intent to enter critical section
 		} tuple;
-		uint32_t atom;									// ensure atomic assignment
+		WHOLESIZE atom;									// atomic assignment
 	} Tuple;
 
 #   define L(t) ((t).tuple.level)
@@ -24,9 +33,9 @@ struct PetersonT : rl::test_suite<PetersonT, N> {
 	int min( int a, int b ) { return a < b ? a : b; }
 
 	int depth, width, mask;
-	std::atomic<uint32_t> Q[N];							// maximal width of binary tree
+	std::atomic<WHOLESIZE> Q[N];						// maximal width of binary tree
 
-	uint32_t QMAX( unsigned int id, int k ) {
+	WHOLESIZE QMAX( unsigned int id, unsigned int k ) {
 		int low = ((id >> (k - 1)) ^ 1) << (k - 1);
 		int high = min( low | mask >> (depth - (k - 1)), N );
 		Tuple opp;
@@ -50,11 +59,11 @@ struct PetersonT : rl::test_suite<PetersonT, N> {
 
 	void thread( int id ) {
 		Tuple opp, temp;
-		for ( uint16_t k = 1; k <= depth; k += 1 ) {	// entry protocol, round
+		for ( HALFSIZE k = 1; k <= (HALFSIZE)depth; k += 1 ) { // entry protocol, round
 			opp.atom = QMAX( id, k );
-			Q[id]($) = L(opp) == k ? (Tuple){ .tuple = { .level = k, .state = (uint16_t)(bit(id,k) ^ R(opp)) } }.atom : (Tuple){ .tuple = {k, 1} }.atom;
+			Q[id]($) = L(opp) == k ? (Tuple){ .tuple = { .level = k, .state = (HALFSIZE)(bit(id,k) ^ R(opp)) } }.atom : (Tuple){ .tuple = {k, 1} }.atom;
 			opp.atom = QMAX( id, k );
-			temp.atom = L(opp) == k ? (Tuple){ .tuple = { .level = k,  .state = (uint16_t)(bit(id,k) ^ R(opp))} }.atom : Q[id]($);
+			temp.atom = L(opp) == k ? (Tuple){ .tuple = { .level = k,  .state = (HALFSIZE)(bit(id,k) ^ R(opp))} }.atom : Q[id]($);
 			Q[id]($) = temp.atom;
 #if 0
 		  wait:	opp.atom = QMAX( id, k );

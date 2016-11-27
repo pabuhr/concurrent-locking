@@ -3,12 +3,20 @@
 
 #include <stdint.h>										// uint*_t
 
+#if __WORDSIZE == 64
+#define HALFSIZE uint32_t
+#define WHOLESIZE uint64_t
+#else  // SPARC
+#define HALFSIZE uint16_t
+#define WHOLESIZE uint32_t
+#endif // __WORDSIZE == 64
+
 typedef union {
 	struct {
-		uint16_t level;									// current level in tournament
-		uint16_t state;									// intent to enter critical section
+		HALFSIZE level;									// current level in tournament
+		HALFSIZE state;									// intent to enter critical section
 	} tuple;
-	uint32_t atom;										// ensure atomic assignment
+	WHOLESIZE atom;										// ensure atomic assignment
 } Tuple;
 
 #define L(t) ((t).tuple.level)
@@ -20,7 +28,7 @@ static inline int min( int a, int b ) { return a < b ? a : b; }
 static int depth, mask;
 static volatile Tuple *Q;
 
-uint32_t QMAX( TYPE id, int k ) {
+WHOLESIZE QMAX( TYPE id, unsigned int k ) {
 	int low = ((id >> (k - 1)) ^ 1) << (k - 1);
 	int high = min( low | mask >> (depth - (k - 1)), N - 1 );
 	Tuple opp;
@@ -43,14 +51,14 @@ static void *Worker( void *arg ) {
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		entry = 0;
 		while ( stop == 0 ) {
-			for ( int k = 1; k <= depth; k += 1 ) {		// entry protocol, round
+			for ( int k = 1; k <= (HALFSIZE)depth; k += 1 ) { // entry protocol, round
 				opp.atom = QMAX( id, k );
 				Fence();								// force store before more loads
-				Q[id].atom = L(opp) == k ? (Tuple){ .tuple = { .level = k, .state = (uint16_t)(bit(id,k) ^ R(opp)) } }.atom : (Tuple){ .tuple = {k, 1} }.atom;
+				Q[id].atom = L(opp) == k ? (Tuple){ .tuple = { .level = k, .state = (HALFSIZE)(bit(id,k) ^ R(opp)) } }.atom : (Tuple){ .tuple = {k, 1} }.atom;
 				Fence();								// force store before more loads
 				opp.atom = QMAX( id, k );
 				Fence();								// force store before more loads
-				Q[id].atom = L(opp) == k ? (Tuple){ .tuple = { .level = k, .state = (uint16_t)(bit(id,k) ^ R(opp)) } }.atom : Q[id].atom;
+				Q[id].atom = L(opp) == k ? (Tuple){ .tuple = { .level = k, .state = (HALFSIZE)(bit(id,k) ^ R(opp)) } }.atom : Q[id].atom;
 #if 0
 			  wait:	opp.atom = QMAX( id, k );
 				Fence();								// force store before more loads
