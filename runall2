@@ -3,7 +3,7 @@
 # Experiments for: Fast Mutual Exclusion by the Triangle Algorithm, Wim H. Hesselink, Peter A. Buhr
 # and David Dice, submitted
 
-algorithms="Burns2 LamportFast Taubenfeld TaubenfeldBuhr Kessels PetersonBuhr AndersonKim Triangle TriangleMod MCS"
+algorithms="Burns2 LamportFast Taubenfeld TaubenfeldBuhr Kessels PetersonBuhr YangAndersonFast AndersonKim Triangle TriangleMod MCS"
 outdir=`hostname`
 mkdir -p ${outdir}
 
@@ -27,7 +27,7 @@ runalgorithm() {
 
 rm -rf core
 for algorithm in ${algorithms} ; do
-    if [ ${algorithm} = "Triangle" -o ${algorithm} = "TriangleMod" -o ${algorithm} = "AndersonKim" ] ; then
+    if [ ${algorithm} = "YangAndersonFast" -o ${algorithm} = "AndersonKim" -o ${algorithm} = "Triangle" -o ${algorithm} = "TriangleMod" ] ; then
 	runalgorithm ${algorithm} PB
 	runalgorithm ${algorithm} TB
     else
