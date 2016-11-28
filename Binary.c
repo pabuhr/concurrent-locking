@@ -93,6 +93,15 @@ static inline void binary_prologue( TYPE c, volatile Token *t ) {
 #endif
 } // binary_prologue
 
+
+// No fence is necessary *before* binary_epilogue for the TSO memory-model because there are only stores, which cannot
+// be moved before prior reads. The exception is DEKKERRW because it has a read of "turn" (t->R) that can be moved
+// before a prior write in the entry protocol.  However, turn is only written in the exit protocol. MX ensures no other
+// thread can change turn except the thread in the CS. Finally, turn cannot be raised before the last line of the
+// DEKKERRW entry-protocol because turn is read on the last line.  Hence, if the thread in the CS reads turn before or
+// after the CS, it must be the same value and it cannot be flickering because of a write. Therefore, no fence is
+// required before binary_epilogue in DEKKERRW.
+	
 static inline void binary_epilogue( TYPE c, volatile Token *t ) {
 #if defined( KESSELS2 )
 	t->Q[c] = 0;
