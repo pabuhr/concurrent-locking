@@ -89,8 +89,8 @@ struct Triangle : rl::test_suite<Triangle, N> {
 		y($) = id;
 		if ( x($) != id ) {
 			b[id]($) = false;
-			for ( int j = 0; y($) == id && j < N ; j += 1 )
-				await( ! b[j]($) );
+			for ( int k = 0; y($) == id && k < N; k += 1 )
+				await( y($) != id || ! b[k]($) );
 			if ( y($) != id ) goto ASIDE;
 		} // if
 

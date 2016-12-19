@@ -27,26 +27,59 @@ static Token *t CALIGN;
 
 //======================================================
 
+static inline void entrySlow(
+#ifdef TB
+	TYPE id
+#else
+	int level, Tuple *state
+#endif // TB
+	) {
+#ifdef TB
+	unsigned int ridt, ridi;
+
+//	ridi = id;
+	for ( unsigned int lv = 0; lv < depth; lv += 1 ) {	// entry protocol
+		ridi = id >> lv;								// round id for intent
+		ridt = ridi >> 1;								// round id for turn
+		intents[lv][ridi] = 1;							// declare intent
+		turns[lv][ridt] = ridi;							// RACE
+		Fence();										// force store before more loads
+		while ( intents[lv][ridi ^ 1] == 1 && turns[lv][ridt] == ridi ) Pause();
+//		ridi = ridi >> 1;
+	} // for
+#else
+	for ( int s = 0; s <= level; s += 1 ) {				// entry protocol
+		binary_prologue( state[s].es, state[s].ns );
+	} // for
+#endif // TB
+} // entrySlow
+
+static inline void exitSlow(
+#ifdef TB
+	TYPE id
+#else
+	int level, Tuple *state
+#endif // TB
+	) {
+#ifdef TB
+	for ( int lv = depth - 1; lv >= 0; lv -= 1 ) {		// exit protocol
+		intents[lv][id >> lv] = 0;						// retract all intents in reverse order
+	} // for
+#else
+	for ( int s = level; s >= 0; s -= 1 ) {				// exit protocol, reverse order
+		binary_epilogue( state[s].es, state[s].ns );
+	} // for
+#endif // TB
+} // exitSlow
+
+//======================================================
+
 static volatile TYPE *b CALIGN;
 static volatile TYPE x CALIGN, y CALIGN;
-//static volatile TYPE bintents[2] CALIGN = { false, false }, last CALIGN;
 static volatile Token B; // = { { 0, 0 }, 0 };
 static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
 
 #define await( E ) while ( ! (E) ) Pause()
-
-static inline void binary( int id ) {
-	binary_prologue( id, &B );
-	//bintents[id] = true;
-	//last = false;
-	//Fence();									// force store before more loads
-	//await( ! bintents[1] || last );
-
-	CriticalSection( id );
-
-	binary_epilogue( id, &B );
-	//bintents[id] = false;
-} // binary
 
 static void *Worker( void *arg ) {
 	TYPE id = (size_t)arg;
@@ -55,16 +88,15 @@ static void *Worker( void *arg ) {
 	unsigned int cnt = 0, oid = id;
 #endif // FAST
 
-#ifdef TB
-	unsigned int ridt, ridi;
-#else
+#ifndef TB
 	int level = levels[id];
 	Tuple *state = states[id];
-#endif // TB
+#endif // ! TB
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		entry = 0;
 		while ( stop == 0 ) {
+
 #if 0
 			if ( FASTPATH( y == N ) ) {
 				b[id] = true;
@@ -78,8 +110,8 @@ static void *Worker( void *arg ) {
 					} else {
 						b[id] = false;
 						Fence();						// force store before more loads
-						for ( int j = 0; y == id && j < N; j += 1 )
-							await( ! b[j] );
+						for ( int k = 0; y == id && k < N; k += 1 )
+							await( y != id || ! b[k] );
 						if ( FASTPATH( y == id ) )
 							goto CONT;
 					} // if
@@ -104,13 +136,14 @@ static void *Worker( void *arg ) {
 			if ( FASTPATH( x != id ) ) {
 				b[id] = false;
 				Fence();								// force store before more loads
-				for ( int j = 0; y == id && j < N ; j += 1 )
-					await( ! b[j] );
+				for ( int k = 0; y == id && k < N; k += 1 )
+					await( y != id || ! b[k] );
 				if ( FASTPATH( y != id ) ) goto ASIDE;
 			} // if
 #endif
-
-			binary( 1 );
+			binary_prologue( 1, &B );
+			CriticalSection( id );
+			binary_epilogue( 1, &B );
 
 			y = N;										// exit protocol
 			b[id] = false;
@@ -121,36 +154,25 @@ static void *Worker( void *arg ) {
 			__asm__ __volatile__ ( "" : : : "memory" );
 #endif // __sparc
 
+			entrySlow(
 #ifdef TB
-//			ridi = id;
-			for ( unsigned int lv = 0; lv < depth; lv += 1 ) { // entry protocol
-				ridi = id >> lv;						// round id for intent
-				ridt = ridi >> 1;						// round id for turn
-				intents[lv][ridi] = 1;					// declare intent
-				turns[lv][ridt] = ridi;					// RACE
-				Fence();								// force store before more loads
-				while ( intents[lv][ridi ^ 1] == 1 && turns[lv][ridt] == ridi ) Pause();
-//				ridi >>= 1;
-			} // for
+				id
 #else
-			for ( int s = 0; s <= level; s += 1 ) {		// entry protocol
-				binary_prologue( state[s].es, state[s].ns );
-			} // for
+				level, state
 #endif // TB
-
-			binary( 0 );
-
+				);
+			binary_prologue( 0, &B );
+			CriticalSection( id );
+			binary_epilogue( 0, &B );
+			exitSlow(
 #ifdef TB
-			for ( int lv = depth - 1; lv >= 0; lv -= 1 ) { // exit protocol
-				intents[lv][id >> lv] = 0;				// retract all intents in reverse order
-			} // for
+				id
 #else
-			for ( int s = level; s >= 0; s -= 1 ) {		// exit protocol, reverse order
-				binary_epilogue( state[s].es, state[s].ns );
-			} // for
+				level, state
 #endif // TB
-
+				);
 		  FINI: ;
+
 #ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
 			cnt = cycleUp( cnt, NoStartPoints );

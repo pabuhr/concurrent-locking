@@ -27,15 +27,6 @@ static Token *t CALIGN;
 
 //======================================================
 
-static volatile TYPE *b CALIGN;
-static volatile TYPE x CALIGN, y CALIGN;
-//static volatile TYPE bintents[2] CALIGN = { false, false }, last CALIGN;
-static volatile Token B; // = { { 0, 0 }, 0 };
-static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
-
-#define await( E ) while ( ! (E) ) Pause()
-
-
 static inline void entrySlow(
 #ifdef TB
 	TYPE id
@@ -81,7 +72,14 @@ static inline void exitSlow(
 #endif // TB
 } // exitSlow
 
-//=========================================================================
+//======================================================
+
+static volatile TYPE *b CALIGN;
+static volatile TYPE x CALIGN, y CALIGN;
+static volatile Token B; // = { { 0, 0 }, 0 };
+static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
+
+#define await( E ) while ( ! (E) ) Pause()
 
 static inline TYPE entryFast( TYPE id ) {
 #if 0
@@ -97,8 +95,8 @@ static inline TYPE entryFast( TYPE id ) {
 			} else {
 				b[id] = false;
 				Fence();								// force store before more loads
-				for ( int j = 0; y == id && j < N; j += 1 )
-					await( ! b[j] );
+				for ( int k = 0; y == id && k < N; k += 1 )
+					await( y != id || ! b[k] );
 				if ( FASTPATH( y == id ) )
 					return true;
 			} // if
@@ -124,8 +122,8 @@ static inline TYPE entryFast( TYPE id ) {
 		return false;
 #else
 		Fence();										// force store before more loads
-		for ( int j = 0; y == id && j < N; j += 1 )
-			await( ! b[j] );
+		for ( int k = 0; y == id && k < N; k += 1 )
+			await( y != id || ! b[k] );
 		if ( FASTPATH( y != id ) ) return false;
 #endif // ALT
 	} // if
