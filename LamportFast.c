@@ -19,7 +19,9 @@ static void *Worker( void *arg ) {
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		entry = 0;
 		while ( stop == 0 ) {
-		  START: b[id] = true;							// entry protocol
+
+		  START: ;
+			b[id] = true;								// entry protocol
 			x = id;
 			Fence();									// force store before more loads
 			if ( FASTPATH( y != N ) ) {
@@ -33,8 +35,8 @@ static void *Worker( void *arg ) {
 			if ( FASTPATH( x != id ) ) {
 				b[id] = false;
 				Fence();								// force store before more loads
-				for ( int j = 0; j < N; j += 1 )
-					await( ! b[j] );
+				for ( int k = 0; k < N; k += 1 )
+					await( ! b[k] );
 				if ( FASTPATH( y != id ) ) {
 //					await( y == N );
 					goto START;
@@ -43,6 +45,7 @@ static void *Worker( void *arg ) {
 			CriticalSection( id );
 			y = N;										// exit protocol
 			b[id] = false;
+
 #ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
 			cnt = cycleUp( cnt, NoStartPoints );
@@ -60,7 +63,7 @@ static void *Worker( void *arg ) {
 	return NULL;
 } // Worker
 
-void ctor() {
+void __attribute__((noinline)) ctor() {
 	b = Allocator( sizeof(typeof(b[0])) * N );
 	for ( int i = 0; i < N; i += 1 ) {					// initialize shared data
 		b[i] = 0;
@@ -68,7 +71,7 @@ void ctor() {
 	y = N;
 } // ctor
 
-void dtor() {
+void __attribute__((noinline)) dtor() {
 	free( (void *)b );
 } // dtor
 
