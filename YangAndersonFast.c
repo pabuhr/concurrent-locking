@@ -30,13 +30,6 @@ static Token *t CALIGN;
 
 //======================================================
 
-static volatile TYPE x CALIGN, y CALIGN;
-static volatile Token B; // = { { 0, 0 }, 0 };
-static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
-
-#define await( E ) while ( ! (E) ) Pause()
-
-
 static inline void entrySlow(
 #ifdef TB
 	TYPE id
@@ -84,8 +77,12 @@ static inline void exitSlow(
 
 //=========================================================================
 
-static volatile TYPE *Bx CALIGN, Z CALIGN;
-static volatile intptr_t X CALIGN, Y CALIGN;			// signed numbers
+static volatile TYPE *b CALIGN, z CALIGN;
+static volatile intptr_t x CALIGN, y CALIGN;			// signed numbers
+static volatile Token B; // = { { 0, 0 }, 0 };
+static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
+
+#define await( E ) while ( ! (E) ) Pause()
 
 static void *Worker( void *arg ) {
 	TYPE id = (size_t)arg;
@@ -105,23 +102,23 @@ static void *Worker( void *arg ) {
 		entry = 0;
 		while ( stop == 0 ) {
 
-			X = id;
+			x = id;
 			Fence();									// force store before more loads
-			if ( FASTPATH( Y != -1 ) ) goto SLOW;
-			Y = id;
+			if ( FASTPATH( y != -1 ) ) goto SLOW;
+			y = id;
 			Fence();									// force store before more loads
-			if ( FASTPATH( X != id ) ) goto SLOW;
-			Bx[id] = true;
+			if ( FASTPATH( x != id ) ) goto SLOW;
+			b[id] = true;
 			Fence();									// force store before more loads
-			if ( FASTPATH( Z ) ) goto SLOW;
-			if ( FASTPATH( Y != id ) ) goto SLOW;
+			if ( FASTPATH( z ) ) goto SLOW;
+			if ( FASTPATH( y != id ) ) goto SLOW;
 
 			binary_prologue( 1, &B );
 			CriticalSection( id );
 			binary_epilogue( 1, &B );
 
-			Y = -1;
-			Bx[id] = false;
+			y = -1;
+			b[id] = false;
 			goto FINI;
 
 		  SLOW: ;
@@ -135,17 +132,17 @@ static void *Worker( void *arg ) {
 			binary_prologue( 0, &B );
 			CriticalSection( id );
 
-			Bx[id] = false;
+			b[id] = false;
 			Fence();									// force store before more loads
-			if ( FASTPATH( X == id ) ) {
-				Z = true;
+			if ( FASTPATH( x == id ) ) {
+				z = true;
 				flag = true;
 				Fence();								// force store before more loads
 				for ( int n = 0; n < N; n += 1 ) {
-					if ( Bx[n] ) flag = false;
+					if ( b[n] ) flag = false;
 				} // for
-				if ( flag ) Y = -1;
-				Z = false;
+				if ( flag ) y = -1;
+				z = false;
 			} // if
 
 			binary_epilogue( 0, &B );
@@ -217,12 +214,12 @@ void __attribute__((noinline)) ctor2() {
 } // ctor2
 
 void __attribute__((noinline)) ctor() {
-	Bx = Allocator( sizeof(typeof(Bx[0])) * N );
+	b = Allocator( sizeof(typeof(b[0])) * N );
 	for ( int i = 0; i < N; i += 1 ) {					// initialize shared data
-		Bx[i] = false;
+		b[i] = false;
 	} // for
-	Y = -1;
-	Z = false;
+	y = -1;
+	z = false;
 	ctor2();											// tournament allocation/initialization
 } // ctor
 
@@ -243,7 +240,7 @@ void __attribute__((noinline)) dtor2() {
 
 void __attribute__((noinline)) dtor() {
 	dtor2();											// tournament deallocation
-	free( (void *)Bx );
+	free( (void *)b );
 } // dtor
 
 // Local Variables: //
