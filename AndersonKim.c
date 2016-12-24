@@ -30,12 +30,6 @@ static Token *t CALIGN;
 
 //======================================================
 
-static volatile TYPE x CALIGN, y CALIGN;
-static volatile Token B; // = { { 0, 0 }, 0 };
-static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
-
-#define await( E ) while ( ! (E) ) Pause()
-
 
 static inline void entrySlow(
 #ifdef TB
@@ -98,13 +92,16 @@ typedef union {
 		HALFSIZE indx;
 	} tuple;
 	WHOLESIZE atom;
-} Ytype;
+} Atomic;
 
-static volatile TYPE X CALIGN;
-static volatile Ytype Y CALIGN, Reset CALIGN;
+static volatile TYPE x CALIGN;
+static volatile Atomic y CALIGN, Reset CALIGN;
 static volatile TYPE *Name_Taken, *Obstacle;
 static volatile TYPE Infast CALIGN;
+static volatile Token B; // = { { 0, 0 }, 0 };
 static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
+
+#define await( E ) while ( ! (E) ) Pause()
 
 
 static inline void SLOW1( TYPE id
@@ -132,7 +129,7 @@ static inline void SLOW1( TYPE id
 } // SLOW1
 
 
-static inline void SLOW2( TYPE id, Ytype y
+static inline void SLOW2( TYPE id, Atomic y
 #ifndef TB
 						  , int level, Tuple *state
 #endif // ! TB
@@ -146,17 +143,17 @@ static inline void SLOW2( TYPE id, Ytype y
 		);
 	binary_prologue( 0, &B );
 	CriticalSection( id );
-	Y.atom = 0;
-	X = id;
+	y.atom = 0;
+	x = id;
 	Fence();											// force store before more loads
 	y.atom = Reset.atom;
 	Obstacle[id] = false;
-	Reset.atom = (Ytype){ .tuple = { .free = false, .indx = y.tuple.indx } }.atom;
+	Reset.atom = (Atomic){ .tuple = { .free = false, .indx = y.tuple.indx } }.atom;
 	Fence();											// force store before more loads
 	if ( ! Name_Taken[ y.tuple.indx ] && ! Obstacle[ y.tuple.indx ] ) {
 		HALFSIZE temp = (HALFSIZE)(y.tuple.indx + 1 < N ? y.tuple.indx + 1 : 0);
-		Reset.atom = (Ytype){ .tuple = { .free = true, .indx = temp } }.atom;
-		Y.atom = (Ytype){ .tuple = { .free = true, .indx = temp } }.atom;
+		Reset.atom = (Atomic){ .tuple = { .free = true, .indx = temp } }.atom;
+		y.atom = (Atomic){ .tuple = { .free = true, .indx = temp } }.atom;
 	} // if
 	binary_epilogue( 0, &B );
 	exitSlow(
@@ -181,37 +178,37 @@ static void *Worker( void *arg ) {
 	Tuple *state = states[id];
 #endif // ! TB
 
-	Ytype y;
+	Atomic ly;
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		entry = 0;
 		while ( stop == 0 ) {
 
-			X = id;
+			x = id;
 			Fence();									// force store before more loads
-			y.atom = Y.atom;
-			if ( FASTPATH( ! y.tuple.free ) ) {
+			ly.atom = y.atom;
+			if ( FASTPATH( ! ly.tuple.free ) ) {
 				SLOW1( id
 #ifndef TB
 					   , level, state
 #endif // ! TB
 					    );
 			} else {
-				Y.atom = 0;
+				y.atom = 0;
 				Obstacle[id] = true;
 				Fence();								// force store before more loads
-				if ( FASTPATH( X != id || Infast ) ) {
-					SLOW2( id, y
+				if ( FASTPATH( x != id || Infast ) ) {
+					SLOW2( id, ly
 #ifndef TB
 						   , level, state
 #endif // ! TB
 						);
 				} else {
-					Name_Taken[y.tuple.indx] = true;
+					Name_Taken[ly.tuple.indx] = true;
 					Fence();							// force store before more loads
-					if ( FASTPATH( Reset.atom != y.atom ) ) {
-						Name_Taken[y.tuple.indx] = false;
-						SLOW2( id, y
+					if ( FASTPATH( Reset.atom != ly.atom ) ) {
+						Name_Taken[ly.tuple.indx] = false;
+						SLOW2( id, ly
 #ifndef TB
 							   , level, state
 #endif // ! TB
@@ -221,16 +218,16 @@ static void *Worker( void *arg ) {
 						binary_prologue( 1, &B );
 						CriticalSection( id );
 						Obstacle[id] = false;
-						Reset.atom = (Ytype){ .tuple = { .free = false, .indx = y.tuple.indx } }.atom;
+						Reset.atom = (Atomic){ .tuple = { .free = false, .indx = ly.tuple.indx } }.atom;
 						Fence();						// force store before more loads
-						// Obstacle[ y.tuple.indx ] is always false for minimal contentions, and almost always false for
+						// Obstacle[ ly.tuple.indx ] is always false for minimal contentions, and almost always false for
 						// maximal contention => LIKELY for both minimal and maximal contention.
-						if ( LIKELY( ! Obstacle[ y.tuple.indx ] ) ) { // always
-							HALFSIZE temp = (HALFSIZE)(y.tuple.indx + 1 < N ? y.tuple.indx + 1 : 0);
-							Reset.atom = (Ytype){ .tuple = { .free = true, .indx = temp } }.atom;
-							Y.atom = (Ytype){ .tuple = { .free = true, .indx = temp } }.atom;
+						if ( LIKELY( ! Obstacle[ ly.tuple.indx ] ) ) { // always
+							HALFSIZE temp = (HALFSIZE)(ly.tuple.indx + 1 < N ? ly.tuple.indx + 1 : 0);
+							Reset.atom = (Atomic){ .tuple = { .free = true, .indx = temp } }.atom;
+							y.atom = (Atomic){ .tuple = { .free = true, .indx = temp } }.atom;
 						} // if
-						Name_Taken[y.tuple.indx] = false;
+						Name_Taken[ly.tuple.indx] = false;
 						binary_epilogue( 1, &B );
 						Infast = false;
 					} // if
@@ -302,8 +299,8 @@ void __attribute__((noinline)) ctor() {
 	for ( int i = 0; i < N; i += 1 ) {					// initialize shared data
 		Name_Taken[i] = Obstacle[i] = false;
 	} // for
-	Y.atom = (Ytype){ .tuple = { .free = true, .indx = 0 } }.atom;
-	Reset.atom = (Ytype){ .tuple = { .free = true, .indx = 0 } }.atom;
+	y.atom = (Atomic){ .tuple = { .free = true, .indx = 0 } }.atom;
+	Reset.atom = (Atomic){ .tuple = { .free = true, .indx = 0 } }.atom;
 	Infast = false;
 	ctor2();											// tournament allocation/initialization
 } // ctor
