@@ -81,6 +81,7 @@ static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false shar
 
 #define await( E ) while ( ! (E) ) Pause()
 
+
 static void *Worker( void *arg ) {
 	TYPE id = (size_t)arg;
 	uint64_t entry;
@@ -95,6 +96,7 @@ static void *Worker( void *arg ) {
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		entry = 0;
+
 		while ( stop == 0 ) {
 
 #if 0
@@ -109,7 +111,7 @@ static void *Worker( void *arg ) {
 						goto CONT;
 					} else {
 						b[id] = false;
-						Fence();						// force store before more loads
+						Fence();						// OPTIONAL, force store before more loads
 						for ( int k = 0; y == id && k < N; k += 1 )
 							await( y != id || ! b[k] );
 						if ( FASTPATH( y == id ) )
@@ -135,7 +137,7 @@ static void *Worker( void *arg ) {
 			Fence();									// force store before more loads
 			if ( FASTPATH( x != id ) ) {
 				b[id] = false;
-				Fence();								// force store before more loads
+				Fence();								// OPTIONAL, force store before more loads
 				for ( int k = 0; y == id && k < N; k += 1 )
 					await( y != id || ! b[k] );
 				if ( FASTPATH( y != id ) ) goto ASIDE;
@@ -179,6 +181,7 @@ static void *Worker( void *arg ) {
 #endif // FAST
 			entry += 1;
 		} // while
+
 #ifdef FAST
 		id = oid;
 #endif // FAST

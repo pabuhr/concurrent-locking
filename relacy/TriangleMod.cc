@@ -105,13 +105,11 @@ struct TriangleMod : rl::test_suite<TriangleMod, N> {
 		if ( ! fa ) {
 			entrySlow( level, state );
 		} // if
-		//entryBinary( fa );
 		binary_prologue( fa, &B );
 		return fa;
 	} // entryComb
 
 	void exitComb( unsigned int id, bool fa, int level, Tuple *state ) {
-		//exitBinary( fa );
 		binary_epilogue( fa, &B );
 		if ( fa )
 			exitFast( id );

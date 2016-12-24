@@ -81,6 +81,7 @@ static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false shar
 
 #define await( E ) while ( ! (E) ) Pause()
 
+
 static inline TYPE entryFast( TYPE id ) {
 #if 0
 	if ( FASTPATH( y == N ) ) {
@@ -94,7 +95,7 @@ static inline TYPE entryFast( TYPE id ) {
 				return true;
 			} else {
 				b[id] = false;
-				Fence();								// force store before more loads
+				Fence();								// OPTIONAL, force store before more loads
 				for ( int k = 0; y == id && k < N; k += 1 )
 					await( y != id || ! b[k] );
 				if ( FASTPATH( y == id ) )
@@ -121,7 +122,7 @@ static inline TYPE entryFast( TYPE id ) {
 #ifdef ALT
 		return false;
 #else
-		Fence();										// force store before more loads
+		Fence();										// OPTIONAL, force store before more loads
 		for ( int k = 0; y == id && k < N; k += 1 )
 			await( y != id || ! b[k] );
 		if ( FASTPATH( y != id ) ) return false;
@@ -160,7 +161,6 @@ static inline TYPE entryComb( TYPE id
 		} // if
 #endif // ALT
 	} // if
-	//entryBinary( fa );
 	binary_prologue( fa, &B );
 	return fa;
 } // entryComb
@@ -170,7 +170,6 @@ static inline void exitComb( TYPE id, TYPE fa
 							 , int level, Tuple *state
 #endif // ! TB
 	) {
-	//exitBinary( fa );
 	binary_epilogue( fa, &B );
 	if ( fa )
 		exitFast( id );
@@ -184,6 +183,7 @@ static inline void exitComb( TYPE id, TYPE fa
 			);
 } // exitComb
 
+//======================================================
 
 static void *Worker( void *arg ) {
 	TYPE id = (size_t)arg;
