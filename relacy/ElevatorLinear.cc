@@ -3,39 +3,7 @@
 
 enum { N = 8 };
 
-//======================================================
-
-typedef TYPE QElem_t;
-
-typedef struct CALIGN {
-	QElem_t elements[N];
-	unsigned int front, rear;
-} Queue;
-
-static inline bool QnotEmpty( volatile Queue *queue ) {
-	return queue->front != queue->rear;
-} // QnotEmpty
-
-static inline void Qenqueue( volatile Queue *queue, QElem_t element ) {
-	queue->elements[queue->rear] = element;
-	queue->rear = cycleUp( queue->rear, N );
-} // Qenqueue
-
-static inline QElem_t Qdequeue( volatile Queue *queue ) {
-	QElem_t element = queue->elements[queue->front];
-	queue->front = cycleUp( queue->front, N );
-	return element;
-} // Qdequeue
-
-static inline void Qctor( Queue *queue ) {
-	queue->front = queue->rear = 0;
-} // Qctor
-
-//======================================================
-
-struct ElevatorQueue : rl::test_suite<ElevatorQueue, N> {
-	Queue queue CALIGN;
-
+struct ElevatorLinear : rl::test_suite<ElevatorLinear, N> {
 	typedef struct CALIGN {								// performance gain when fields juxtaposed
 		std::atomic<TYPE> apply;
 #ifdef FLAG
@@ -45,7 +13,6 @@ struct ElevatorQueue : rl::test_suite<ElevatorQueue, N> {
 
 	std::atomic<TYPE> fast;
 	Tstate tstate[N + 1];
-	std::atomic<TYPE> val[2 * N];
 
 #ifndef CAS
 	std::atomic<TYPE> b[N], x, y;
@@ -108,8 +75,7 @@ struct ElevatorQueue : rl::test_suite<ElevatorQueue, N> {
 	//======================================================
 
 	void before() {
-		Qctor( &queue );
-		for ( TYPE id = 0; id <= N; id += 1 ) {			// initialize shared data
+		for ( TYPE id = 0; id <= N; id += 1 ) {				// initialize shared data
 			tstate[id].apply($) = false;
 #ifdef FLAG
 			tstate[id].flag($) = false;
@@ -122,13 +88,8 @@ struct ElevatorQueue : rl::test_suite<ElevatorQueue, N> {
 		first($) = N;
 #endif // FLAG
 
-		for ( TYPE id = 0; id < N; id += 1 ) {			// initialize shared data
-			val[id]($) = N;
-			val[N + id]($) = id;
-		} // for
-
 #ifndef CAS
-		for ( TYPE id = 0; id < N; id += 1 ) {			// initialize shared data
+		for ( TYPE id = 0; id < N; id += 1 ) {				// initialize shared data
 			b[id]($) = false;
 		} // for
 		y($) = N;
@@ -139,18 +100,13 @@ struct ElevatorQueue : rl::test_suite<ElevatorQueue, N> {
 	rl::var<int> CS;									// shared resource for critical section
 
 	void thread( TYPE id ) {
-		const unsigned int n = N + id, dep = Log2( n );
 		typeof(tstate[0].apply) *applyId = &tstate[id].apply;
 #ifdef FLAG
 		typeof(tstate[0].flag) *flagId = &tstate[id].flag;
 		typeof(tstate[0].flag) *flagN = &tstate[N].flag;
 #endif // FLAG
 
-		// loop goes from parent of leaf to child of root
 		(*applyId)($) = true;
-		for ( unsigned int j = (n >> 1); j > 1; j >>= 1 )
-			val[j]($) = id;
-
 		if ( WCas( id ) ) {
 #ifdef FLAG
 			await( (*flagN)($) || (*flagId)($) );
@@ -170,34 +126,28 @@ struct ElevatorQueue : rl::test_suite<ElevatorQueue, N> {
 #ifdef FLAG
 		(*flagId)($) = false;
 #endif // FLAG
-		(*applyId)($) = false;
 
 		CS($) = id + 1;									// critical section
 
-		// loop goes from child of root to leaf and inspects siblings
-		for ( int j = dep - 1; j >= 0; j -= 1 ) {		// must be "signed"
-			TYPE k = val[(n >> j) ^ 1]($);
-			if ( tstate[k].apply($) ) {
-				tstate[k].apply($) = false;
-				Qenqueue( &queue, k );
-			} // if
-		}  // for
-		if ( QnotEmpty( &queue ) )
+		typeof(id) thr;
+		for ( thr = cycleUp( id, N ); ! tstate[thr].apply($); thr = cycleUp( thr, N ) );
+		(*applyId)($) = false;							// must appear before setting first
+		if ( thr != id )
 #ifdef FLAG
-			tstate[Qdequeue( &queue )].flag($) = true; else (*flagN)($) = true;
+			tstate[thr].flag($) = true; else (*flagN)($) = true;
 #else
-		first($) = Qdequeue( &queue ); else first($) = N;
+			first($) = thr; else first($) = N;
 #endif // FLAG
 	} // thread
-}; // ElevatorQueue
+}; // ElevatorLinear
 
 int main() {
 	rl::test_params p;
 	SetParms( p );
-	rl::simulate<ElevatorQueue>( p );
+	rl::simulate<ElevatorLinear>( p );
 } // main
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "g++ -Wall -O3 -DNDEBUG -DCAS -I/u/pabuhr/software/relacy_2_4 ElevatorQueue.cc" //
+// compile-command: "g++ -Wall -O3 -DNDEBUG -I/u/pabuhr/software/relacy_2_4 ElevatorLinear.cc" //
 // End: //

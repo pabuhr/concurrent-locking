@@ -1,5 +1,42 @@
 #include <stdbool.h>
 
+//======================================================
+
+typedef TYPE QElem_t;
+
+typedef struct CALIGN {
+	QElem_t *elements;
+	unsigned int front, rear;
+} Queue;
+
+static inline bool QnotEmpty( volatile Queue *queue ) {
+	return queue->front != queue->rear;
+} // QnotEmpty
+
+static inline void Qenqueue( volatile Queue *queue, QElem_t element ) {
+	queue->elements[queue->rear] = element;
+	queue->rear = cycleUp( queue->rear, N );
+} // Qenqueue
+
+static inline QElem_t Qdequeue( volatile Queue *queue ) {
+	QElem_t element = queue->elements[queue->front];
+	queue->front = cycleUp( queue->front, N );
+	return element;
+} // Qdequeue
+
+static inline void Qctor( Queue *queue ) {
+	queue->front = queue->rear = 0;
+	queue->elements = Allocator( N * sizeof(typeof(queue->elements[0])) );
+} // Qctor
+
+static inline void Qdtor( Queue *queue ) {
+	free( queue->elements );
+} // Qdtor
+
+Queue queue CALIGN;
+
+//======================================================
+
 typedef struct CALIGN {									// performance gain when fields juxtaposed
 	TYPE apply;
 #ifdef FLAG
@@ -9,6 +46,7 @@ typedef struct CALIGN {									// performance gain when fields juxtaposed
 
 static volatile TYPE fast CALIGN;
 static volatile Tstate *tstate CALIGN;
+static volatile TYPE *val CALIGN;
 
 #ifndef CAS
 static volatile TYPE *b CALIGN, x CALIGN, y CALIGN;
@@ -60,9 +98,9 @@ static inline bool WCas( TYPE id ) {					// based on Lamport-Fast algorithm
 	Fence();											// force store before more loads
 	if ( FASTPATH( x != id ) ) {
 		b[id] = false;
-		Fence();										// force store before more loads
-		for ( int j = 0; j < N; j += 1 )
-			await( ! b[j] );
+		Fence();										// OPTIONAL, force store before more loads
+		for ( int k = 0; k < N; k += 1 )
+			await( ! b[k] );
 		if ( FASTPATH( y != id ) ) return false;
 	} // if
 	bool leader = ((! fast) ? fast = true : false);
@@ -80,6 +118,7 @@ static void *Worker( void *arg ) {
 	TYPE id = (size_t)arg;
 	uint64_t entry;
 
+	const unsigned int n = N + id, dep = Log2( n );
 	volatile typeof(tstate[0].apply) *applyId = &tstate[id].apply;
 #ifdef FLAG
 	volatile typeof(tstate[0].flag) *flagId = &tstate[id].flag;
@@ -89,12 +128,14 @@ static void *Worker( void *arg ) {
 #ifdef FAST
 	typeof(id) cnt = 0, oid = id;
 #endif // FAST
-	typeof(id) thr;
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		entry = 0;
 		while ( stop == 0 ) {
 			*applyId = true;							// entry protocol
+			// loop goes from parent of leaf to child of root
+			for ( unsigned int j = (n >> 1); j > 1; j >>= 1 )
+				val[j] = id;
 			if ( FASTPATH( WCas( id ) ) ) {				// true => leader
 #ifndef CAS
 				Fence();								// force store before more loads
@@ -115,28 +156,37 @@ static void *Worker( void *arg ) {
 				await( first == id );
 #endif // FLAG
 			} // if
+			*applyId = false;
 #ifdef FLAG
 			*flagId = false;
 #endif // FLAG
 
 			CriticalSection( id );
 
-			for ( thr = cycleUp( id, N ); ! tstate[thr].apply; thr = cycleUp( thr, N ) );
-//			for ( thr = cycleUp( curr, N ); ! apply[thr]; thr = cycleUp( thr, N ) );
-//			curr = thr;
-			*applyId = false;							// must appear before setting first
-			if ( FASTPATH( thr != id ) )
+			// loop goes from child of root to leaf and inspects siblings
+			for ( int j = dep - 1; j >= 0; j -= 1 ) {	// must be "signed"
+				typeof(val[0]) k = val[(n >> j) ^ 1];
+				if ( FASTPATH( tstate[k].apply ) ) {
+					tstate[k].apply = false;
+					Qenqueue( &queue, k );
+				} // if
+			} // for
+			if ( FASTPATH( QnotEmpty( &queue ) ) )
 #ifdef FLAG
-				tstate[thr].flag = true; else *flagN = true;
+				tstate[Qdequeue( &queue )].flag = true;
+			else
+				*flagN = true;
 #else
-				first = thr; else first = N;
+				first = Qdequeue( &queue );
+			else
+				first = N;
 #endif // FLAG
 
 #ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
 			cnt = cycleUp( cnt, NoStartPoints );
 
-			applyId = &tstate[id].apply;				// must reset for new id
+			applyId = &tstate[id].apply;				// must reset
 #ifdef FLAG
 			flagId = &tstate[id].flag;
 			flagN = &tstate[N].flag;
@@ -147,7 +197,7 @@ static void *Worker( void *arg ) {
 #ifdef FAST
 		id = oid;
 
-		applyId = &tstate[id].apply;					// must reset for new id
+		applyId = &tstate[id].apply;					// must reset
 #ifdef FLAG
 		flagId = &tstate[id].flag;
 		flagN = &tstate[N].flag;
@@ -162,6 +212,7 @@ static void *Worker( void *arg ) {
 } // Worker
 
 void __attribute__((noinline)) ctor() {
+	Qctor( &queue );
 	tstate = Allocator( (N + 1) * sizeof(typeof(tstate[0])) );
 	for ( TYPE id = 0; id <= N; id += 1 ) {				// initialize shared data
 		tstate[id].apply = false;
@@ -176,6 +227,12 @@ void __attribute__((noinline)) ctor() {
 	first = N;
 #endif // FLAG
 
+	val = Allocator( 2 * N * sizeof(typeof(val[0])) );
+	for ( TYPE id = 0; id < N; id += 1 ) {				// initialize shared data
+		val[id] = N;
+		val[N + id] = id;
+	} // for
+
 #ifndef CAS
 	b = Allocator( N * sizeof(typeof(b[0])) );
 	for ( TYPE id = 0; id < N; id += 1 ) {				// initialize shared data
@@ -183,7 +240,6 @@ void __attribute__((noinline)) ctor() {
 	} // for
 	y = N;
 #endif // CAS
-//	curr = N;
 	fast = false;
 } // ctor
 
@@ -191,10 +247,12 @@ void __attribute__((noinline)) dtor() {
 #ifndef CAS
 	free( (void *)b );
 #endif // ! CAS
+	free( (void *)val );
 	free( (void *)tstate );
+	Qdtor( &queue );
 } // dtor
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=ElevatorSimple -DWCasLF Harness.c -lpthread -lm" //
+// compile-command: "gcc -Wall -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=ElevatorQueue -DWCasLF Harness.c -lpthread -lm" //
 // End: //
