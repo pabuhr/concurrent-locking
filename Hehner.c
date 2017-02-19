@@ -3,9 +3,9 @@
 
 enum { MAX_TICKET = INTPTR_MAX };
 
-static ATYPE *ticket CALIGN;
+static VTYPE * ticket CALIGN;
 
-static void *Worker( void *arg ) {
+static void * Worker( void *arg ) {
 	TYPE id = (size_t)arg;
 	uint64_t entry;
 #ifdef FAST
@@ -15,6 +15,7 @@ static void *Worker( void *arg ) {
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		entry = 0;
 		while ( stop == 0 ) {
+
 			// step 1, select a ticket
 			ticket[id] = 0;								// set highest priority
 			Fence();									// force store before more loads
@@ -27,6 +28,7 @@ static void *Worker( void *arg ) {
 			max += 1;									// advance ticket
 			ticket[id] = max;
 			Fence();									// force store before more loads
+
 			// step 2, wait for ticket to be selected
 			for ( int j = 0; j < N; j += 1 )			// check other tickets
 				while ( ticket[j] < max ||				// busy wait if choosing or
@@ -34,13 +36,16 @@ static void *Worker( void *arg ) {
 #else
 			ticket[id] = max + 1;
 			Fence();									// force store before more loads
+
 			// step 2, wait for ticket to be selected
 			for ( int j = 0; j < N; j += 1 )			// check other tickets
 				while ( ticket[j] < ticket[id] ||		// busy wait if choosing or
 						( ticket[j] == ticket[id] && j < id ) ) Pause(); //  greater ticket value or lower priority
 #endif
+
 			CriticalSection( id );
 			ticket[id] = MAX_TICKET;					// exit protocol
+
 #ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
 			cnt = cycleUp( cnt, NoStartPoints );

@@ -19,6 +19,7 @@ static void *Worker( void *arg ) {
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		entry = 0;
 		while ( stop == 0 ) {
+
 #ifdef FLICKER
 			for ( int i = 0; i < 100; i += 1 ) cc[id] = i % 2; // flicker
 #endif // FLICKER
@@ -38,7 +39,9 @@ static void *Worker( void *arg ) {
 					Fence();							// force store before more loads
 				} // if
 			} // while
+
 			CriticalSection( id );
+
 			if ( last != id ) {
 #ifdef FLICKER
 				for ( int i = id; i < 100; i += 1 ) last = i % 2; // flicker
