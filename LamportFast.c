@@ -38,7 +38,7 @@ static void *Worker( void *arg ) {
 				for ( int k = 0; k < N; k += 1 )
 					await( ! b[k] );
 				if ( FASTPATH( y != id ) ) {
-//					await( y == N );
+					//await( y == N );					// optional
 					goto START;
 				} // if
 			} // if
