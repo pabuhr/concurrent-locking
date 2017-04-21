@@ -123,13 +123,18 @@ static inline void *CAS32( volatile void *ptr, void *cmp, void *set ) {
 
 //------------------------------------------------------------------------------
 
-typedef uintptr_t TYPE;									// atomically addressable word-size
-typedef volatile TYPE ATYPE;							// atomic shared data
+typedef uintptr_t TYPE;									// addressable word-size
+typedef volatile TYPE VTYPE;							// volatile addressable word-size
+#ifdef __clang__
+typedef _Atomic TYPE ATYPE;								// atomic shared data
+#else
+typedef VTYPE ATYPE;									// volatile addressable word-size
+#endif // __clang__
 
 enum { RUNS = 5 };
 
-static inline TYPE cycleUp( TYPE v, TYPE n ) { return ( ((v) >= (n - 1)) ? 0 : (v + 1) ); }
-static inline TYPE cycleDown( TYPE v, TYPE n ) { return ( ((v) <= 0) ? (n - 1) : (v - 1) ); }
+static __attribute__(( unused )) inline TYPE cycleUp( TYPE v, TYPE n ) { return ( ((v) >= (n - 1)) ? 0 : (v + 1) ); }
+static __attribute__(( unused )) inline TYPE cycleDown( TYPE v, TYPE n ) { return ( ((v) <= 0) ? (n - 1) : (v - 1) ); }
 
 //------------------------------------------------------------------------------
 
@@ -142,12 +147,12 @@ static inline TYPE cycleDown( TYPE v, TYPE n ) { return ( ((v) <= 0) ? (n - 1) :
 				  ( sizeof(n) == 16 ) ? __builtin_clzll( n ) :	\
 				  -1 ) )
 #else
-static int Log2( int n ) {								// fallback integer log2( n )
+static __attribute__(( unused )) int Log2( int n ) {	// fallback integer log2( n )
 	return n > 1 ? 1 + Log2( n / 2 ) : n == 1 ? 0 : -1;
 }
 #endif // __GNUC__
 
-static inline int Clog2( int n ) {						// integer ceil( log2( n ) )
+static __attribute__(( unused )) inline int Clog2( int n ) { // integer ceil( log2( n ) )
 	if ( n <= 0 ) return -1;
 	int ln = Log2( n );
 	return ln + ( (n - (1 << ln)) != 0 );				// check for any 1 bits to the right of the most significant bit
@@ -155,11 +160,20 @@ static inline int Clog2( int n ) {						// integer ceil( log2( n ) )
 
 //------------------------------------------------------------------------------
 
+// Because of the race on the shared variable CurrTid, it is possible to get false negatives, that is, miss mutual
+// exclusion violations.  The assignment to CurrTid can delay in a store buffer, that is, committed but not pushed into
+// coherent space, so subsequent loads in the loop fetch the value from the store buffer via look aside instead of the
+// coherent version.  If this scenario occurs for multiple threads in the CS, these threads do not detect the violation
+// because their copy of CurrTid in the store buffer is unchanged.  The fence after the assignment of CurrTid guarantees
+// seeing a coherent value because the store to coherent space has occurred before any subsequent loads.  Hence, the
+// loads in the loop either see the value just stored or the value stored by another thread, which is sufficient to
+// detect violation of mutual exclusion.
+
 static inline void CriticalSection( const TYPE id ) {
-	static ATYPE CurrTid CALIGN;						// shared, current thread id in critical section
+	static VTYPE CurrTid CALIGN;						// shared, current thread id in critical section
 
 	CurrTid = id;
-	Fence();
+	Fence();											// optional
 	for ( int i = 1; i <= 100; i += 1 ) {				// delay
 		if ( CurrTid != id ) {							// mutual exclusion violation ?
 			printf( "Interference Id:%zu\n", id );
@@ -352,7 +366,7 @@ static struct cnts **counters CALIGN;
 
 //------------------------------------------------------------------------------
 
-static void shuffle( unsigned int set[], const int size ) {
+static __attribute__(( unused )) void shuffle( unsigned int set[], const int size ) {
 	unsigned int p1, p2, temp;
 
 	for ( int i = 0; i < 200; i +=1 ) {					// shuffle array S times
@@ -421,7 +435,7 @@ int main( int argc, char *argv[] ) {
 	unsigned int set[Threads];
 	for ( int i = 0; i < Threads; i += 1 ) set[ i ] = i;
 	//srand( getpid() );
-	shuffle( set, Threads );
+	//shuffle( set, Threads );							// randomize thread ids
 
 	ctor();												// global algorithm constructor
 
