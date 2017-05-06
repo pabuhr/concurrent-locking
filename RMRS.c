@@ -8,19 +8,19 @@
 typedef TYPE QElem_t;
 
 typedef struct CALIGN {
-	QElem_t *elements;
-	unsigned int *inQueue;
+	QElem_t * elements;
+	unsigned int * inQueue;
 	unsigned int front, rear;
 	unsigned int capacity;
 } Queue;
 
-static int toursize CALIGN;
+static unsigned int toursize CALIGN;
 
-static inline bool QnotEmpty( volatile Queue *queue ) {
+static inline bool QnotEmpty( volatile Queue * queue ) {
 	return queue->front != queue->rear;
 } // QnotEmpty
 
-static inline void Qenqueue( volatile Queue *queue, QElem_t element ) {
+static inline void Qenqueue( volatile Queue * queue, QElem_t element ) {
 	if ( FASTPATH( element != FREE_NODE && queue->inQueue[element] == false ) ) {
 		queue->elements[queue->rear] = element;
 		queue->rear = cycleUp( queue->rear, queue->capacity );
@@ -31,7 +31,7 @@ static inline void Qenqueue( volatile Queue *queue, QElem_t element ) {
 	} // if
 } // Qenqueue
 
-static inline QElem_t Qdequeue( volatile Queue *queue ) {
+static inline QElem_t Qdequeue( volatile Queue * queue ) {
 	QElem_t element = queue->elements[queue->front];
 	queue->front = cycleUp( queue->front, queue->capacity );
 //	queue->front += 1;
@@ -41,7 +41,7 @@ static inline QElem_t Qdequeue( volatile Queue *queue ) {
 	return element;
 } // Qdequeue
 
-static inline Queue *Qctor( int maxElements ) {
+static inline Queue * Qctor( unsigned int maxElements ) {
 	Queue *queue;
 	queue = malloc( sizeof(typeof(*queue)) );
 	queue->capacity = maxElements + 1;
@@ -68,9 +68,9 @@ typedef struct CALIGN {
 	unsigned int wait;
 } Tstate;
 
-static volatile Queue *q CALIGN;
-static volatile TYPE **tournament CALIGN;
-static volatile Tstate *arrState CALIGN;
+static volatile Queue * q CALIGN;
+static volatile TYPE ** tournament CALIGN;
+static volatile Tstate * arrState CALIGN;
 static volatile TYPE first CALIGN;
 static volatile TYPE exits CALIGN;
 static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
@@ -101,7 +101,7 @@ static void *Worker( void *arg ) {
 
 			if ( FASTPATH( ! __sync_bool_compare_and_swap( &first, FREE_LOCK, id ) ) ) {
 				typeof(exits) e = exits;
-				await( exits - e >= 2 || first == FREE_LOCK || first == id );
+				await( exits - e >= 2 || first == id || first == FREE_LOCK );
 				if ( FASTPATH( ! __sync_bool_compare_and_swap( &first, FREE_LOCK, id ) ) ) {
 					await( *tWait );
 				} // if
@@ -167,11 +167,11 @@ void __attribute__((noinline)) ctor() {
 
 	toursize = Clog2( N ) + 1;
 	tournament = malloc( toursize * sizeof(typeof(tournament[0])) );
-	int levelSize = 1 << (toursize - 1);				// 2^|log N|
+	unsigned int levelSize = 1 << (toursize - 1);				// 2^|log N|
 
-	for ( int i = 0; i < toursize; i += 1 ) {
+	for ( unsigned int i = 0; i < toursize; i += 1 ) {
 		tournament[i] = malloc( levelSize * sizeof(typeof(tournament[0][0])) );
-		for ( int j = 0; j < levelSize; j += 1 ) {
+		for ( unsigned int j = 0; j < levelSize; j += 1 ) {
 			tournament[i][j] = FREE_NODE;
 		} // for
 		levelSize /= 2;
