@@ -121,20 +121,32 @@ static void *Worker( void *arg ) {
 
 			CriticalSection( id );
 
-			for ( thr = cycleDown( (id + N) % N, N ); ! tstate[thr].apply; thr = cycleDown( thr, N ) );
-//			for ( thr = N - 1; ! tstate[(id + thr) % N].apply; thr -= 1 );
-//			for ( thr = cycleUp( id, N ); ! tstate[thr].apply; thr = cycleUp( thr, N ) );
-//			for ( thr = cycleUp( curr, N ); ! apply[thr]; thr = cycleUp( thr, N ) );
-//			curr = thr;
+#ifdef CYCLEUP
+			for ( thr = cycleUp( id, N ); ! tstate[thr].apply; thr = cycleUp( thr, N ) );
+#else // CYCLEDOWN
+			#define Mod( a, b, N ) ((a + b) < N ? (a + b) : (a + b - N))
+			for ( thr = N - 1; ! tstate[Mod(id, thr, N)].apply; thr -= 1 );
+#endif // CYCLEUP
+
 			*applyId = false;							// must appear before setting first
+
+#ifdef CYCLEUP
 			if ( FASTPATH( thr != id ) )
 #ifdef FLAG
 				tstate[thr].flag = true; else *flagN = true;
-#else
+#else // NOFLAG
 				first = thr; else first = N;
-//			first = thr != 0 ? (id + thr) % N : N;
-
 #endif // FLAG
+
+#else // CYCLEDOWN
+
+			if ( FASTPATH( thr != 0 ) )
+#ifdef FLAG
+				tstate[Mod(id, thr, N)].flag = true; else *flagN = true;
+#else // NOFLAG
+				first = Mod(id, thr, N); else first = N;
+#endif // FLAG
+#endif // CYCLEUP
 
 #ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
@@ -187,7 +199,6 @@ void __attribute__((noinline)) ctor() {
 	} // for
 	y = N;
 #endif // CAS
-//	curr = N;
 	fast = false;
 } // ctor
 
