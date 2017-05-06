@@ -1,4 +1,5 @@
 #include "relacy/relacy_std.hpp"
+#include <iostream>
 
 #define CACHE_ALIGN 64
 #define CALIGN __attribute__(( aligned (CACHE_ALIGN) ))
@@ -38,7 +39,7 @@ static void SetParms( rl::test_params &p ) {
 
 //#include "Common.h"
 
-enum { N = 8 };
+enum { N = 3 };
 
 //======================================================
 
@@ -54,13 +55,13 @@ typedef struct CALIGN {
 	unsigned int capacity;
 } Queue;
 
-static int toursize CALIGN;
+static unsigned int toursize CALIGN;
 
-static inline bool QnotEmpty( volatile Queue *queue ) {
+static inline bool QnotEmpty( volatile Queue * queue ) {
 	return queue->front != queue->rear;
 } // QnotEmpty
 
-static inline void Qenqueue( volatile Queue *queue, QElem_t element ) {
+static inline void Qenqueue( volatile Queue * queue, QElem_t element ) {
 	if ( element != FREE_NODE && queue->inQueue[element] == false ) {
 		queue->elements[queue->rear] = element;
 		queue->rear = cycleUp( queue->rear, queue->capacity );
@@ -68,7 +69,7 @@ static inline void Qenqueue( volatile Queue *queue, QElem_t element ) {
 	} // if
 } // Qenqueue
 
-static inline QElem_t Qdequeue( volatile Queue *queue ) {
+static inline QElem_t Qdequeue( volatile Queue * queue ) {
 	QElem_t element = queue->elements[queue->front];
 	queue->front = cycleUp( queue->front, queue->capacity );
 	queue->inQueue[element] = false;
@@ -93,8 +94,8 @@ struct RMRS : rl::test_suite<RMRS, N> {
 	} Tstate;
 
 	Queue queue CALIGN;
-	std::atomic<TYPE> tournament[N][N];
-	Tstate arrState[N + 1];
+	std::atomic<TYPE> tournament[N][N+1];
+	Tstate arrState[N];
 	std::atomic<TYPE> first;
 	std::atomic<TYPE> exits;
 
@@ -105,15 +106,15 @@ struct RMRS : rl::test_suite<RMRS, N> {
 	void before() {
 		Qctor( &queue, N );
 
-		for ( int i = 0; i < N; i += 1 ) {
+		for ( unsigned int i = 0; i < N; i += 1 ) {
 			arrState[i].enter($) = arrState[i].wait($) = false;
 		} // for
 
 		toursize = Clog2( N ) + 1;
-		int levelSize = 1 << (toursize - 1);			// 2^|log N|
+		unsigned int levelSize = 1 << (toursize - 1);	// 2^|log N|
 
-		for ( int i = 0; i < toursize; i += 1 ) {
-			for ( int j = 0; j < levelSize; j += 1 ) {
+		for ( unsigned int i = 0; i < toursize; i += 1 ) {
+			for ( unsigned int j = 0; j < levelSize; j += 1 ) {
 				tournament[i][j]($) = FREE_NODE;
 			} // for
 			levelSize /= 2;
@@ -129,12 +130,11 @@ struct RMRS : rl::test_suite<RMRS, N> {
 		typeof(arrState[0].enter) *enter = &arrState[id].enter;
 		typeof(arrState[0].wait) *wait = &arrState[id].wait;
 
-		//(*wait)($) = true;
-		(*enter)($) = false;
+		(*enter)($) = true;
 
 		// up hill
 		typeof(id) node = id;
-		for ( int j = 0; j < toursize; j += 1 ) {		// tree register
+		for ( unsigned int j = 0; j < toursize; j += 1 ) { // tree register
 			tournament[j][node]($) = id;
 			node >>= 1;
 		} // for
@@ -142,14 +142,14 @@ struct RMRS : rl::test_suite<RMRS, N> {
 		TYPE comp = FREE_LOCK;
 		if ( ! first.compare_exchange_strong( comp, id, std::memory_order_seq_cst ) ) {
 			TYPE e = exits($);
-			await( exits($) - e >= 2 || first($) == FREE_LOCK || first($) == id );
-			comp = FREE_LOCK;
-			if ( ! first.compare_exchange_strong( comp, id, std::memory_order_seq_cst ) ) {
+			await( exits($) - e >= 2 || first($) == id || first($) == FREE_LOCK );
+			TYPE comp2 = FREE_LOCK;
+			if ( ! first.compare_exchange_strong( comp2, id, std::memory_order_seq_cst ) ) {
 				await( (*wait)($) );
 			} // if
 		} // if
 
-		(*enter)($) = (*wait)($) = true;
+		(*enter)($) = (*wait)($) = false;
 		exits($) += 1 ;
 
 		CS($) = id + 1;									// critical section
@@ -177,9 +177,10 @@ struct RMRS : rl::test_suite<RMRS, N> {
 		if ( QnotEmpty( &queue ) ) {
 			thread = Qdequeue( &queue );
 			first($) = thread;
-			arrState[thread].wait($) = false;
+			arrState[thread].wait($) = true;
 		} else {
 			first($) = FREE_LOCK;
+			//std::cout << "END2 id " << id << std::endl;
 		} // if
 	} // thread
 }; // RMRS
