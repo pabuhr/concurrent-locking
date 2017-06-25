@@ -26,7 +26,7 @@
 #if defined( __sparc )
 #define CACHE_ALIGN 4
 #else
-#define CACHE_ALIGN 64
+#define CACHE_ALIGN 128
 #endif // SPARC
 #define CALIGN __attribute__(( aligned (CACHE_ALIGN) ))
 
