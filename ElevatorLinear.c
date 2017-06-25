@@ -1,25 +1,11 @@
 #include <stdbool.h>
 
-typedef struct CALIGN {									// performance gain when fields juxtaposed
-	TYPE apply;
-#ifdef FLAG
-	TYPE flag;
-#endif // FLAG
-} Tstate;
+//======================================================
 
 static volatile TYPE fast CALIGN;
-static volatile Tstate *tstate CALIGN;
-
 #ifndef CAS
 static volatile TYPE *b CALIGN, x CALIGN, y CALIGN;
 #endif // ! CAS
-
-#ifndef FLAG
-static volatile TYPE first CALIGN;
-#endif // FLAG
-
-static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
-
 
 #define await( E ) while ( ! (E) ) Pause()
 
@@ -41,7 +27,9 @@ static inline bool WCas( TYPE id ) {					// based on Burns-Lamport algorithm
 	for ( typeof(id) thr = id + 1; thr < N; thr += 1 ) {
 		await( ! b[thr] );
 	} // for
-	bool leader = ((! fast) ? fast = true : false);
+	bool leader;
+	if ( ! fast ) { fast = true; leader = true; }
+	else leader = false;
 	b[id] = false;
 	return leader;
 } // WCas
@@ -60,30 +48,48 @@ static inline bool WCas( TYPE id ) {					// based on Lamport-Fast algorithm
 	Fence();											// force store before more loads
 	if ( FASTPATH( x != id ) ) {
 		b[id] = false;
-		Fence();										// force store before more loads
+		Fence();										// OPTIONAL, force store before more loads
 		for ( int k = 0; k < N; k += 1 )
 			await( ! b[k] );
 		if ( FASTPATH( y != id ) ) return false;
 	} // if
-	bool leader = ((! fast) ? fast = true : false);
+	bool leader;
+	if ( ! fast ) { fast = true; leader = true; }
+	else leader = false;
 	y = N;
 	b[id] = false;
 	return leader;
 } // WCas
 
 #else
-    #error unsupported architecture
+	#error unsupported architecture
 #endif // WCas
+
+//======================================================
+
+typedef struct CALIGN {
+	TYPE apply;
+#ifdef FLAG
+	TYPE flag;
+#endif // FLAG
+} Flags;
+static volatile Flags *flags CALIGN;
+
+#ifndef FLAG
+static volatile TYPE first CALIGN;
+#endif // FLAG
+
+static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
 
 
 static void *Worker( void *arg ) {
 	TYPE id = (size_t)arg;
 	uint64_t entry;
 
-	volatile typeof(tstate[0].apply) *applyId = &tstate[id].apply;
+	volatile typeof(flags[0].apply) *applyId = &flags[id].apply;
 #ifdef FLAG
-	volatile typeof(tstate[0].flag) *flagId = &tstate[id].flag;
-	volatile typeof(tstate[0].flag) *flagN = &tstate[N].flag;
+	volatile typeof(flags[0].flag) *flagId = &flags[id].flag;
+	volatile typeof(flags[0].flag) *flagN = &flags[N].flag;
 #endif // FLAG
 
 #ifdef FAST
@@ -122,10 +128,10 @@ static void *Worker( void *arg ) {
 			CriticalSection( id );
 
 #ifdef CYCLEUP
-			for ( thr = cycleUp( id, N ); ! tstate[thr].apply; thr = cycleUp( thr, N ) );
+			for ( thr = cycleUp( id, N ); ! flags[thr].apply; thr = cycleUp( thr, N ) );
 #else // CYCLEDOWN
 			#define Mod( a, b, N ) ((a + b) < N ? (a + b) : (a + b - N))
-			for ( thr = N - 1; ! tstate[Mod(id, thr, N)].apply; thr -= 1 );
+			for ( thr = N - 1; ! flags[Mod(id, thr, N)].apply; thr -= 1 );
 #endif // CYCLEUP
 
 			*applyId = false;							// must appear before setting first
@@ -133,7 +139,7 @@ static void *Worker( void *arg ) {
 #ifdef CYCLEUP
 			if ( FASTPATH( thr != id ) )
 #ifdef FLAG
-				tstate[thr].flag = true; else *flagN = true;
+				flags[thr].flag = true; else *flagN = true;
 #else // NOFLAG
 				first = thr; else first = N;
 #endif // FLAG
@@ -142,7 +148,7 @@ static void *Worker( void *arg ) {
 
 			if ( FASTPATH( thr != 0 ) )
 #ifdef FLAG
-				tstate[Mod(id, thr, N)].flag = true; else *flagN = true;
+				flags[Mod(id, thr, N)].flag = true; else *flagN = true;
 #else // NOFLAG
 				first = Mod(id, thr, N); else first = N;
 #endif // FLAG
@@ -152,10 +158,10 @@ static void *Worker( void *arg ) {
 			id = startpoint( cnt );						// different starting point each experiment
 			cnt = cycleUp( cnt, NoStartPoints );
 
-			applyId = &tstate[id].apply;				// must reset for new id
+			applyId = &flags[id].apply;				// must reset for new id
 #ifdef FLAG
-			flagId = &tstate[id].flag;
-			flagN = &tstate[N].flag;
+			flagId = &flags[id].flag;
+			flagN = &flags[N].flag;
 #endif // FLAG
 #endif // FAST
 			entry += 1;
@@ -163,10 +169,10 @@ static void *Worker( void *arg ) {
 #ifdef FAST
 		id = oid;
 
-		applyId = &tstate[id].apply;					// must reset for new id
+		applyId = &flags[id].apply;					// must reset for new id
 #ifdef FLAG
-		flagId = &tstate[id].flag;
-		flagN = &tstate[N].flag;
+		flagId = &flags[id].flag;
+		flagN = &flags[N].flag;
 #endif // FLAG
 #endif // FAST
 		entries[r][id] = entry;
@@ -178,16 +184,16 @@ static void *Worker( void *arg ) {
 } // Worker
 
 void __attribute__((noinline)) ctor() {
-	tstate = Allocator( (N + 1) * sizeof(typeof(tstate[0])) );
+	flags = Allocator( (N + 1) * sizeof(typeof(flags[0])) );
 	for ( TYPE id = 0; id <= N; id += 1 ) {				// initialize shared data
-		tstate[id].apply = false;
+		flags[id].apply = false;
 #ifdef FLAG
-		tstate[id].flag = false;
+		flags[id].flag = false;
 #endif // FLAG
 	} // for
 
 #ifdef FLAG
-	tstate[N].flag = true;
+	flags[N].flag = true;
 #else
 	first = N;
 #endif // FLAG
@@ -206,7 +212,7 @@ void __attribute__((noinline)) dtor() {
 #ifndef CAS
 	free( (void *)b );
 #endif // ! CAS
-	free( (void *)tstate );
+	free( (void *)flags );
 } // dtor
 
 // Local Variables: //
