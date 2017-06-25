@@ -107,7 +107,8 @@ static void *Worker( void *arg ) {
 				} // if
 			} // if
 
-			*tEnter = *tWait = false;
+			*tEnter = false;
+			*tWait = false;
 			exits += 1 ;
 			//Fence();									// force store before more loads
 
