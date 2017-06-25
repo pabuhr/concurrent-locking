@@ -1,14 +1,14 @@
 // John M. Mellor-Crummey and Michael L. Scott, Algorithm for Scalable Synchronization on Shared-Memory Multiprocessors,
 // ACM Transactions on Computer Systems, 9(1), 1991, Fig. 6, p. 30
 
-typedef struct mcs_node MCS_node;
-typedef struct CALIGN mcs_node {
-	MCS_node *volatile next;
+typedef struct mcs_node MCS_node;						// remove redundant struct qualifier
+typedef struct mcs_node {
+	MCS_node * volatile next;
 	volatile TYPE spin;
-} *MCS_lock;
+} * MCS_lock;
 
-void mcs_lock( MCS_lock *lock, MCS_node *node ) {
-	MCS_node *pred;
+void mcs_lock( MCS_lock * lock, MCS_node * node ) {
+	MCS_node * pred;
 	node->next = NULL;
 #if defined( __sparc )
 	pred = SWAP32( lock, node );						// fetch-and-store
@@ -22,7 +22,7 @@ void mcs_lock( MCS_lock *lock, MCS_node *node ) {
 	} // if
 } // mcs_lock
 
-void mcs_unlock( MCS_lock *lock, MCS_node *node ) {
+void mcs_unlock( MCS_lock * lock, MCS_node * node ) {
 	if ( node->next == NULL ) {							// no one waiting ?
 #if defined( __sparc )
   if ( (void *)CAS32( lock, node, NULL ) == node ) return; // not changed since last looked ?
@@ -37,7 +37,7 @@ void mcs_unlock( MCS_lock *lock, MCS_node *node ) {
 static MCS_lock lock CALIGN;
 static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
 
-static void *Worker( void *arg ) {
+static void * Worker( void * arg ) {
 	TYPE id = (size_t)arg;
 	uint64_t entry;
 #ifdef FAST
