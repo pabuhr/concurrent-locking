@@ -36,24 +36,10 @@ static inline void Qctor( Queue *queue ) {
 struct ElevatorTree : rl::test_suite<ElevatorTree, N> {
 	Queue queue CALIGN;
 
-	typedef struct CALIGN {								// performance gain when fields juxtaposed
-		std::atomic<TYPE> apply;
-#ifdef FLAG
-		std::atomic<TYPE> flag;
-#endif // FLAG
-	} Tstate;
-
 	std::atomic<TYPE> fast;
-	Tstate tstate[N + 1];
-	std::atomic<TYPE> val[2 * N];
-
 #ifndef CAS
 	std::atomic<TYPE> b[N], x, y;
 #endif // ! CAS
-
-#ifndef FLAG
-	std::atomic<TYPE> first;
-#endif // FLAG
 
 #   define await( E ) while ( ! (E) ) Pause()
 
@@ -74,7 +60,9 @@ struct ElevatorTree : rl::test_suite<ElevatorTree, N> {
 		for ( typeof(id) thr = id + 1; thr < N; thr += 1 ) {
 			await( ! b[thr]($) );
 		} // for
-		bool leader = ((! fast($)) ? fast($) = true : false);
+		bool leader;
+		if ( ! fast($) ) { fast($) = true; leader = true; }
+		else leader = false;
 		b[id]($) = false;
 		return leader;
 	} // WCas
@@ -95,7 +83,9 @@ struct ElevatorTree : rl::test_suite<ElevatorTree, N> {
 				await( ! b[j]($) );
 			if ( y($) != id ) return false;
 		} // if
-		bool leader = ((! fast($)) ? fast($) = true : false);
+		bool leader;
+		if ( ! fast($) ) { fast($) = true; leader = true; }
+		else leader = false;
 		y($) = N;
 		b[id]($) = false;
 		return leader;
@@ -107,24 +97,37 @@ struct ElevatorTree : rl::test_suite<ElevatorTree, N> {
 
 	//======================================================
 
+#ifdef FLAG
+	typedef struct CALIGN {								// performance gain when fields juxtaposed
+		std::atomic<TYPE> flag;
+	} Flags;
+	Flags flags[N + 1];
+	std::atomic<TYPE> val[2 * N];
+#else
+	std::atomic<TYPE> first;
+#endif // FLAG
+
+	typedef struct CALIGN {
+		std::atomic<TYPE> val;
+	} Vals;
+	Vals vals[2 * N + 1];
+
 	void before() {
 		Qctor( &queue );
-		for ( TYPE id = 0; id <= N; id += 1 ) {			// initialize shared data
-			tstate[id].apply($) = false;
 #ifdef FLAG
-			tstate[id].flag($) = false;
-#endif // FLAG
+		for ( TYPE id = 0; id <= N; id += 1 ) {			// initialize shared data
+			flags[id].flag($) = false;
 		} // for
+#endif // FLAG
 
 #ifdef FLAG
-		tstate[N].flag($) = true;
+		flags[N].flag($) = true;
 #else
 		first($) = N;
 #endif // FLAG
 
-		for ( TYPE id = 0; id < N; id += 1 ) {			// initialize shared data
-			val[id]($) = N;
-			val[N + id]($) = id;
+		for ( TYPE id = 0; id <= 2 * N; id += 1 ) {		// initialize shared data
+			vals[id].val($) = N;
 		} // for
 
 #ifndef CAS
@@ -140,23 +143,22 @@ struct ElevatorTree : rl::test_suite<ElevatorTree, N> {
 
 	void thread( TYPE id ) {
 		const unsigned int n = N + id, dep = Log2( n );
-		typeof(tstate[0].apply) *applyId = &tstate[id].apply;
+		typeof(vals[0].val) *valId = &vals[n].val;
 #ifdef FLAG
-		typeof(tstate[0].flag) *flagId = &tstate[id].flag;
-		typeof(tstate[0].flag) *flagN = &tstate[N].flag;
+		typeof(flags[0].flag) *flagId = &flags[id].flag;
+		typeof(flags[0].flag) *flagN = &flags[N].flag;
 #endif // FLAG
 
-		// loop goes from parent of leaf to child of root
-		(*applyId)($) = true;
-		for ( unsigned int j = (n >> 1); j > 1; j >>= 1 )
-			val[j]($) = id;
+		// loop goes from leaf to child of root
+		for ( unsigned int j = n; j > 1; j >>= 1 )		// entry protocol
+			vals[j].val($) = id;
 
-		if ( WCas( id ) ) {
+		if ( WCas( id ) ) {								// true => leader
 #ifdef FLAG
-			await( (*flagN)($) || (*flagId)($) );
+			await( (*flagId)($) || (*flagN)($) );
 			(*flagN)($) = false;
 #else
-			await( first($) == N || first($) == id );
+			await( first($) == id || first($) == N );
 			first($) = id;
 #endif // FLAG
 			fast($) = false;
@@ -167,26 +169,31 @@ struct ElevatorTree : rl::test_suite<ElevatorTree, N> {
 			await( first($) == id );
 #endif // FLAG
 		} // if
+		(*valId)($) = N;
 #ifdef FLAG
 		(*flagId)($) = false;
 #endif // FLAG
-		(*applyId)($) = false;
 
 		CS($) = id + 1;									// critical section
 
 		// loop goes from child of root to leaf and inspects siblings
 		for ( int j = dep - 1; j >= 0; j -= 1 ) {		// must be "signed"
-			TYPE k = val[(n >> j) ^ 1]($);
-			if ( tstate[k].apply($) ) {
-				tstate[k].apply($) = false;
+			TYPE k = vals[(n >> j) ^ 1].val($);
+			std::atomic<TYPE> *wid = &(vals[N + k].val);
+			if ( (*wid)($) < N ) {
+				(*wid)($) = N;
 				Qenqueue( &queue, k );
 			} // if
-		}  // for
+		} // for
 		if ( QnotEmpty( &queue ) )
 #ifdef FLAG
-			tstate[Qdequeue( &queue )].flag($) = true; else (*flagN)($) = true;
+			flags[Qdequeue( &queue )].flag($) = true;
+		else
+			(*flagN)($) = true;
 #else
-		first($) = Qdequeue( &queue ); else first($) = N;
+			first($) = Qdequeue( &queue );
+		else
+			first($) = N;
 #endif // FLAG
 	} // thread
 }; // ElevatorTree
