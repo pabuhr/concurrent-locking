@@ -41,7 +41,9 @@ struct ElevatorLinear : rl::test_suite<ElevatorLinear, N> {
 		for ( typeof(id) thr = id + 1; thr < N; thr += 1 ) {
 			await( ! b[thr]($) );
 		} // for
-		bool leader = ((! fast($)) ? fast($) = true : false);
+		bool leader;
+		if ( ! fast($) ) { fast($) = true; leader = true; }
+		else leader = false;
 		b[id]($) = false;
 		return leader;
 	} // WCas
@@ -62,7 +64,9 @@ struct ElevatorLinear : rl::test_suite<ElevatorLinear, N> {
 				await( ! b[j]($) );
 			if ( y($) != id ) return false;
 		} // if
-		bool leader = ((! fast($)) ? fast($) = true : false);
+		bool leader;
+		if ( ! fast($) ) { fast($) = true; leader = true; }
+		else leader = false;
 		y($) = N;
 		b[id]($) = false;
 		return leader;
