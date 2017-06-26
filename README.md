@@ -31,7 +31,19 @@ script "runall" compiles all the algorithms listed in the script, and uses the
 "run1" script to run each of them for 1-32 threads (can take 1-2 days to
 complete).
 
-The project authors are:
+
+Project authors:
 
 Peter Buhr <pabuhr@uwaterloo.ca>, David Dice <dave.dice@oracle.com> (adviser),
 and Wim H. Hesselink <w.h.hesselink@rug.nl>
+
+
+Project papers:
+
+Peter A. Buhr and David Dice and Wim H. Hesselink, High-Performance N-Thread
+Software Solutions for Mutual Exclusion, Concurrency and Computation: Practice
+and Experience, 27(3), pp. 651-701, March, 2015
+
+Peter A. Buhr and David Dice and Wim H. Hesselink, Dekker's Mutual Exclusion
+Algorithm Made RW-Safe, Concurrency and Computation: Practice and Experience,
+28(1), pp. 144-165, January, 2016
