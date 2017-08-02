@@ -27,8 +27,8 @@ Time=10 	# R x Time = length of experiment
 
 case ${HOST} in				# set cpusets for appropriate computer
     "plg7"  ) echo $$ > /cpuset/cg32_63/tasks ;;
-    "plg7a" ) echo $$ > /cpuset/cg32_63/tasks ;;
-    "plg7b" ) echo $$ > /cpuset/cg00_31/tasks ;;
+#    "plg7a" ) echo $$ > /cpuset/cg32_63/tasks ;;
+#    "plg7b" ) echo $$ > /cpuset/cg00_31/tasks ;;
 esac
 
 while [ ${#} -gt 0 ] ; do		# process command-line arguments

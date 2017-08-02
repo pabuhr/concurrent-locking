@@ -11,11 +11,11 @@ static volatile TYPE *b CALIGN, x CALIGN, y CALIGN;
 
 #ifdef CAS
 
-#define WCas( x ) __sync_bool_compare_and_swap( &(fast), false, true )
+#define trylock( x ) __sync_bool_compare_and_swap( &(fast), false, true )
 
 #elif defined( WCasBL )
 
-static inline bool WCas( TYPE id ) {					// based on Burns-Lamport algorithm
+static inline bool trylock( TYPE id ) {					// based on Burns-Lamport algorithm
 	b[id] = true;
 	Fence();											// force store before more loads
 	for ( typeof(id) thr = 0; thr < id; thr += 1 ) {
@@ -36,7 +36,7 @@ static inline bool WCas( TYPE id ) {					// based on Burns-Lamport algorithm
 
 #elif defined( WCasLF )
 
-static inline bool WCas( TYPE id ) {					// based on Lamport-Fast algorithm
+static inline bool trylock( TYPE id ) {					// based on Lamport-Fast algorithm
 	b[id] = true;
 	x = id;
 	Fence();											// force store before more loads
@@ -65,6 +65,8 @@ static inline bool WCas( TYPE id ) {					// based on Lamport-Fast algorithm
 	#error unsupported architecture
 #endif // WCas
 
+#define unlock() fast = false
+
 //======================================================
 
 typedef struct CALIGN {
@@ -86,7 +88,7 @@ static void *Worker( void *arg ) {
 	TYPE id = (size_t)arg;
 	uint64_t entry;
 
-	volatile typeof(flags[0].apply) *applyId = &flags[id].apply;
+	volatile typeof(flags[0].apply) *applyId = &flags[id].apply; // optimizations
 #ifdef FLAG
 	volatile typeof(flags[0].flag) *flagId = &flags[id].flag;
 	volatile typeof(flags[0].flag) *flagN = &flags[N].flag;
@@ -101,7 +103,7 @@ static void *Worker( void *arg ) {
 		entry = 0;
 		while ( stop == 0 ) {
 			*applyId = true;							// entry protocol
-			if ( FASTPATH( WCas( id ) ) ) {				// true => leader
+			if ( FASTPATH( trylock( id ) ) ) {			// true => leader
 #ifndef CAS
 				Fence();								// force store before more loads
 #endif // ! CAS
@@ -113,7 +115,7 @@ static void *Worker( void *arg ) {
 				await( first == id || first == N );
 				first = id;
 #endif // FLAG
-				fast = false;
+				unlock();
 			} else {
 #ifdef FLAG
 				await( *flagId );
@@ -135,7 +137,6 @@ static void *Worker( void *arg ) {
 #endif // CYCLEUP
 
 			*applyId = false;							// must appear before setting first
-
 #ifdef CYCLEUP
 			if ( FASTPATH( thr != id ) )
 #ifdef FLAG
@@ -205,7 +206,7 @@ void __attribute__((noinline)) ctor() {
 	} // for
 	y = N;
 #endif // CAS
-	fast = false;
+	unlock();
 } // ctor
 
 void __attribute__((noinline)) dtor() {

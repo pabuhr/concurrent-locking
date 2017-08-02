@@ -46,11 +46,11 @@ static volatile TYPE *b CALIGN, x CALIGN, y CALIGN;
 
 #ifdef CAS
 
-#define WCas( x ) __sync_bool_compare_and_swap( &(fast), false, true )
+#define trylock( x ) __sync_bool_compare_and_swap( &(fast), false, true )
 
 #elif defined( WCasBL )
 
-static inline bool WCas( TYPE id ) {					// based on Burns-Lamport algorithm
+static inline bool trylock( TYPE id ) {					// based on Burns-Lamport algorithm
 	b[id] = true;
 	Fence();											// force store before more loads
 	for ( typeof(id) thr = 0; thr < id; thr += 1 ) {
@@ -71,7 +71,7 @@ static inline bool WCas( TYPE id ) {					// based on Burns-Lamport algorithm
 
 #elif defined( WCasLF )
 
-static inline bool WCas( TYPE id ) {					// based on Lamport-Fast algorithm
+static inline bool trylock( TYPE id ) {					// based on Lamport-Fast algorithm
 	b[id] = true;
 	x = id;
 	Fence();											// force store before more loads
@@ -100,13 +100,15 @@ static inline bool WCas( TYPE id ) {					// based on Lamport-Fast algorithm
 	#error unsupported architecture
 #endif // WCas
 
+#define unlock() fast = false
+
 //======================================================
 
 #ifdef FLAG
 typedef struct CALIGN {
 	TYPE flag;
-} Flags;
-static volatile Flags *flags CALIGN;					// array of flags
+} Flages;
+static volatile Flages *flags CALIGN;
 #else
 static volatile TYPE first CALIGN;
 #endif // FLAG
@@ -123,7 +125,7 @@ static void *Worker( void *arg ) {
 	uint64_t entry;
 
 	const unsigned int n = N + id, dep = Log2( n );
-	volatile typeof(vals[0].val) *valId = &vals[n].val;
+	volatile typeof(vals[0].val) *valId = &vals[n].val;	// optimizations
 #ifdef FLAG
 	volatile typeof(flags[0].flag) *flagId = &flags[id].flag;
 	volatile typeof(flags[0].flag) *flagN = &flags[N].flag;
@@ -140,7 +142,7 @@ static void *Worker( void *arg ) {
 			for ( unsigned int j = n; j > 1; j >>= 1 )	// entry protocol
 				vals[j].val = id;
 
-			if ( FASTPATH( WCas( id ) ) ) {				// true => leader
+			if ( FASTPATH( trylock( id ) ) ) {			// true => leader
 #ifndef CAS
 				Fence();								// force store before more loads
 #endif // ! CAS
@@ -152,7 +154,7 @@ static void *Worker( void *arg ) {
 				await( first == id || first == N );
 				first = id;
 #endif // FLAG
-				fast = false;
+				unlock();
 			} else {
 #ifdef FLAG
 				await( *flagId );
@@ -175,6 +177,7 @@ static void *Worker( void *arg ) {
 					Qenqueue( &queue, k );
 				} // if
 			} // for
+
 			if ( FASTPATH( QnotEmpty( &queue ) ) )
 #ifdef FLAG
 				flags[Qdequeue( &queue )].flag = true;
@@ -189,7 +192,6 @@ static void *Worker( void *arg ) {
 #ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
 			cnt = cycleUp( cnt, NoStartPoints );
-
 			valId = &vals[N + id].val;					// must reset
 #ifdef FLAG
 			flagId = &flags[id].flag;
@@ -242,7 +244,7 @@ void __attribute__((noinline)) ctor() {
 	} // for
 	y = N;
 #endif // CAS
-	fast = false;
+	unlock();
 } // ctor
 
 void __attribute__((noinline)) dtor() {
@@ -258,5 +260,5 @@ void __attribute__((noinline)) dtor() {
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=ElevatorTree -DWCasLF Harness.c -lpthread -lm" //
+// compile-command: "gcc -Wall -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=ElevatorTree2 -DWCasLF Harness.c -lpthread -lm" //
 // End: //
