@@ -85,6 +85,14 @@ static inline void binary_prologue( TYPE c, volatile Token *t ) {
 	Fence();											// force store before more loads
 	if ( FASTPATH( t->Q[other] ) )
 		while ( t->R == c ) Pause();					// busy wait
+#elif defined( PETERSONU )
+	t->Q[c] = 1;
+	Fence();											// force store before more loads
+	if ( FASTPATH( t->Q[other] ) ) {
+		t->R = c;										// RACE
+		Fence();										// force store before more loads
+		while ( t->Q[other] && t->R == c ) Pause();		// busy wait
+	} // if
 #else // Peterson (default)
 	t->Q[c] = 1;
 	t->R = c;											// RACE
@@ -116,7 +124,7 @@ static inline void binary_epilogue( TYPE c, volatile Token *t ) {
 #elif defined( TSAY )
 	t->Q[c] = 0;
 	t->R = c;
-#else // Peterson (default)
+#else // PETERSONU & Peterson (default)
 	t->Q[c] = 0;
 #endif
 } // binary_epilogue
