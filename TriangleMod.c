@@ -123,7 +123,7 @@ static inline TYPE entryFast( TYPE id ) {
 		return false;
 #else
 		Fence();										// OPTIONAL, force store before more loads
-		for ( int k = 0; y == id && k < N; k += 1 )
+		for ( uintptr_t k = 0; y == id && k < N; k += 1 )
 			await( y != id || ! b[k] );
 		if ( FASTPATH( y != id ) ) return false;
 #endif // ALT
@@ -274,7 +274,7 @@ void __attribute__((noinline)) ctor2() {
 
 void __attribute__((noinline)) ctor() {
 	b = Allocator( sizeof(typeof(b[0])) * N );
-	for ( int i = 0; i < N; i += 1 ) {					// initialize shared data
+	for ( uintptr_t i = 0; i < N; i += 1 ) {			// initialize shared data
 		b[i] = 0;
 	} // for
 	y = N;

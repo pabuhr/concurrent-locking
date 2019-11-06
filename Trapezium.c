@@ -169,7 +169,7 @@ static inline void exitSlow(
 
 //======================================================
 
-enum { K = KKK };
+enum { K = NEST };
 typedef struct CALIGN {
 	volatile TYPE * b CALIGN;
 	volatile TYPE x CALIGN, y CALIGN;

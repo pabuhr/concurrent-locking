@@ -8,7 +8,7 @@ static volatile TYPE lock
 #endif
 static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
 
-void spin_lock( volatile TYPE *lock ) {
+void spin_lock( volatile TYPE * lock ) {
 #ifndef NOEXPBACK
 	enum { SPIN_START = 4, SPIN_END = 64 * 1024, };
 	unsigned int spin = SPIN_START;
@@ -27,11 +27,11 @@ void spin_lock( volatile TYPE *lock ) {
 	} // for
 } // spin_lock
 
-void spin_unlock( volatile TYPE *lock ) {
+void spin_unlock( volatile TYPE * lock ) {
 	__sync_lock_release( lock );
 } // spin_unlock
 
-static void *Worker( void *arg ) {
+static void * Worker( void * arg ) {
 	TYPE id = (size_t)arg;
 	uint64_t entry;
 #ifdef FAST

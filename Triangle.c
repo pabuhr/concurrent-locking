@@ -108,50 +108,50 @@ static void *Worker( void *arg ) {
 					y = id;
 					Fence();							// force store before more loads
 					if ( FASTPATH( x == id ) ) {
-						goto CONT;
+						goto Fast;
 					} else {
 						b[id] = false;
 						Fence();						// OPTIONAL, force store before more loads
-						for ( int k = 0; y == id && k < N; k += 1 )
+						for ( uintptr_t k = 0; y == id && k < N; k += 1 )
 							await( y != id || ! b[k] );
 						if ( FASTPATH( y == id ) )
-							goto CONT;
+							goto Fast;
 					} // if
 				} else {
 					b[id] = false;
 				} // if
 			} // if
-			goto ASIDE;
+			goto Slow;
 
-		  CONT: ;
 #else
-			if ( FASTPATH( y != N ) ) goto ASIDE;
+			if ( FASTPATH( y != N ) ) goto Slow;
 			b[id] = true;								// entry protocol
 			x = id;
 			Fence();									// force store before more loads
 			if ( FASTPATH( y != N ) ) {
 				b[id] = false;
-				goto ASIDE;
+				goto Slow;
 			} // if
 			y = id;
 			Fence();									// force store before more loads
 			if ( FASTPATH( x != id ) ) {
 				b[id] = false;
 				Fence();								// OPTIONAL, force store before more loads
-				for ( int k = 0; y == id && k < N; k += 1 )
+				for ( uintptr_t k = 0; y == id && k < N; k += 1 )
 					await( y != id || ! b[k] );
-				if ( FASTPATH( y != id ) ) goto ASIDE;
+				if ( FASTPATH( y != id ) ) goto Slow;
 			} // if
 #endif
+		  Fast: __attribute__(( unused ));
 			binary_prologue( 1, &B );
 			CriticalSection( id );
 			binary_epilogue( 1, &B );
 
 			y = N;										// exit protocol
 			b[id] = false;
-			goto FINI;
+			goto Fini;
 
-		  ASIDE:
+		  Slow:
 #if defined( __sparc )
 			__asm__ __volatile__ ( "" : : : "memory" );
 #endif // __sparc
@@ -173,7 +173,7 @@ static void *Worker( void *arg ) {
 				level, state
 #endif // TB
 				);
-		  FINI: ;
+		  Fini: ;
 
 #ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
@@ -234,7 +234,7 @@ void __attribute__((noinline)) ctor2() {
 
 void __attribute__((noinline)) ctor() {
 	b = Allocator( sizeof(typeof(b[0])) * N );
-	for ( int i = 0; i < N; i += 1 ) {					// initialize shared data
+	for ( uintptr_t i = 0; i < N; i += 1 ) {			// initialize shared data
 		b[i] = 0;
 	} // for
 	y = N;

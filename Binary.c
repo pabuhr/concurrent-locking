@@ -16,7 +16,7 @@ typedef struct CALIGN {
 #endif // KESSELS
 } Token;
 
-static inline void binary_prologue( TYPE c, volatile Token *t ) {
+static inline void binary_prologue( TYPE c, volatile Token * t ) {
 	int other = inv( c );								// int is better than TYPE
 #if defined( KESSELS2 )
 	t->Q[c] = 1;
