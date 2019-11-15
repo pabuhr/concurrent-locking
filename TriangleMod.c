@@ -6,22 +6,22 @@
 
 #ifdef TB
 
-static volatile TYPE **intents CALIGN;					// triangular matrix of intents
-static volatile TYPE **turns CALIGN;					// triangular matrix of turns
+static volatile TYPE ** intents CALIGN;					// triangular matrix of intents
+static volatile TYPE ** turns CALIGN;					// triangular matrix of turns
 static unsigned int depth CALIGN;
 
 #else
 
 typedef struct CALIGN {
-	Token *ns;											// pointer to path node from leaf to root
+	Token * ns;											// pointer to path node from leaf to root
 	TYPE es;											// left/right opponent
 } Tuple;
 
-static Tuple **states CALIGN;							// handle N threads
-static int *levels CALIGN;								// minimal level for binary tree
+static Tuple ** states CALIGN;							// handle N threads
+static int * levels CALIGN;								// minimal level for binary tree
 //static Tuple states[64][6] CALIGN;						// handle 64 threads with maximal tree depth of 6 nodes (lg 64)
 //static int levels[64] = { -1 } CALIGN;					// minimal level for binary tree
-static Token *t CALIGN;
+static Token * t CALIGN;
 
 #endif // TB
 
@@ -31,7 +31,7 @@ static inline void entrySlow(
 #ifdef TB
 	TYPE id
 #else
-	int level, Tuple *state
+	int level, Tuple * state
 #endif // TB
 	) {
 #ifdef TB
@@ -58,7 +58,7 @@ static inline void exitSlow(
 #ifdef TB
 	TYPE id
 #else
-	int level, Tuple *state
+	int level, Tuple * state
 #endif // TB
 	) {
 #ifdef TB
@@ -74,10 +74,11 @@ static inline void exitSlow(
 
 //======================================================
 
-static volatile TYPE *b CALIGN;
+static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
+static volatile TYPE * b CALIGN;
 static volatile TYPE x CALIGN, y CALIGN;
-static volatile Token B; // = { { 0, 0 }, 0 };
-static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
+static Token B; // = { { 0, 0 }, 0 };
+static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 #define await( E ) while ( ! (E) ) Pause()
 
