@@ -3,13 +3,14 @@
 
 #include <stdbool.h>
 
-static volatile TYPE *b CALIGN;
+static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
+static volatile TYPE * b CALIGN;
 static volatile TYPE x CALIGN, y CALIGN;
-static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
+static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 #define await( E ) while ( ! (E) ) Pause()
 
-static void *Worker( void *arg ) {
+static void * Worker( void * arg ) {
 	TYPE id = (size_t)arg;
 	uint64_t entry;
 #ifdef FAST
@@ -35,7 +36,7 @@ static void *Worker( void *arg ) {
 			if ( FASTPATH( x != id ) ) {
 				b[id] = false;
 				Fence();								// force store before more loads
-				for ( int k = 0; k < N; k += 1 )
+				for ( unsigned int k = 0; k < N; k += 1 )
 					await( ! b[k] );
 				if ( FASTPATH( y != id ) ) {
 					//await( y == N );					// optional
@@ -65,7 +66,7 @@ static void *Worker( void *arg ) {
 
 void __attribute__((noinline)) ctor() {
 	b = Allocator( sizeof(typeof(b[0])) * N );
-	for ( int i = 0; i < N; i += 1 ) {					// initialize shared data
+	for ( unsigned int i = 0; i < N; i += 1 ) {			// initialize shared data
 		b[i] = 0;
 	} // for
 	y = N;
@@ -77,5 +78,5 @@ void __attribute__((noinline)) dtor() {
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=LamportFast Harness.c -lpthread -lm" //
+// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=LamportFast Harness.c -lpthread -lm" //
 // End: //
