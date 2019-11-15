@@ -1,34 +1,21 @@
 // http://pdos.csail.mit.edu/papers/linux:lock.pdf
 
 typedef struct {
-	TYPE ticket
-#if defined( __i386 ) || defined( __x86_64 )
-		__attribute__(( aligned (128) ));				// Intel recommendation
-#elif defined( __sparc )
-		CALIGN;
-#else
-    #error unsupported architecture
-#endif
-
-	TYPE serving
-#if defined( __i386 ) || defined( __x86_64 )
-		__attribute__(( aligned (128) ));				// Intel recommendation
-#elif defined( __sparc )
-		CALIGN;
-#else
-    #error unsupported architecture
-#endif
+	// 32 bit sufficient and can reduce 1 clock latency in some cases.
+	volatile uint32_t ticket CALIGN;
+	volatile uint32_t serving CALIGN;
 } Lock;
 
-static Lock lock __attribute__(( aligned (128) ));		// Intel recommendation
-static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
+static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
+static Lock lock;										// fields cache aligned in node
+static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 #ifdef PASS
 TYPE
 #else
 void
 #endif // PASS
-spin_lock( volatile Lock * lock ) {
+spin_lock( Lock * lock ) {
 	TYPE myticket = __sync_fetch_and_add( &lock->ticket, 1 );
 	while ( myticket != lock->serving ) Pause();
 #ifdef PASS
@@ -40,7 +27,7 @@ void spin_unlock(
 #ifdef PASS
 		const TYPE ticket,
 #endif // PASS
-		volatile Lock * lock ) {
+		Lock * lock ) {
 #ifdef PASS
 	lock->serving = ticket + 1;
 #else
@@ -95,5 +82,5 @@ void dtor() {
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=SpinLockTicket Harness.c -lpthread -lm" //
+// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=SpinLockTicket Harness.c -lpthread -lm" //
 // End: //
