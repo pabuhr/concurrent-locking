@@ -92,7 +92,6 @@ function exitBiased(p) {
 // Thread p2 remains in its waiting loop indefinitely, because each time it inspects b[p0], b[p0] happens to be true.
 
 
-
 #include <stdbool.h>
 
 #define inv( c ) ( (c) ^ 1 )
@@ -101,14 +100,14 @@ function exitBiased(p) {
 
 #ifdef TB
 
-static volatile TYPE **intents CALIGN;					// triangular matrix of intents
-static volatile TYPE **turns CALIGN;					// triangular matrix of turns
+static volatile TYPE ** intents CALIGN;					// triangular matrix of intents
+static volatile TYPE ** turns CALIGN;					// triangular matrix of turns
 static unsigned int depth CALIGN;
 
 #else
 
 typedef struct CALIGN {
-	Token *ns;											// pointer to path node from leaf to root
+	Token * ns;											// pointer to path node from leaf to root
 	TYPE es;											// left/right opponent
 } Tuple;
 
@@ -126,7 +125,7 @@ static inline void entrySlow(
 #ifdef TB
 	TYPE id
 #else
-	int level, Tuple *state
+	int level, Tuple * state
 #endif // TB
 	) {
 #ifdef TB
@@ -169,14 +168,15 @@ static inline void exitSlow(
 
 //======================================================
 
+static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
 enum { K = NEST };
 typedef struct CALIGN {
 	volatile TYPE * b CALIGN;
 	volatile TYPE x CALIGN, y CALIGN;
-	volatile Token B; // = { { 0, 0 }, 0 };
+	Token B; // = { { 0, 0 }, 0 };
 } FastPaths;
 static FastPaths fastpaths[K] CALIGN;
-static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
+static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 #define await( E ) while ( ! (E) ) Pause()
 
@@ -194,6 +194,8 @@ static void * Worker( void * arg ) {
 	Tuple * state = states[id];
 #endif // ! TB
 
+	intptr_t fa;
+
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		entry = 0;
 
@@ -204,9 +206,7 @@ static void * Worker( void * arg ) {
 #endif // CNT
 
 		while ( stop == 0 ) {
-			intptr_t fa;
-
-#if 1
+#if 0
 			for ( fa = 0; fa < K; fa += 1 ) {
 				FastPaths * fp = &fastpaths[fa];		// optimization
 				if ( FASTPATH( fp->y == N ) ) {
@@ -277,10 +277,6 @@ static void * Worker( void * arg ) {
 			goto Fini;
 
 		  Slow:
-#if defined( __sparc )
-			__asm__ __volatile__ ( "" : : : "memory" );
-#endif // __sparc
-
 			entrySlow(
 #ifdef TB
 				id
@@ -328,6 +324,8 @@ static void * Worker( void * arg ) {
 	} // for
 	return NULL;
 } // Worker
+
+//=========================================================================
 
 void __attribute__((noinline)) ctor2() {
 #ifdef TB
@@ -403,5 +401,5 @@ void __attribute__((noinline)) dtor() {
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=TriangleTrapezium Harness.c -lpthread -lm" //
+// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=Trapezium -DNEST=1 Harness.c -lpthread -lm" //
 // End: //
