@@ -23,56 +23,22 @@
 #include <malloc.h>										// memalign
 #include <unistd.h>										// getpid
 
-#if defined( __sparc )
-#define CACHE_ALIGN 4
+#ifdef __ARM_ARCH
+#define ARM( stmt ) stmt
 #else
-#define CACHE_ALIGN 128
-#endif // SPARC
-#define CALIGN __attribute__(( aligned (CACHE_ALIGN) ))
-
-// gcc atomic-intrinsic inserts unnecessary MEMBAR
-#if defined( __sparc )
-static inline void *SWAP32( volatile void *ptr, void *v ) {
-	__asm__ __volatile__ ("swap [%[ADR]],%[RV]"
-		: [RV] "+r" (v)
-		: [ADR] "r" (ptr)
-		: "memory" );
-	return v;
-}
-
-#define CAS32(ptr,cmp,set)                      \
-  ({  typeof(set) tt = (set);                   \
-      __asm__ __volatile__ (                    \
-        "cas [%2],%3,%0"                        \
-        : "=&r" (tt)                            \
-        : "0" (tt), "r" (ptr), "r" (cmp)        \
-        : "memory" );                           \
-      tt ;                                      \
-  })
-#if 0
-static inline void *CAS32( volatile void *ptr, void *cmp, void *set ) {
-	__asm__ __volatile__ (
-		"cas [%2],%3,%0"
-		: "=&r" (set)
-		: "0" (set), "r" (ptr), "r" (cmp)
-		: "memory" );
-	return set;
-}
-#endif // 0
-#endif // SPARC
-
-// pause to prevent excess processor bus usage
-#if defined( __sparc )
-	#define Pause() __asm__ __volatile__ ( "rd %ccr,%g0" )
-#elif defined( __i386 ) || defined( __x86_64 )
-	#define Pause() __asm__ __volatile__ ( "pause" : : : )
-#else
-	#error unsupported architecture
+#define ARM( stmt )
 #endif
 
-//#if defined( __i386 ) || defined( __x86_64 )
+#if __GNUC__ >= 7					// valid GNU compiler diagnostic ?
+#pragma GCC diagnostic ignored "-Wimplicit-fallthrough"	// Mute g++-7
+#endif // __GNUC__ >= 7
+
+#define CACHE_ALIGN 128
+#define CALIGN __attribute__(( aligned (CACHE_ALIGN) ))
+
 #define LIKELY(x)   __builtin_expect(!!(x), 1)
 #define UNLIKELY(x) __builtin_expect(!!(x), 0)
+
 #ifdef FAST
 	// unlikely
 	#define FASTPATH(x) __builtin_expect(!!(x), 0)
@@ -82,44 +48,35 @@ static inline void *CAS32( volatile void *ptr, void *cmp, void *set ) {
 	#define FASTPATH(x) __builtin_expect(!!(x), 1)
 	#define SLOWPATH(x) __builtin_expect(!!(x), 0)
 #endif // FASTPATH
-//#else
-//#define FASTPATH(x) (x)
-//#endif // __i386 || __x86_64
 
 // Architectural ST-LD barrier -- memory fences
 // In theory these should be obviated by the C++11 std::atomic_thread_fence() primitives.  Another option is the gcc
 // _sync* primitives, but those are deprecated in favor of the new C++11 operators.  Unfortunately the current
 // implementations of both __sync and C++11 atomic operators is sub-optimal.  On x86 these facilities use MFENCE, which
-// is a poor choice.  On SPARC these facilities conservatively assume RMO instead of TSO.  Furthermore atomic
-// instructions such as CAS/LDSTUB/SWAP are _not assumed to have fence semantics.  In principle that's prudent as,
-// strictly speaking, the architecture manuals clearly state that atomics may not have barrier semantics.  But in
-// practice because of "impl-dep" specifications, atomics have full bidirectional fence semantics on all SPARC
-// processors.  Solaris, the JVM, etc., all assume TSO where atomics have full fence semantics.
+// is a poor choice.
 
-#if defined(__sparc)
-	#define Fence() __asm__ __volatile__ ( "membar #StoreLoad;" )
-	// On x86, use either MFENCE; LOCK:ADDN 0,[SP]; or XCHGN to implement Fence().  See
-	// https://blogs.oracle.com/dave/entry/instruction_selection_for_volatile_fences We could be slightly more clever
-	// and merge the ST and FENCE into a single STFenced(Location,Value) primitive which is implemented via XCHG.  On
-	// SPARC STFenced() is implemented via ST;MEMBAR.
-#elif defined(__x86_64) 
+#if defined(__x86_64)
 	//#define Fence() __asm__ __volatile__ ( "mfence" )
 	#define Fence() __asm__ __volatile__ ( "lock; addq $0,(%%rsp);" ::: "cc" )
 #elif defined(__i386)
 	#define Fence() __asm__ __volatile__ ( "lock; addl $0,(%%esp);" ::: "cc" )
+#elif defined(__ARM_ARCH)
+	#define Fence() __asm__ __volatile__ ( "DMB ISH" ::: )
+#else
+	#error unsupported architecture
+#endif
+
+// pause to prevent excess processor bus usage
+#if defined(__i386) || defined(__x86_64)
+	#define Pause() __asm__ __volatile__ ( "pause" : : : )
+#elif defined(__ARM_ARCH)
+	#define Pause() __asm__ __volatile__ ( "YIELD" ::: )
 #else
 	#error unsupported architecture
 #endif
 
 // memory allocator to align or not align storage
-#if defined( __sparc )
-	//#define Allocator( size ) malloc( (size) )
-	#define Allocator( size ) memalign( CACHE_ALIGN, (size) )
-#elif defined( __i386 ) || defined( __x86_64 )
-	#define Allocator( size ) memalign( CACHE_ALIGN, (size) )
-#else
-	#error unsupported architecture
-#endif
+#define Allocator( size ) memalign( CACHE_ALIGN, (size) )
 
 //------------------------------------------------------------------------------
 
@@ -186,14 +143,15 @@ static inline void CriticalSection( const TYPE id ) {
 
 static ATYPE stop CALIGN = 0;
 static ATYPE Arrived CALIGN = 0;
-static int N CALIGN, Threads CALIGN, Time CALIGN, Degree CALIGN = -1;
+static uintptr_t N CALIGN, Threads CALIGN, Time CALIGN;
+static intptr_t Degree CALIGN = -1;
 
 //------------------------------------------------------------------------------
 
 #ifdef FAST
 enum { MaxStartPoints = 64 };
 static unsigned int NoStartPoints CALIGN;
-static unsigned int *Startpoints CALIGN;
+static unsigned int * Startpoints CALIGN;
 
 // To ensure the single thread exercises all aspects of an algorithm, it is assigned different start-points on each
 // access to the critical section by randomly changing its thread id.  The randomness is accomplished using
@@ -202,7 +160,7 @@ static unsigned int *Startpoints CALIGN;
 // 1 2.  There are no consecutive thread-ids within a repetition but there may be between repetition.  The thread cycles
 // through this array of ids during an experiment.
 
-void __attribute__((noinline)) startpoints() {
+void startpoints() {
 	Startpoints[0] = N;
 	for ( unsigned int i = 0; i < NoStartPoints; i += N ) {
 		for ( unsigned int j = i; j < i + N; j += 1 ) {
@@ -218,6 +176,7 @@ void __attribute__((noinline)) startpoints() {
 		} // for
 	} // for
 #if 0
+	printf( "N %jd NoStartPoints %d ", N, NoStartPoints );
 	for ( unsigned int i = 0; i < NoStartPoints; i += 1 ) {
 		printf( "%d ", Startpoints[i] );
 	} // for
@@ -351,13 +310,13 @@ void affinity( pthread_t pthreadid, unsigned int tid ) {
 
 //------------------------------------------------------------------------------
 
-static uint64_t **entries CALIGN;						// holds CS entry results for each threads for all runs
+static uint64_t ** entries CALIGN;						// holds CS entry results for each threads for all runs
 
 #ifdef CNT
 struct cnts {
-	uint64_t cnt1, cnt2, cnt3;
+	uint64_t cnts[CNT + 1];
 };
-static struct cnts **counters CALIGN;
+static struct cnts ** counters CALIGN;
 #endif // CNT
 
 #define xstr(s) str(s)
@@ -381,7 +340,7 @@ static __attribute__(( unused )) void shuffle( unsigned int set[], const int siz
 //------------------------------------------------------------------------------
 
 #define median(a) ((RUNS & 1) == 0 ? (a[RUNS/2-1] + a[RUNS/2]) / 2 : a[RUNS/2] )
-static int compare( const void *p1, const void *p2 ) {
+static int compare( const void * p1, const void * p2 ) {
 	size_t i = *((size_t *)p1);
 	size_t j = *((size_t *)p2);
 	return i > j ? 1 : i < j ? -1 : 0;
@@ -389,7 +348,7 @@ static int compare( const void *p1, const void *p2 ) {
 
 //------------------------------------------------------------------------------
 
-int main( int argc, char *argv[] ) {
+int main( int argc, char * argv[] ) {
 	N = 8;												// defaults
 	Time = 10;											// seconds
 
@@ -404,12 +363,12 @@ int main( int argc, char *argv[] ) {
 		break;
 	  USAGE:
 	  default:
-		printf( "Usage: %s %d (number of threads) %d (time in seconds threads spend entering critical section) %d (Zhang D-ary)\n",
+		printf( "Usage: %s %ju (number of threads) %ju (time in seconds threads spend entering critical section) %jd (Zhang D-ary)\n",
 				argv[0], N, Time, Degree );
 		exit( EXIT_FAILURE );
 	} // switch
 
-	printf( "%d %d ", N, Time );
+	printf( "%ju %jd ", N, Time );
 
 #ifdef FAST
 	assert( N <= MaxStartPoints );
@@ -421,6 +380,7 @@ int main( int argc, char *argv[] ) {
 	Threads = N;										// allow testing of T < N
 	//N = 32;
 #endif // FAST
+
 	entries = malloc( sizeof(typeof(entries[0])) * RUNS );
 #ifdef CNT
 	counters = malloc( sizeof(typeof(counters[0])) * RUNS );
@@ -428,12 +388,30 @@ int main( int argc, char *argv[] ) {
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		entries[r] = Allocator( sizeof(typeof(entries[0][0])) * Threads );
 #ifdef CNT
+#ifdef FAST
+		counters[r] = Allocator( sizeof(typeof(counters[0][0])) * N );
+#else
 		counters[r] = Allocator( sizeof(typeof(counters[0][0])) * Threads );
+#endif // FAST
 #endif // CNT
 	} // for
 
+#ifdef CNT
+#ifdef FAST
+	// For FAST experiments, there is only thread but it changes its thread id to visit all the start points. Therefore,
+	// all the counters for each id must be initialized and summed at the end.
+	for ( int r = 0; r < RUNS; r += 1 ) {
+		for ( uintptr_t id = 0; id < N; id += 1 ) {
+			for ( unsigned int i = 0; i < CNT + 1; i += 1 ) { // reset for each run
+				counters[r][id].cnts[i] = 0;
+			} // for
+		} // for
+	} // for
+#endif // FAST
+#endif // CNT
+
 	unsigned int set[Threads];
-	for ( int i = 0; i < Threads; i += 1 ) set[ i ] = i;
+	for ( uintptr_t i = 0; i < Threads; i += 1 ) set[ i ] = i;
 	//srand( getpid() );
 	//shuffle( set, Threads );							// randomize thread ids
 
@@ -441,7 +419,7 @@ int main( int argc, char *argv[] ) {
 
 	pthread_t workers[Threads];
 
-	for ( int tid = 0; tid < Threads; tid += 1 ) {		// start workers
+	for ( uintptr_t tid = 0; tid < Threads; tid += 1 ) { // start workers
 		int rc = pthread_create( &workers[tid], NULL, Worker, (void *)(size_t)set[tid] );
 		if ( rc != 0 ) {
 			errno = rc;
@@ -475,7 +453,7 @@ int main( int argc, char *argv[] ) {
 	} // for
 #endif // STRESSINTERVAL
 
-	for ( int tid = 0; tid < Threads; tid += 1 ) {		// terminate workers
+	for ( uintptr_t tid = 0; tid < Threads; tid += 1 ) { // terminate workers
 		int rc = pthread_join( workers[tid], NULL );
 		if ( rc != 0 ) {
 			errno = rc;
@@ -493,7 +471,7 @@ int main( int argc, char *argv[] ) {
 #endif // DEBUG
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		totals[r] = 0;
-		for ( int tid = 0; tid < Threads; tid += 1 ) {
+		for ( uintptr_t tid = 0; tid < Threads; tid += 1 ) {
 			totals[r] += entries[r][tid];
 #ifdef DEBUG
 			printf( "%ju ", entries[r][tid] );
@@ -523,7 +501,7 @@ int main( int argc, char *argv[] ) {
 #endif // DEBUG
 	double avg = (double)totals[posn] / Threads;		// average
 	double sum = 0.0;
-	for ( int tid = 0; tid < Threads; tid += 1 ) {		// sum squared differences from average
+	for ( uintptr_t tid = 0; tid < Threads; tid += 1 ) { // sum squared differences from average
 		double diff = entries[posn][tid] - avg;
 		sum += diff * diff;
 	} // for
@@ -531,16 +509,36 @@ int main( int argc, char *argv[] ) {
 	printf( " %.1f %.1f %.1f%%", avg, std, avg == 0 ? 0.0 : std / avg * 100 );
 
 #ifdef CNT
-	uint64_t cnt1 = 0, cnt2 = 0, cnt3 = 0;
-	for ( int tid = 0; tid < Threads; tid += 1 ) {
-		cnt1 += counters[posn][tid].cnt1;
-		cnt2 += counters[posn][tid].cnt2;
-		cnt3 += counters[posn][tid].cnt3;
+	// posn is the run containing the median result. Other runs are ignored.
+	uint64_t cntsum;
+	printf( "\n" );
+	for ( unsigned int i = 0; i < CNT + 1; i += 1 ) {
+		cntsum = 0;
+#ifdef FAST
+		for ( uintptr_t tid = 0; tid < N; tid += 1 ) {
+#else
+		for ( uintptr_t tid = 0; tid < Threads; tid += 1 ) {
+#endif // FAST
+			cntsum += counters[posn][tid].cnts[i];
+		} // for
+		printf( "%ju ", cntsum );
 	} // for
-	printf( "\ncnt1:%ju cnt2:%ju cnt3:%ju\n", cnt1, cnt2, cnt3 );
 #endif // CNT
 
+	for ( int r = 0; r < RUNS; r += 1 ) {
+		free( entries[r] );
+#ifdef CNT
+		free( counters[r] );
+#endif // CNT
+	} // for
+#ifdef CNT
+	free( counters );
+#endif // CNT
 	free( entries );
+
+#ifdef FAST
+	free( Startpoints );
+#endif // FAST
 
 	printf( "\n" );
 } // main
