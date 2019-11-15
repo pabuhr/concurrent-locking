@@ -3,12 +3,8 @@
 //#define inv( c ) ((c) ^ 1)
 
 typedef struct CALIGN {
-	TYPE Q[2];
-#if defined( __sparc ) && defined( TB )
-	int /* gcc on SPARC has an issue with unsigned affecting performance */
-#else
-	TYPE
-#endif // TB
+	volatile TYPE Q[2];
+	volatile TYPE
 #if defined( KESSELS2 )
 	R[2];
 #else
@@ -16,7 +12,7 @@ typedef struct CALIGN {
 #endif // KESSELS
 } Token;
 
-static inline void binary_prologue( TYPE c, volatile Token * t ) {
+static inline void binary_prologue( TYPE c, Token * t ) {
 	int other = inv( c );								// int is better than TYPE
 #if defined( KESSELS2 )
 	t->Q[c] = 1;
@@ -110,7 +106,7 @@ static inline void binary_prologue( TYPE c, volatile Token * t ) {
 // after the CS, it must be the same value and it cannot be flickering because of a write. Therefore, no fence is
 // required before binary_epilogue in DEKKERRW.
 	
-static inline void binary_epilogue( TYPE c, volatile Token *t ) {
+static inline void binary_epilogue( TYPE c, Token * t ) {
 #if defined( KESSELS2 )
 	t->Q[c] = 0;
 #elif defined( DEKKERORIG ) || defined( DEKKERA ) || defined( DEKKERB ) || defined( DORAN )
@@ -125,6 +121,7 @@ static inline void binary_epilogue( TYPE c, volatile Token *t ) {
 	t->Q[c] = 0;
 	t->R = c;
 #else // PETERSONU & Peterson (default)
+	ARM( Fence(); )										// force store before more loads
 	t->Q[c] = 0;
 #endif
 } // binary_epilogue
