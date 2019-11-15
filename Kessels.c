@@ -47,9 +47,6 @@ static void *Worker( void *arg ) {
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		entry = 0;
 		while ( stop == 0 ) {
-#if defined( __sparc )
-			__asm__ __volatile__ ( "" : : : "memory" );
-#endif // __sparc
 			n = N + id;
 			while ( n > 1 ) {							// entry protocol
 #if 1
@@ -66,9 +63,7 @@ static void *Worker( void *arg ) {
 #endif
 			} // while
 			CriticalSection( id );
-#if defined( __sparc )
-			__asm__ __volatile__ ( "" : : : "memory" );
-#endif // __sparc
+
 			for ( n = 1; n < N; n = n + n + e[n] ) {	// exit protocol
 //				n = n + n + e[n];
 //				binary_epilogue( n & 1, &t[n >> 1] );

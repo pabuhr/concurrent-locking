@@ -18,9 +18,6 @@ static void *Worker( void *arg ) {
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		entry = 0;
 		while ( stop == 0 ) {
-#if defined( __sparc )
-			__asm__ __volatile__ ( "" : : : "memory" );
-#endif // __sparc
 		  L0: flag[id] = true;							// entry protocol
 			turn = id;									// RACE
 			Fence();									// force store before more loads

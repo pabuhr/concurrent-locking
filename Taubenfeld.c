@@ -15,9 +15,6 @@ static void *Worker( void *arg ) {
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		entry = 0;
 		while ( stop == 0 ) {
-#if defined( __sparc )
-			__asm__ __volatile__ ( "" : : : "memory" );
-#endif // __sparc
 			unsigned int node = id;
 			for ( int lv = 0; lv < depth; lv += 1 ) {	// entry protocol
 				unsigned int lr = node & 1;				// round id for intent

@@ -1,6 +1,6 @@
 // Leslie Lamport, A New Solution of Dijkstra's Concurrent Programming Problem, CACM, 1974, 17(8), p. 454
 
-volatile TYPE *choosing CALIGN, *ticket CALIGN;			// no "static" on SPARC
+volatile TYPE *choosing CALIGN, *ticket CALIGN;
 
 static void *Worker( void *arg ) {
 	TYPE id = (size_t)arg;

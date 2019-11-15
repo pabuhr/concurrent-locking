@@ -14,9 +14,6 @@ static void *Worker( void *arg ) {
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		entry = 0;
 		while ( stop == 0 ) {
-#if defined( __sparc )
-			__asm__ __volatile__ ( "" : : : "memory" );
-#endif // __sparc
 			ridi = id;									// this version fastest on SPARC
 			for ( unsigned int lv = 0; lv < depth; lv += 1 ) { // entry protocol
 //				ridi = id >> lv;						// round id for intent
