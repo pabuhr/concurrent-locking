@@ -1,0 +1,41 @@
+#!/bin/sh -
+
+# Experiments for: Trapezium Algorithm, Wim H. Hesselink, Peter A. Buhr, submitted
+
+#algorithms="Triangle TriangleMod Trapezium TrapeziumHW MCS SpinLock SpinLockTicket"
+algorithms="TrapeziumHW"
+outdir=`hostname`
+mkdir -p ${outdir}
+
+if [ ${#} -ne 0 ] ; then
+    algorithms="${@}"
+fi
+
+cflag="-Wall -Wextra -Werror -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN" #
+
+runalgorithm() {
+    for contention in "" "FAST" ; do
+	outfile=${outdir}/${1}${2}${contention}
+	echo "${outfile}"
+	gcc-9 ${cflag} ${contention:+-D${contention}} ${2:+-DNEST=${2}} ${2:+-DCNT=${2}} -DAlgorithm=${1} Harness.c -lpthread -lm
+#	gcc-9 ${cflag} ${contention:+-D${contention}} ${2:+-DNEST=${2}} -DAlgorithm=${1} Harness.c -lpthread -lm
+	./run1 > "${outfile}"
+	if [ -f core ] ; then
+	    echo core generated for ${1}
+	    break
+	fi
+    done
+}
+
+rm -rf core
+for algorithm in ${algorithms} ; do
+    if [ ${algorithm} = "Trapezium" -o ${algorithm} = "TrapeziumHW" ] ; then
+	for K in 1 2 3 4 5 ; do
+	    runalgorithm ${algorithm} ${K}
+	done
+    else
+	runalgorithm ${algorithm}
+    fi
+done
+
+rm -f a.out
