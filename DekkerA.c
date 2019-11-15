@@ -78,7 +78,7 @@ static void *Worker( void *arg ) {
 
 void __attribute__((noinline)) ctor() {
 	if ( N != 2 ) {
-		printf( "\nUsage: N=%d must be 2\n", N );
+		printf( "\nUsage: N=%zd must be 2\n", N );
 		exit( EXIT_FAILURE);
 	} // if
 } // ctor
