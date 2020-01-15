@@ -1,36 +1,14 @@
 /*
-static
+  T0 > T1 > T2 > Slow
+   |    |    |  /
+   |    |    B2
+   |    |   /
+   |    B1
+   |   /
+   B0
+   |
+   CS
 
-      |
-     F0  --  F1  --   F2 -- Slow
-      |       |        |     /
-      |       |          B2
-      |       |        /
-      |          B1
-      |        /
-         B0
-         |
-         CS
-
-dynamic, Fi,j,k means a fast thread and Si means a slow thread.
-
-       F0
-      /   \
-     Fi   F1
-     |   /   \
-     |  Fj   F2
-     |  |   /   \
-     |  |  Fk   Si
-     |  |  \    /
-     |  |    B2
-     |   \  /
-     |    B1
-     |    /
-      \  /
-       B0
-        |
-       CS
-        |
 reverse upward path
 */
 
@@ -46,51 +24,6 @@ reverse upward path
 // There are two versions.  In both versions, we need only modify Figure 2 of the paper (apart from the K systems of
 // shared variables of Fast and Binary).  The first version uses an arbitrary slow algorithm as in the paper.  If K = 1,
 // this should be just the Triangle algorithm.
-
-#if 0
-int function entryTriangle(p) {
-	int i, fa = 0;
-	while (fa < K && ! entryFast(fa, p)) fa++;
-	if (fa == K) entrySlow(p);
-	for (i = min(K-1, fa); i >= 0 ; i--) {
-		entryBinary(i, i < fa);
-	}
-	return fa;
-}
-
-function exitTriangle(fa, p) {
-	int i;
-	for (i = 0; i <= min(K-1, fa); i++) {
-		exitBinary(i, i < fa);
-	}
-	if (fa < K) exitFast(fa, p); else exitSlow(p);
-}
-
-// ==================================================================
-
-// A biased MX algorithm that gives priority to the lower threads.  I have replaced the tests "i < p" by "i == p".  This
-// swaps the two ports of each binary algorithm.
-
-int function entryBiased(p: [0..K]) {
-	int i;
-	for (i = min(K-1, p); i >= 0 ; i--) {
-		entryBinary(i, i == p);
-	}
-}
-
-function exitBiased(p) {
-	int i;
-	for (i = 0; i <= min(K-1, p); i++) {
-		exitBinary(i, i == p);
-	}
-}
-#endif // 0
-
-// Indeed, independently of the waiting condition, sharing array b would allow starvation of the trapezium.  Scenario:
-// use K > 2, and three threads p0, p1, p2.  Thread p0 cycles successfully through LF0.  Threads p1 and p2 are pushed by
-// p0 to LF1.  Thread p1 becomes x[1] and thread p2 becomes y[1] and enters the waiting loop as y[1].  Thread p1 exits.
-// Thread p2 remains in its waiting loop indefinitely, because each time it inspects b[p0], b[p0] happens to be true.
-
 
 #include <stdbool.h>
 
@@ -168,14 +101,14 @@ static inline void exitSlow(
 
 //======================================================
 
-static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
 enum { K = NEST };
 typedef struct CALIGN {
-	volatile TYPE * b CALIGN;
-	volatile TYPE x CALIGN, y CALIGN;
+	volatile TYPE * b;
+	volatile TYPE x, y;
 	Token B; // = { { 0, 0 }, 0 };
 } FastPaths;
-static FastPaths fastpaths[K] CALIGN;
+static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
+static FastPaths fastpaths[K] CALIGN;					// zero filled
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 #define await( E ) while ( ! (E) ) Pause()
@@ -195,6 +128,7 @@ static void * Worker( void * arg ) {
 #endif // ! TB
 
 	intptr_t fa;
+	FastPaths * fp;
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		entry = 0;
@@ -208,7 +142,7 @@ static void * Worker( void * arg ) {
 		while ( stop == 0 ) {
 #if 0
 			for ( fa = 0; fa < K; fa += 1 ) {
-				FastPaths * fp = &fastpaths[fa];		// optimization
+				fp = &fastpaths[fa];					// optimization
 				if ( FASTPATH( fp->y == N ) ) {
 					fp->b[id] = true;
 					fp->x = id;
@@ -217,6 +151,7 @@ static void * Worker( void * arg ) {
 						fp->y = id;
 						Fence();						// force store before more loads
 						if ( FASTPATH( fp->x == id ) ) {
+							fp->y = id;
 							goto Fast;
 						} else {
 							fp->b[id] = false;
@@ -225,7 +160,7 @@ static void * Worker( void * arg ) {
 								await( fp->y != id || ! fp->b[k] );
 							if ( FASTPATH( fp->y == id ) ) {
 								goto Fast;
-							}
+							} // if
 						} // if
 					} else {
 						fp->b[id] = false;
@@ -233,27 +168,25 @@ static void * Worker( void * arg ) {
 				} // if
 			} // for
 			goto Slow;
-
 #else
-
 			for ( fa = 0; fa < K; fa += 1 ) {
-				FastPaths * fp = &fastpaths[fa];		// optimization
-				if ( FASTPATH( fp->y != N ) ) continue;
+				fp = &fastpaths[fa];					// optimization
+				if ( SLOWPATH( fp->y != N ) ) continue;
 				fp->b[id] = true;						// entry protocol
 				fp->x = id;
 				Fence();								// force store before more loads
-				if ( FASTPATH( fp->y != N ) ) {
+				if ( SLOWPATH( fp->y != N ) ) {
 					fp->b[id] = false;
 					continue;
 				} // if
 				fp->y = id;
 				Fence();								// force store before more loads
-				if ( FASTPATH( fp->x != id ) ) {
+				if ( SLOWPATH( fp->x != id ) ) {
 					fp->b[id] = false;
 					Fence();							// OPTIONAL, force store before more loads
 					for ( uintptr_t k = 0; fp->y == id && k < N; k += 1 )
 						await( fp->y != id || ! fp->b[k] );
-					if ( FASTPATH( fp->y != id ) ) continue;
+					if ( SLOWPATH( fp->y != id ) ) continue;
 				} // if
 				goto Fast;
 			} // for
@@ -272,11 +205,15 @@ static void * Worker( void * arg ) {
 				binary_epilogue( i < fa, &fastpaths[i].B );
 			} // for
 
-			fastpaths[fa].y = N;						// exit fast protocol
-			fastpaths[fa].b[id] = false;
+			fp->y = N;									// exit fast protocol
+			fp->b[id] = false;
 			goto Fini;
 
 		  Slow:
+#ifdef CNT
+			counters[r][id].cnts[fa] += 1;
+#endif // CNT
+
 			entrySlow(
 #ifdef TB
 				id
@@ -285,9 +222,6 @@ static void * Worker( void * arg ) {
 #endif // TB
 				);
 
-#ifdef CNT
-			counters[r][id].cnts[fa] += 1;
-#endif // CNT
 			fa -= 1;
 			for ( intptr_t i = fa; i >= 0; i -= 1 ) {
 				binary_prologue( 1, &fastpaths[i].B );
@@ -367,9 +301,9 @@ void __attribute__((noinline)) ctor2() {
 } // ctor2
 
 void __attribute__((noinline)) ctor() {
-	for ( unsigned int k = 0; k < K; k += 1 ) {
+	for ( uintmax_t k = 0; k < K; k += 1 ) {			// initialize shared data
 		fastpaths[k].b = Allocator( sizeof(typeof(fastpaths[0].b[0])) * N );
-		for ( uintptr_t i = 0; i < N; i += 1 ) {		// initialize shared data
+		for ( uintmax_t i = 0; i < N; i += 1 ) {
 			fastpaths[k].b[i] = 0;
 		} // for
 		fastpaths[k].y = N;
@@ -394,12 +328,12 @@ void __attribute__((noinline)) dtor2() {
 
 void __attribute__((noinline)) dtor() {
 	dtor2();											// tournament deallocation
-	for ( unsigned int k = 0; k < K; k += 1 ) {
+	for ( uintmax_t k = 0; k < K; k += 1 ) {
 		free( (void *)fastpaths[k].b );
 	} // for
 } // dtor
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=Trapezium -DNEST=1 Harness.c -lpthread -lm" //
+// compile-command: "gcc -DNEST=3 -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=Trapezium Harness.c -lpthread -lm" //
 // End: //

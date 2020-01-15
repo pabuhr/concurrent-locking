@@ -1,97 +1,3 @@
-/*
-static
-
-      |
-     F0  --  F1  --   F2 -- Slow
-      |       |        |     /
-      |       |          B2
-      |       |        /
-      |          B1
-      |        /
-         B0
-         |
-         CS
-
-dynamic, Fi,j,k means a fast thread and Si means a slow thread.
-
-       F0
-      /   \
-     Fi   F1
-     |   /   \
-     |  Fj   F2
-     |  |   /   \
-     |  |  Fk   Si
-     |  |  \    /
-     |  |    B2
-     |   \  /
-     |    B1
-     |    /
-      \  /
-       B0
-        |
-       CS
-        |
-reverse upward path
-*/
-
-// Recursive versions of the Triangle algorithm
-//
-// When the Triangle algorithm runs at full contention, half of the threads go via the fast route and the other half are
-// routed along the slow route.  It therefore pays to make the slow route as fast as possible.  Why not use the Triangle
-// algorithm for this purpose?  Then, within this embedded triangle, we could use the triangle again.  Let us allow a
-// nesting of K > 0 levels.  We then need K versions of LamportFast with its shared variables x and y and array b, and K
-// versions of Binary.  The calls are entryFast(i, p), exitFast(i, p), and entryBinary(i, b) and exitBinary(i, b), where
-// p ranges over the thread numbers, and 0 <= i < K, and b over the booleans (bits).
-// 
-// There are two versions.  In both versions, we need only modify Figure 2 of the paper (apart from the K systems of
-// shared variables of Fast and Binary).  The first version uses an arbitrary slow algorithm as in the paper.  If K = 1,
-// this should be just the Triangle algorithm.
-
-#if 0
-int function entryTriangle(p) {
-	int i, fa = 0;
-	while (fa < K && ! entryFast(fa, p)) fa++;
-	if (fa == K) entrySlow(p);
-	for (i = min(K-1, fa); i >= 0 ; i--) {
-		entryBinary(i, i < fa);
-	}
-	return fa;
-}
-
-function exitTriangle(fa, p) {
-	int i;
-	for (i = 0; i <= min(K-1, fa); i++) {
-		exitBinary(i, i < fa);
-	}
-	if (fa < K) exitFast(fa, p); else exitSlow(p);
-}
-
-// ==================================================================
-
-// A biased MX algorithm that gives priority to the lower threads.  I have replaced the tests "i < p" by "i == p".  This
-// swaps the two ports of each binary algorithm.
-
-int function entryBiased(p: [0..K]) {
-	int i;
-	for (i = min(K-1, p); i >= 0 ; i--) {
-		entryBinary(i, i == p);
-	}
-}
-
-function exitBiased(p) {
-	int i;
-	for (i = 0; i <= min(K-1, p); i++) {
-		exitBinary(i, i == p);
-	}
-}
-#endif // 0
-
-// Indeed, independently of the waiting condition, sharing array b would allow starvation of the trapezium.  Scenario:
-// use K > 2, and three threads p0, p1, p2.  Thread p0 cycles successfully through LF0.  Threads p1 and p2 are pushed by
-// p0 to LF1.  Thread p1 becomes x[1] and thread p2 becomes y[1] and enters the waiting loop as y[1].  Thread p1 exits.
-// Thread p2 remains in its waiting loop indefinitely, because each time it inspects b[p0], b[p0] happens to be true.
-
-
 #include <stdbool.h>
 
 #define inv( c ) ( (c) ^ 1 )
@@ -203,7 +109,7 @@ static void * Worker( void * arg ) {
 
 		while ( stop == 0 ) {
 			for ( fa = 0; fa < K; fa += 1 ) {
-			  if ( __sync_bool_compare_and_swap( &mutex[fa], N, id ) ) goto Fast;
+			  if ( mutex[fa] == N && __sync_bool_compare_and_swap( &mutex[fa], N, id ) ) goto Fast;
 			} // for
 			goto Slow;
  
