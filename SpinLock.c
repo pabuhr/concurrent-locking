@@ -1,11 +1,18 @@
-static volatile TYPE lock
-#if defined( __i386 ) || defined( __x86_64 )
-	__attribute__(( aligned (128) ));					// Intel recommendation
-#elif defined( __sparc )
-	CALIGN;
-#else
-    #error unsupported architecture
-#endif
+// On Intel, spinlock performance is constant independent of contention. The reason is that the hardware is running the
+// threads almost sequentially. The issue is spinlock unfairness, which is usually attributed to cache line arbitration
+// and the fact that the current owner has a better chance of reacquiring when the non-critical section is short.  On
+// NUMA systems there are also some performance effects visible related to the placement of the lock (it's home node) vs
+// the node of threads trying to get the lock.  In some similar experiments, both long-term and show-term fairness for
+// test-and-test-and-set spin locks occurs.  There are modes where one, or perhaps two, threads are dominating ownership
+// for non-trivial periods that can span 1000s of acquisitions.  Put another way, the long-term fairness as reported via
+// relative std deviation is bad, but the short-term is likely far worse.  There is not much in the literature regarding
+// measures of shorter term fairness for locks.  One approach is to have the critical section record the owner thread ID
+// into an append only log, but there is a large probe effect here.  Post-processing the log and reporting the "median
+// time to reacquire", where time is given in lock acquisition counts instead of normal time units, should give
+// interesting information.
+
+static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
+static volatile TYPE lock CALIGN;						// Intel recommendation
 static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
 
 void spin_lock( volatile TYPE * lock ) {
@@ -17,9 +24,9 @@ void spin_lock( volatile TYPE * lock ) {
 	for ( unsigned int i = 1;; i += 1 ) {
 	  if ( *lock == 0 && __sync_lock_test_and_set( lock, 1 ) == 0 ) break;
 #ifndef NOEXPBACK
-		for ( volatile unsigned int s = 0; s < spin; s += 1 ) Pause(); // exponential spin
-		//spin += spin;									// powers of 2
-		if ( i % 64 == 0 ) spin += spin;				// slowly increase by powers of 2
+		for ( unsigned int s = 0; s < spin; s += 1 ) Pause(); // exponential spin
+		spin += spin;									// powers of 2
+		//if ( i % 64 == 0 ) spin += spin;				// slowly increase by powers of 2
 		if ( spin > SPIN_END ) spin = SPIN_START;		// prevent overflow
 #else
 	    Pause();
@@ -28,6 +35,7 @@ void spin_lock( volatile TYPE * lock ) {
 } // spin_lock
 
 void spin_unlock( volatile TYPE * lock ) {
+	ARM( Fence(); )
 	__sync_lock_release( lock );
 } // spin_unlock
 
