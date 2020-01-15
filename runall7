@@ -1,8 +1,8 @@
 #!/bin/sh -
 
-# Experiments for: Trapezium Algorithm
+# Experiments for: Rectangle Algorithm
 
-algorithms="Triangle TriangleMod Trapezium TrapeziumHW MCS SpinLock SpinLockTicket"
+algorithms="Triangle TriangleMod Trapezium Rectangle MCS SpinLock SpinLockTicket"
 outdir=`hostname`
 mkdir -p ${outdir}
 
@@ -16,9 +16,9 @@ runalgorithm() {
     for contention in "" "FAST" ; do
 	outfile=${outdir}/${1}${2}${contention}
 	echo "${outfile}"
-	gcc-9 ${cflag} ${contention:+-D${contention}} ${2:+-DNEST=${2}} ${2:+-DCNT=${2}} -DAlgorithm=${1} Harness.c -lpthread -lm
+	gcc-9 ${cflag} ${contention:+-D${contention}} ${2:+-DNEST=${2}} -DAlgorithm=${1} Harness.c -lpthread -lm
 #	gcc-9 ${cflag} ${contention:+-D${contention}} ${2:+-DNEST=${2}} -DAlgorithm=${1} Harness.c -lpthread -lm
-	./run1 > "${outfile}"
+#	./run1 > "${outfile}"
 	if [ -f core ] ; then
 	    echo core generated for ${1}
 	    break
@@ -29,7 +29,7 @@ runalgorithm() {
 rm -rf core
 for algorithm in ${algorithms} ; do
     if [ ${algorithm} = "Trapezium" -o ${algorithm} = "TrapeziumHW" ] ; then
-	for K in 1 2 3 4 5 ; do
+	for K in 1 2 3 ; do # 4 5
 	    runalgorithm ${algorithm} ${K}
 	done
     else

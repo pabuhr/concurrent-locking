@@ -9,7 +9,7 @@ if [ ${#} -ne 0 ] ; then
     algorithms="${@}"
 fi
 
-cflag="-Wall -Werror -std=gnu11 -g -O3 -DNDEBUG -fno-reorder-functions -DPIN" #
+cflag="-Wall -Wextra -Werror -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN" #
 
 runalgorithm() {
     for contention in "" "FAST" ; do

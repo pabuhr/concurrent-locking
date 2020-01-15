@@ -1,0 +1,43 @@
+#!/bin/sh -
+
+# Experiments for: Elevator Algorithm
+
+algorithms="ElevatorLinear ElevatorLinear2 ElevatorTree ElevatorTree2"
+outdir=`hostname`
+mkdir -p ${outdir}
+
+if [ ${#} -ne 0 ] ; then
+    algorithms="${@}"
+fi
+
+cflag="-Wall -Wextra -Werror -Wno-implicit-fallthrough -std=gnu11 -g -O3 -DNDEBUG -fno-reorder-functions -DPIN" #
+
+runalgorithm() {
+    for contention in "" "FAST" ; do
+	outfile=${outdir}/${1}${2}${3}${4}${contention}
+	echo "${outfile}"
+	gcc ${cflag} ${contention:+-D${contention}} ${2:+-D${2}} ${3:+-D${3}} ${4:+-D${4}} ${5:+-D${5}} -DAlgorithm=${1} Harness.c -lpthread -lm
+	./run1 > "${outfile}"
+	if [ -f core ] ; then
+	    echo core generated for ${1}
+	    break
+	fi
+    done
+}
+
+rm -rf core
+for algorithm in ${algorithms} ; do
+    if [ ${algorithm} = "ElevatorLinear" -o ${algorithm} = "ElevatorTree" -o ${algorithm} = "ElevatorLinear2" -o ${algorithm} = "ElevatorTree2" ] ; then
+	for cas in "CAS" "WCasBL" "WCasLF" ; do
+	    for flag in "FLAG" ; do
+		for posn in "P1" "P2" ; do
+		    runalgorithm ${algorithm} ${cas} ${flag} ${posn}
+		done
+	    done
+	done
+    else
+	runalgorithm ${algorithm}
+    fi
+done
+
+rm -f a.out
