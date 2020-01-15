@@ -101,7 +101,7 @@ static void * Worker( void * arg ) {
 
 		while ( stop == 0 ) {
 
-#if 0
+#if 1
 			if ( FASTPATH( y == N ) ) {
 				b[id] = true;
 				x = id;
@@ -110,40 +110,43 @@ static void * Worker( void * arg ) {
 					y = id;
 					Fence();							// force store before more loads
 					if ( FASTPATH( x == id ) ) {
+						y = id;
 						goto Fast;
 					} else {
 						b[id] = false;
 						Fence();						// OPTIONAL, force store before more loads
 						for ( uintptr_t k = 0; y == id && k < N; k += 1 )
 							await( y != id || ! b[k] );
-						if ( FASTPATH( y == id ) )
+						if ( FASTPATH( y == id ) ) {
+							y = id;
 							goto Fast;
+						} // if
 					} // if
 				} else {
 					b[id] = false;
 				} // if
 			} // if
 			goto Slow;
-
 #else
-			if ( FASTPATH( y != N ) ) goto Slow;
+			if ( SLOWPATH( y != N ) ) goto Slow;
 			b[id] = true;								// entry protocol
 			x = id;
 			Fence();									// force store before more loads
-			if ( FASTPATH( y != N ) ) {
+			if ( SLOWPATH( y != N ) ) {
 				b[id] = false;
 				goto Slow;
 			} // if
 			y = id;
 			Fence();									// force store before more loads
-			if ( FASTPATH( x != id ) ) {
+			if ( SLOWPATH( x != id ) ) {
 				b[id] = false;
 				Fence();								// OPTIONAL, force store before more loads
 				for ( uintptr_t k = 0; y == id && k < N; k += 1 )
 					await( y != id || ! b[k] );
-				if ( FASTPATH( y != id ) ) goto Slow;
+				if ( SLOWPATH( y != id ) ) goto Slow;
 			} // if
 #endif
+
 		  Fast: __attribute__(( unused ));
 			binary_prologue( 1, &B );
 			CriticalSection( id );
@@ -164,6 +167,7 @@ static void * Worker( void * arg ) {
 			binary_prologue( 0, &B );
 			CriticalSection( id );
 			binary_epilogue( 0, &B );
+
 			exitSlow(
 #ifdef TB
 				id
@@ -171,6 +175,7 @@ static void * Worker( void * arg ) {
 				level, state
 #endif // TB
 				);
+
 		  Fini: ;
 
 #ifdef FAST

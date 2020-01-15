@@ -18,13 +18,13 @@ struct Triangle : rl::test_suite<Triangle, N> {
 
 #   define inv( c ) ( (c) ^ 1 )
 
-	void binary_prologue( int c, Token *t ) {
+	void binary_prologue( int c, Token * t ) {
 		t->Q[c]($) = 1;
 		t->R($) = c;
 		while ( t->Q[inv( c )]($) && t->R($) == c ) Pause(); // busy wait
 	} // binary_prologue
 
-	void binary_epilogue( int c, Token *t ) {
+	void binary_epilogue( int c, Token * t ) {
 		t->Q[c]($) = 0;
 	} // binary_epilogue
 
@@ -77,7 +77,7 @@ struct Triangle : rl::test_suite<Triangle, N> {
 
 	void thread( int id ) {
 		int level = levels[id];
-		Tuple *state = states[id];
+		Tuple * state = states[id];
 
 		if ( y($) != N ) goto ASIDE;
 		b[id]($) = true;								// entry protocol
