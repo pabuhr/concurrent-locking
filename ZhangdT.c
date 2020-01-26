@@ -4,7 +4,7 @@
 
 static volatile TYPE **x CALIGN;
 
-#define min( x, y ) (x < y ? x : y)
+#define min( x, y ) ((x) < (y) ? (x) : (y))
 #define logx( N, b ) (log(N) / log(b))
 
 static void *Worker( void *arg ) {
