@@ -6,7 +6,7 @@ hardware-instructions, there is still a need for these algorithms in threaded,
 embedded systems running on low-cost processors lacking atomic instructions.
 
 This repository contains C-language software-solutions for mutual exclusion
-using phtreads for 2-threads and N-threads.  As well, a worst-case
+using pthreads for 2-threads and N-threads.  As well, a worst-case
 high-contention performance experiment is provided to compare the algorithms
 and contrast them with three common locks based on hardware atomic
 instructions.  Each algorithm is compiled through the file "Harness.c", which
@@ -42,8 +42,17 @@ Project papers:
 
 Peter A. Buhr and David Dice and Wim H. Hesselink, High-Performance N-Thread
 Software Solutions for Mutual Exclusion, Concurrency and Computation: Practice
-and Experience, 27(3), pp. 651-701, March, 2015
+and Experience, 27(3), pp. 651-701, March, 2015, https://doi.org/10.1002/cpe.3263
 
 Peter A. Buhr and David Dice and Wim H. Hesselink, Dekker's Mutual Exclusion
 Algorithm Made RW-Safe, Concurrency and Computation: Practice and Experience,
-28(1), pp. 144-165, January, 2016
+28(1), pp. 144-165, January, 2016, https://doi.org/10.1002/cpe.3659
+
+Wim H. Hesselink and Peter A. Buhr and David Dice, Fast Mutual Exclusion by the
+Triangle Algorithm, Concurrency and Computation: Practice and Experience, 30(4),
+February, 2018, https://doi.org/10.1002/cpe.4183
+
+Peter A. Buhr and David Dice and Wim H. Hesselink, High-Contention Mutual
+Exclusion by Elevator Algorithms, Concurrency and Computation: Practice and
+Experience, 30(18), September, 2018, https://doi.org/10.1002/cpe.4475
+
