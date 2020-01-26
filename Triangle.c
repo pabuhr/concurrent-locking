@@ -101,7 +101,7 @@ static void * Worker( void * arg ) {
 
 		while ( stop == 0 ) {
 
-#if 1
+#if 0
 			if ( FASTPATH( y == N ) ) {
 				b[id] = true;
 				x = id;
