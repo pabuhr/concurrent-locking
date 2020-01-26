@@ -27,7 +27,7 @@ void spin_lock( volatile TYPE * lock ) {
 		for ( unsigned int s = 0; s < spin; s += 1 ) Pause(); // exponential spin
 		spin += spin;									// powers of 2
 		//if ( i % 64 == 0 ) spin += spin;				// slowly increase by powers of 2
-		if ( spin > SPIN_END ) spin = SPIN_START;		// prevent overflow
+		if ( spin > SPIN_END ) spin = SPIN_END;			// cap spinning
 #else
 	    Pause();
 #endif // ! NOEXPBACK
