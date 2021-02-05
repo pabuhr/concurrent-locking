@@ -1,55 +1,64 @@
-// Hesselink, W.H. Correctness and Concurrent Complexity of the Black-White Bakery Algorithm. Formal Aspects of
-// Computing, Figure 1, 28, 325-341 (2016). https://doi-org.proxy.lib.uwaterloo.ca/10.1007/s00165-016-0364-4
+// Gadi Taubenfeld, The Black-White Bakery Algorithm and Related Bounded-Space, Adaptive, Local-Spinning and FIFO Algorithms.
+// Algorithm 2, page 62, DISC 2004, LNCS 3274, pp. 56-70, 2004
 
 #include <stdbool.h>
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
-volatile TYPE color CALIGN;
-volatile TYPE * cho CALIGN, * pair CALIGN;
+typedef enum { black, white } BW;
+volatile BW color CALIGN;
+volatile TYPE * choosing CALIGN;
+typedef struct {
+	BW color;
+	TYPE number;
+} Ticket;
+volatile Ticket * ticket CALIGN;
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
-#define fn(n, mcol) (1 + (n % 2 == mcol ? n / 2 : 0))
-#define guardA(n, mcol, lev, p, thr) (n / 2 == 0 || n % 2 != mcol || (lev <= n / 2 && (lev < n / 2 || p <= thr))) /* where <= is the lexical order */
-#define guardB(n, mcol) ((n / 2 == 0 || n % 2 == mcol))
-
-#define max( x, y ) ((x) < (y) ? (y) : (x))
 #define await( E ) while ( ! (E) ) Pause()
 
 static void * Worker( void * arg ) {
 	TYPE id = (size_t)arg;
 	uint64_t entry;
 
-	TYPE mcol;
-	TYPE lev;
+	TYPE mycolor, number;
+
 #ifdef FAST
 	unsigned int cnt = 0, oid = id;
 #endif // FAST
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		for ( entry = 0; stop == 0; entry += 1 ) {
-			cho[id] = true;
-			mcol = color; lev = 1; 
-			Fence();
-			for ( typeof(N) thr = 0; thr < N; thr += 1 ) {
-				if ( thr != id ) lev = max( lev, fn( pair[thr], mcol ) );
-			}
-			pair[id] = 2 * lev + mcol;
-			cho[id] = false;
-			Fence();
-			for ( typeof(N) thr = 0; thr < N; thr += 1 ) {
-				if ( thr != id ) {
-					await( ! cho[thr] );
-					if ( pair[thr] % 2 == mcol )
-						await( guardA( pair[thr], mcol, lev, id, thr ) );
-					else 
-						await( guardB( pair[thr], mcol ) || color != mcol ); 
-				}  // if
+			// step 1, select a ticket
+			choosing[id] = true;						// entry protocol
+			Fence();									// force store before more loads
+			mycolor = color;
+			number = 0;
+			for ( typeof(N) j = 0; j < N; j += 1 ) {	// O(N) search for largest ticket
+				Ticket v = ticket[j];					// could change so must copy
+				if ( number < v.number && mycolor == v.color ) number = v.number;
+			} // for
+			number += 1;								// advance ticket
+			ticket[id] = (Ticket){ mycolor, number };	// set public state
+			choosing[id] = false;
+			Fence();									// force store before more loads
+
+			// step 2, wait for ticket to be selected
+			for ( typeof(N) j = 0; j < N; j += 1 ) {	// check other tickets
+				await( choosing[j] == false );			// busy wait if thread selecting ticket
+				if ( ticket[j].color == mycolor ) {
+					await( ticket[j].number == 0 ||
+						   ticket[j].number > number || (j >= id && ticket[j].number >= number) ||
+						   ticket[j].color != mycolor );
+				} else {
+					await( ticket[j].number == 0 || mycolor != color ||
+						   ticket[j].color == mycolor );
+				} // if
 			} // for
 
 			CriticalSection( id );
 
-			color = 1 - mcol;
-			pair[id] = mcol;
+			color = ! mycolor;
+			ticket[id].number = 0;
 
 #ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
@@ -69,18 +78,17 @@ static void * Worker( void * arg ) {
 } // Worker
 
 void __attribute__((noinline)) ctor() {
-	color = 0;
-	cho = Allocator( sizeof(typeof(cho[0])) * N );
-	pair = Allocator( sizeof(typeof(pair[0])) * N );
+	choosing = Allocator( sizeof(typeof(choosing[0])) * N );
+	ticket = Allocator( sizeof(typeof(ticket[0])) * N );
 	for ( typeof(N) i = 0; i < N; i += 1 ) {			// initialize shared data
-		cho[i] = false;
-		pair[i] = 0;
+		choosing[i] = false;
+		ticket[i] = (Ticket){ black, 0 };
 	} // for
 } // ctor
 
 void __attribute__((noinline)) dtor() {
-	free( (void *)pair );
-	free( (void *)cho );
+	free( (void *)ticket );
+	free( (void *)choosing );
 } // dtor
 
 // Local Variables: //
