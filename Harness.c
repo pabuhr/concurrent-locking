@@ -19,21 +19,25 @@
 #include <errno.h>										// errno
 #include <stdint.h>										// uintptr_t, UINTPTR_MAX
 #include <sys/time.h>
-//#include <poll.h>										// poll
+#include <poll.h>										// poll
 #include <malloc.h>										// memalign
 #include <unistd.h>										// getpid
+#include <limits.h>										// ULONG_MAX
+#ifdef CFMT												// output comma format
+#include <locale.h>
+#endif // CFMT
 
 #ifdef __ARM_ARCH
-#define ARM( stmt ) stmt
+#define WO( stmt ) stmt
 #else
-#define ARM( stmt )
+#define WO( stmt )
 #endif
 
-#if __GNUC__ >= 7					// valid GNU compiler diagnostic ?
-#pragma GCC diagnostic ignored "-Wimplicit-fallthrough"	// Mute g++-7
+#if __GNUC__ >= 7										// valid GNU compiler diagnostic ?
+#pragma GCC diagnostic ignored "-Wimplicit-fallthrough"	// Mute g++
 #endif // __GNUC__ >= 7
 
-#define CACHE_ALIGN 128
+#define CACHE_ALIGN 128									// Intel recommendation
 #define CALIGN __attribute__(( aligned (CACHE_ALIGN) ))
 
 #define LIKELY(x)   __builtin_expect(!!(x), 1)
@@ -66,9 +70,42 @@
 	#error unsupported architecture
 #endif
 
+static uint64_t Mix64( uint64_t v ) {
+	static const int64_t Mix64K = 0xdaba0b6eb09322e3LL;
+	v = (v ^ (v >> 32)) * Mix64K;
+	v = (v ^ (v >> 32)) * Mix64K;
+	return v ^ (v >> 32);
+} // Mix64
+
+// Marsaglia shift-XOR PRNG with thread-local state
+// Period is 4G-1
+// 0 is absorbing and must be avoided
+// Low-order bits are not particularly random
+// Self-seeding based on address of thread-local state
+// Not reproducible run-to-run because of user-mode address space randomization
+// Pipelined to allow OoO overlap with reduced dependencies
+// Critically, we return the current value, and compute and store the next value
+// Optionally, we might sequester R on its own cache line to avoid false sharing
+// but on linux __thread "initial-exec" TLS variables are already segregated.
+
+static __attribute__(( unused )) uint32_t ThreadLocalRandom() {
+	static __thread uint32_t R = 0;
+	if (R == 0) R = Mix64 ((uint64_t)(uintptr_t)&R) | 1;
+	uint32_t v = R;
+	uint32_t n = v;
+	n ^= n << 6;
+	n ^= n >> 21;
+	n ^= n << 7;
+	R = n;
+	return v;
+} // ThreadLocalRandom
+
 // pause to prevent excess processor bus usage
-#if defined(__i386) || defined(__x86_64)
+#if defined( __i386 ) || defined( __x86_64 )
 	#define Pause() __asm__ __volatile__ ( "pause" : : : )
+//	#define Delay() for ( int i = random() & (512 - 1); i < 1000; i += 1 ) Pause()
+//	#define Delay() { for ( uint32_t r = (ThreadLocalRandom() & ( (1<<16) - 1)) + ((1<<16) - 1); r >= 8; r -= 8 ) { Pause(); Pause(); Pause(); Pause(); Pause(); Pause(); Pause(); Pause(); } }
+//	#define Delay() { for ( uint32_t r = 1 << (((ThreadLocalRandom() & (1<<4)) - 1) + 3); r >= 8; r -= 8 ) { Pause(); Pause(); Pause(); Pause(); Pause(); Pause(); Pause(); Pause(); } }
 #elif defined(__ARM_ARCH)
 	#define Pause() __asm__ __volatile__ ( "YIELD" ::: )
 #else
@@ -82,11 +119,7 @@
 
 typedef uintptr_t TYPE;									// addressable word-size
 typedef volatile TYPE VTYPE;							// volatile addressable word-size
-#ifdef __clang__
-typedef _Atomic TYPE ATYPE;								// atomic shared data
-#else
 typedef VTYPE ATYPE;									// volatile addressable word-size
-#endif // __clang__
 
 enum { RUNS = 5 };
 
@@ -117,27 +150,14 @@ static __attribute__(( unused )) inline int Clog2( int n ) { // integer ceil( lo
 
 //------------------------------------------------------------------------------
 
-// Because of the race on the shared variable CurrTid, it is possible to get false negatives, that is, miss mutual
-// exclusion violations.  The assignment to CurrTid can delay in a store buffer, that is, committed but not pushed into
-// coherent space, so subsequent loads in the loop fetch the value from the store buffer via look aside instead of the
-// coherent version.  If this scenario occurs for multiple threads in the CS, these threads do not detect the violation
-// because their copy of CurrTid in the store buffer is unchanged.  The fence after the assignment of CurrTid guarantees
-// seeing a coherent value because the store to coherent space has occurred before any subsequent loads.  Hence, the
-// loads in the loop either see the value just stored or the value stored by another thread, which is sufficient to
-// detect violation of mutual exclusion.
+#ifdef CNT
+struct CALIGN cnts {
+	uint64_t cnts[CNT + 1];
+};
+static struct cnts ** counters CALIGN;
+#endif // CNT
 
-static inline void CriticalSection( const TYPE id ) {
-	static VTYPE CurrTid CALIGN;						// shared, current thread id in critical section
-
-	CurrTid = id;
-	Fence();											// optional
-	for ( int i = 1; i <= 100; i += 1 ) {				// delay
-		if ( CurrTid != id ) {							// mutual exclusion violation ?
-			printf( "Interference Id:%zu\n", id );
-			abort();
-		} // if
-	} // for
-} // CriticalSection
+volatile int Run CALIGN = 0;
 
 //------------------------------------------------------------------------------
 
@@ -148,10 +168,57 @@ static intptr_t Degree CALIGN = -1;
 
 //------------------------------------------------------------------------------
 
+// Because of the race on the shared variable CurrTid, it is possible to get false negatives, that is, miss mutual
+// exclusion violations.  The assignment to CurrTid can delay in a store buffer, that is, committed but not pushed into
+// coherent space, so subsequent loads in the loop fetch the value from the store buffer via look aside instead of the
+// coherent version.  If this scenario occurs for multiple threads in the CS, these threads do not detect the violation
+// because their copy of CurrTid in the store buffer is unchanged.  The fence after the assignment of CurrTid guarantees
+// seeing a coherent value because the store to coherent space has occurred before any subsequent loads.  Hence, the
+// loads in the loop either see the value just stored or the value stored by another thread, which is sufficient to
+// detect violation of mutual exclusion.
+
+static TYPE HPAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
+static VTYPE CurrTid CALIGN = ULONG_MAX;				// shared, current thread id in critical section
+static VTYPE TidSum CALIGN;
+static TYPE HPAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
+enum { CSTimes = 50 };
+
+#ifdef NONCS
+static inline void NonCriticalSection( const TYPE id ) {
+	for ( volatile int i = 0; i < 550; i += 1 ); // Spinlock: 200
+	// Fence();											// optional
+	// for ( int i = 1; i <= CSTimes; i += 1 ) {		// delay
+	// 	if ( id == Threads ) {							// mutual exclusion violation ?
+	// 		printf( "Interference Id:%zu\n", id );
+	// 	} // if
+	// } // for
+} // NonCriticalSection
+#endif // NONCS
+
+static inline void CriticalSection( const TYPE tid ) {
+#ifdef CNT
+	if ( UNLIKELY( CurrTid == tid ) ) {
+		counters[Run][tid].cnts[0] += 1;
+	} //if
+#endif // CNT
+	CurrTid = tid;
+	for ( int delay = 0; delay < CSTimes; delay += 1 ) { // delay
+		// If the critical section is violated, the additions to TidSum are corrupted because of the load/store race
+		// unless there is perfect interleaving.
+		TidSum += tid; // tid == 0 produces zero sum but only 1 thread => no violation
+		if ( CurrTid != tid ) {							// mutual exclusion violation ?
+			printf( "Interference Id:%zu\n", tid );
+			abort();
+		} // if
+	} // for
+} // CriticalSection
+
+//------------------------------------------------------------------------------
+
 #ifdef FAST
 enum { MaxStartPoints = 64 };
 static unsigned int NoStartPoints CALIGN;
-static unsigned int * Startpoints CALIGN;
+static uint64_t * Startpoints CALIGN;
 
 // To ensure the single thread exercises all aspects of an algorithm, it is assigned different start-points on each
 // access to the critical section by randomly changing its thread id.  The randomness is accomplished using
@@ -199,70 +266,70 @@ static inline unsigned int startpoint( unsigned int pos ) {
 // All threads are explicitly and intentionally quiesced while changing concurrency levels to increase the frequency at
 // which the lock shifts between contended and uncontended states.  Specifically, concurrency shifts from M to 0 to N
 // instead of from M to N.
-// 
+//
 // We expect "Threads" to remain stable - Should be a stationary field.  When the barrier is operating BVO VStress != 0,
 // Threads serves as a bound on concurrency.  The actual concurrency level at any given time will be in [1,Threads].
 // Arrive() respects the Halt flag.
 
 #ifdef STRESSINTERVAL
 static int StressInterval CALIGN = STRESSINTERVAL;		// 500 is good
-static volatile int BarHalt CALIGN = 0; 
+static volatile int BarHalt CALIGN = 0;
 
 static int __attribute__((noinline)) PollBarrier() {
-  if ( BarHalt == 0 ) return 0; 
+  if ( BarHalt == 0 ) return 0;
 	// singleton barrier instance state
-	static volatile int Ticket = 0;  
-	static volatile int Grant  = 0; 
-	static volatile int Gate   = 0; 
-	static volatile int nrun   = 0; 
-	static const int Verbose   = 1; 
+	static volatile int Ticket = 0;
+	static volatile int Grant  = 0;
+	static volatile int Gate   = 0;
+	static volatile int nrun   = 0;
+	static const int Verbose   = 1;
 
-	static int ConcurrencyLevel = 0; 
+	static int ConcurrencyLevel = 0;
 
 	// We have distinct non-overlapping arrival and draining/departure phases
 	// Lead threads waits inside CS for quorum
 	// Follower threads wait at entry to CS on ticket lock
-	// XXX ASSERT (Threads > 0); 
-	int t = __sync_fetch_and_add (&Ticket, 1); 
-	while ( Grant != t ) Pause(); 
+	// XXX ASSERT (Threads > 0);
+	int t = __sync_fetch_and_add (&Ticket, 1);
+	while ( Grant != t ) Pause();
 
-	if ( Gate == 0 ) { 
+	if ( Gate == 0 ) {
 		// Wait for full quorum
-		while ( (Ticket - t) != Threads ) Pause(); 
+		while ( (Ticket - t) != Threads ) Pause();
 		// Compute new/next concurrency level - cohort
 		// Consider biasing PRNG to favor 1 to more frequently alternate contended
-		// and uncontended modes.  
+		// and uncontended modes.
 		// Release a subset of the captured threads
 		// We expect the formation of the subsets to be effectively random,
 		// but if that's not the case we can use per-thread flags and explicitly
-		// select a random subset for the next epoch. 
-		if ( (rand() % 10) == 0 ) { 
-			Gate = 1; 
-		} else { 
-			Gate = (rand() % Threads) + 1; 
+		// select a random subset for the next epoch.
+		if ( (rand() % 10) == 0 ) {
+			Gate = 1;
+		} else {
+			Gate = (rand() % Threads) + 1;
 		}
-		ConcurrencyLevel = Gate; 
+		ConcurrencyLevel = Gate;
 		if ( Verbose ) printf ("L%d", Gate);
-		// XXX ASSERT (Gate > 0); 
-		// XXX ASSERT (BarHalt != 0); 
-		BarHalt = 0; 
-		nrun = 0; 
+		// XXX ASSERT (Gate > 0);
+		// XXX ASSERT (BarHalt != 0);
+		BarHalt = 0;
+		nrun = 0;
 	} // if
 
 	// Consider : shift Verbose printing to after incrementing Grant
-	if ( Verbose ) { 
+	if ( Verbose ) {
 		int k = __sync_fetch_and_add( &nrun, 1 );
 		if ( k == (ConcurrencyLevel-1) ) printf( "; " );
 		if ( k >= ConcurrencyLevel ) printf( "?" );
 	} // if
 
-	Gate -= 1; 
+	Gate -= 1;
 	// Need ST-ST barrier here
 	// Release ticket lock
-	Grant += 1; 
+	Grant += 1;
 
 	// Consider a randomized delay here ...
-	return 0; 
+	return 0;
 } // PollBarrier
 #endif // STRESSINTERVAL
 
@@ -290,13 +357,28 @@ void affinity( pthread_t pthreadid, unsigned int tid ) {
 	cpu = cpus[tid] + 32;
 #endif // 0
 #if 1
-#ifdef FAST
-	enum { OFFSET = 35 };								// random CPU in upper range
-#else
-	enum { OFFSET = 32 };								// upper range of cores away from core 0
-#endif // FAST
+#if defined( nasus )
+	enum { OFFSET = 64 };
+#elif defined( c4arm )
+	enum { OFFSET = 48 };
+#elif defined( jax )
+	enum { OFFSET = 24, PACKAGE = 24 };
+#elif defined( cfapi1 )
+	enum { OFFSET = 0 };
+#else // default
+	enum { OFFSET = 32 };
+#endif // HOSTS
+
 	cpu = tid + OFFSET;
 #endif // 0
+
+#ifdef nasus
+//	cpu = (tid < OFFSET) ? cpu : cpu + (192 - OFFSET);
+#endif // nasus
+#ifdef jax
+	cpu = (tid < PACKAGE) ? cpu : cpu + (96 - PACKAGE);
+#endif // jax
+
 	//printf( "%d\n", cpu );
 	CPU_SET( cpu, &mask );
 	int rc = pthread_setaffinity_np( pthreadid, sizeof(cpu_set_t), &mask );
@@ -312,16 +394,13 @@ void affinity( pthread_t pthreadid, unsigned int tid ) {
 
 static uint64_t ** entries CALIGN;						// holds CS entry results for each threads for all runs
 
-#ifdef CNT
-struct cnts {
-	uint64_t cnts[CNT + 1];
-};
-static struct cnts ** counters CALIGN;
-#endif // CNT
-
 #define xstr(s) str(s)
 #define str(s) #s
+#ifdef __cplusplus
+#include xstr(Algorithm.cc)								// include software algorithm for testing
+#else
 #include xstr(Algorithm.c)								// include software algorithm for testing
+#endif // __cplusplus
 
 //------------------------------------------------------------------------------
 
@@ -368,7 +447,22 @@ int main( int argc, char * argv[] ) {
 		exit( EXIT_FAILURE );
 	} // switch
 
-	printf( "%ju %jd ", N, Time );
+#ifdef CFMT
+	#define COMMA "'13"
+	setlocale( LC_NUMERIC, "en_US.UTF-8" );
+
+	if ( N == 1 ) printf( "%s"
+	#ifdef __cplusplus
+						  ".cc"
+	#else
+						  ".c"
+	#endif // __cplusplus
+						  "\n  N   T    CS Entries           AVG           STD   RSTD   CAVG        SMALLS\n", xstr(Algorithm) );
+#else
+	#define COMMA ""
+#endif // CFMT
+
+	printf( "%3ju %3jd ", N, Time );
 
 #ifdef FAST
 	assert( N <= MaxStartPoints );
@@ -381,23 +475,23 @@ int main( int argc, char * argv[] ) {
 	//N = 32;
 #endif // FAST
 
-	entries = malloc( sizeof(typeof(entries[0])) * RUNS );
+	entries = (typeof(entries[0]) *)malloc( sizeof(typeof(entries[0])) * RUNS );
 #ifdef CNT
-	counters = malloc( sizeof(typeof(counters[0])) * RUNS );
+	counters = (typeof(counters[0]) *)malloc( sizeof(typeof(counters[0])) * RUNS );
 #endif // CNT
 	for ( int r = 0; r < RUNS; r += 1 ) {
-		entries[r] = Allocator( sizeof(typeof(entries[0][0])) * Threads );
+		entries[r] = (typeof(entries[0][0]) *)Allocator( sizeof(typeof(entries[0][0])) * Threads );
 #ifdef CNT
 #ifdef FAST
-		counters[r] = Allocator( sizeof(typeof(counters[0][0])) * N );
+		counters[r] = (typeof(counters[0][0]) *)Allocator( sizeof(typeof(counters[0][0])) * N );
 #else
-		counters[r] = Allocator( sizeof(typeof(counters[0][0])) * Threads );
+		counters[r] = (typeof(counters[0][0]) *)Allocator( sizeof(typeof(counters[0][0])) * Threads );
 #endif // FAST
 #endif // CNT
 	} // for
 
 #ifdef CNT
-#ifdef FAST
+//#ifdef FAST
 	// For FAST experiments, there is only thread but it changes its thread id to visit all the start points. Therefore,
 	// all the counters for each id must be initialized and summed at the end.
 	for ( int r = 0; r < RUNS; r += 1 ) {
@@ -407,19 +501,23 @@ int main( int argc, char * argv[] ) {
 			} // for
 		} // for
 	} // for
-#endif // FAST
+//#endif // FAST
 #endif // CNT
 
 	unsigned int set[Threads];
-	for ( uintptr_t i = 0; i < Threads; i += 1 ) set[ i ] = i;
-	//srand( getpid() );
-	//shuffle( set, Threads );							// randomize thread ids
+	for ( typeof(Threads) i = 0; i < Threads; i += 1 ) set[ i ] = i;
+	// srand( getpid() );
+	// shuffle( set, Threads );							// randomize thread ids
+#ifdef DEBUG
+	printf( "\nthread set: " );
+	for ( uintptr_t i = 0; i < Threads; i += 1 ) printf( "%u ", set[ i ] );
+#endif // DEBUG
 
 	ctor();												// global algorithm constructor
 
 	pthread_t workers[Threads];
 
-	for ( uintptr_t tid = 0; tid < Threads; tid += 1 ) { // start workers
+	for ( typeof(Threads) tid = 0; tid < Threads; tid += 1 ) { // start workers
 		int rc = pthread_create( &workers[tid], NULL, Worker, (void *)(size_t)set[tid] );
 		if ( rc != 0 ) {
 			errno = rc;
@@ -437,23 +535,40 @@ int main( int argc, char * argv[] ) {
 			"The program runs indefinitely in this mode.\n"
 			"Performance data has no meaning, and should not be reported or collected!\n",
 			Threads, StressInterval );
-	for ( ;; ) { 
-		poll( NULL, 0, StressInterval ); 
-		BarHalt = 1; 
+	for ( ;; ) {
+		poll( NULL, 0, StressInterval );
+		BarHalt = 1;
 	} // for
 #else
-	for ( int r = 0; r < RUNS; r += 1 ) {
+	for ( ; Run < RUNS;  ) {							// global variable
 		// threads start first experiment immediately
 		sleep( Time );									// delay for experiment duration
 		//poll( NULL, 0, Time * 1000 );
 		stop = 1;										// stop threads
 		while ( Arrived != Threads ) Pause();			// all threads stopped ?
+
+		// alternate check for critical-section violation
+		TYPE checkSum = 0;
+		for ( typeof(N) id = 0; id < N; id += 1 ) {
+			checkSum += id * entries[Run][id];
+		} // for
+		checkSum *= CSTimes;
+		//printf( "TidSum %" COMMA "ju checkSum:%" COMMA "ju\n", TidSum, checkSum );
+		if ( TidSum != checkSum ) {
+			printf( "Interference TidSum %" COMMA "ju checkSum:%"  COMMA "ju\n", TidSum, checkSum );
+			abort();
+		} // if
+
+		CurrTid = ULONG_MAX;							// reset for next run
+		TidSum = 0;
+
+		Run += 1;
 		stop = 0;										// start threads
 		while ( Arrived != 0 ) Pause();					// all threads started ?
 	} // for
 #endif // STRESSINTERVAL
 
-	for ( uintptr_t tid = 0; tid < Threads; tid += 1 ) { // terminate workers
+	for ( typeof(Threads) tid = 0; tid < Threads; tid += 1 ) { // terminate workers
 		int rc = pthread_join( workers[tid], NULL );
 		if ( rc != 0 ) {
 			errno = rc;
@@ -464,17 +579,18 @@ int main( int argc, char * argv[] ) {
 
 	dtor();												// global algorithm destructor
 
-	uint64_t totals[RUNS], sort[RUNS];
+	uint64_t totals[RUNS], sort[RUNS], smalls[RUNS];
 
 #ifdef DEBUG
 	printf( "\n" );
 #endif // DEBUG
 	for ( int r = 0; r < RUNS; r += 1 ) {
-		totals[r] = 0;
-		for ( uintptr_t tid = 0; tid < Threads; tid += 1 ) {
+		smalls[r] = totals[r] = 0;
+		for ( typeof(Threads) tid = 0; tid < Threads; tid += 1 ) {
+			if ( entries[r][tid] <= 5 ) smalls[r] += 1;
 			totals[r] += entries[r][tid];
 #ifdef DEBUG
-			printf( "%ju ", entries[r][tid] );
+			printf( "%" COMMA "ju ", entries[r][tid] );
 #endif // DEBUG
 		} // for
 #ifdef DEBUG
@@ -484,34 +600,55 @@ int main( int argc, char * argv[] ) {
 	} // for
 	qsort( sort, RUNS, sizeof(typeof(sort[0])), compare );
 	uint64_t med = median( sort );
-	printf( "%ju", med );								// median round
+	printf( "%" COMMA "ju", med );						// median round
 
 	unsigned int posn;									// run with median result
 	for ( posn = 0; posn < RUNS && totals[posn] != med; posn += 1 ); // assumes RUNS is odd
 #ifdef DEBUG
 	printf( "\ntotals: " );
 	for ( int i = 0; i < RUNS; i += 1 ) {				// print values
-		printf( "%ju ", totals[i] );
+		printf( "%" COMMA "ju ", totals[i] );
 	} // for
 	printf( "\nsorted: " );
 	for ( int i = 0; i < RUNS; i += 1 ) {				// print values
-		printf( "%ju ", sort[i] );
+		printf( "%" COMMA "ju ", sort[i] );
 	} // for
 	printf( "\nmedian posn:%d\n", posn );
 #endif // DEBUG
 	double avg = (double)totals[posn] / Threads;		// average
 	double sum = 0.0;
-	for ( uintptr_t tid = 0; tid < Threads; tid += 1 ) { // sum squared differences from average
+	for ( typeof(Threads) tid = 0; tid < Threads; tid += 1 ) { // sum squared differences from average
 		double diff = entries[posn][tid] - avg;
 		sum += diff * diff;
 	} // for
 	double std = sqrt( sum / Threads );
-	printf( " %.1f %.1f %.1f%%", avg, std, avg == 0 ? 0.0 : std / avg * 100 );
+	printf( " %" COMMA ".1f %" COMMA ".1f %5.1f%%", avg, std, avg == 0 ? 0.0 : std / avg * 100 );
+
+
+#if 0
+#ifdef CNT
+	printf( "\n\n" );
+	uint64_t cntsum2;
+	for ( unsigned int r = 0; r < RUNS; r += 1 ) {
+		cntsum2 = 0;
+#ifdef FAST
+		for ( uintptr_t tid = 0; tid < N; tid += 1 ) {
+#else
+		for ( uintptr_t tid = 0; tid < Threads; tid += 1 ) {
+			cntsum2 += counters[r][tid].cnts[0];
+#endif // FAST
+			printf( "%" COMMA "ju ", counters[r][tid].cnts[0] );
+		} // for
+		printf( "= %lu\n", cntsum2 );
+	} // for
+	printf( "\n" );
+#endif // CNT
+#endif // 0
+
 
 #ifdef CNT
 	// posn is the run containing the median result. Other runs are ignored.
 	uint64_t cntsum;
-	printf( "\n" );
 	for ( unsigned int i = 0; i < CNT + 1; i += 1 ) {
 		cntsum = 0;
 #ifdef FAST
@@ -521,9 +658,11 @@ int main( int argc, char * argv[] ) {
 #endif // FAST
 			cntsum += counters[posn][tid].cnts[i];
 		} // for
-		printf( "%ju ", cntsum );
+		printf( " %5.1f%%", (double)cntsum / (double)totals[posn] * 100.0 );
 	} // for
 #endif // CNT
+
+	printf( " %" COMMA "ju", smalls[posn] );
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		free( entries[r] );
@@ -534,6 +673,7 @@ int main( int argc, char * argv[] ) {
 #ifdef CNT
 	free( counters );
 #endif // CNT
+
 	free( entries );
 
 #ifdef FAST
