@@ -70,7 +70,28 @@
 	#error unsupported architecture
 #endif
 
-static uint64_t Mix64( uint64_t v ) {
+// pause to prevent excess processor bus usage
+#if defined( __i386 ) || defined( __x86_64 )
+	#define Pause() __asm__ __volatile__ ( "pause" : : : )
+//	#define Delay() for ( int i = random() & (512 - 1); i < 1000; i += 1 ) Pause()
+//	#define Delay() { for ( uint32_t r = (ThreadLocalRandom() & ( (1<<16) - 1)) + ((1<<16) - 1); r >= 8; r -= 8 ) { Pause(); Pause(); Pause(); Pause(); Pause(); Pause(); Pause(); Pause(); } }
+//	#define Delay() { for ( uint32_t r = 1 << (((ThreadLocalRandom() & (1<<4)) - 1) + 3); r >= 8; r -= 8 ) { Pause(); Pause(); Pause(); Pause(); Pause(); Pause(); Pause(); Pause(); } }
+#elif defined(__ARM_ARCH)
+	#define Pause() __asm__ __volatile__ ( "YIELD" ::: )
+#else
+	#error unsupported architecture
+#endif
+
+//------------------------------------------------------------------------------
+
+typedef uintptr_t TYPE;									// addressable word-size
+typedef volatile TYPE VTYPE;							// volatile addressable word-size
+typedef VTYPE ATYPE;									// volatile addressable word-size
+typedef uint32_t RTYPE;									// unsigned 32-bit integer
+
+//------------------------------------------------------------------------------
+
+static RTYPE Mix64( uint64_t v ) {
 	static const int64_t Mix64K = 0xdaba0b6eb09322e3LL;
 	v = (v ^ (v >> 32)) * Mix64K;
 	v = (v ^ (v >> 32)) * Mix64K;
@@ -84,15 +105,15 @@ static uint64_t Mix64( uint64_t v ) {
 // Self-seeding based on address of thread-local state
 // Not reproducible run-to-run because of user-mode address space randomization
 // Pipelined to allow OoO overlap with reduced dependencies
-// Critically, we return the current value, and compute and store the next value
-// Optionally, we might sequester R on its own cache line to avoid false sharing
+// Critically, return the current value, and compute and store the next value
+// Optionally, sequester R on its own cache line to avoid false sharing
 // but on linux __thread "initial-exec" TLS variables are already segregated.
 
-static __attribute__(( unused )) uint32_t ThreadLocalRandom() {
-	static __thread uint32_t R = 0;
-	if (R == 0) R = Mix64 ((uint64_t)(uintptr_t)&R) | 1;
-	uint32_t v = R;
-	uint32_t n = v;
+static __attribute__(( unused )) RTYPE ThreadLocalRandom() {
+	static __thread RTYPE R = 0;
+	if ( R == 0 ) R = Mix64( (uint64_t)(uintptr_t)&R ) | 1;
+	RTYPE v = R;
+	RTYPE n = v;
 	n ^= n << 6;
 	n ^= n >> 21;
 	n ^= n << 7;
@@ -100,33 +121,10 @@ static __attribute__(( unused )) uint32_t ThreadLocalRandom() {
 	return v;
 } // ThreadLocalRandom
 
-// pause to prevent excess processor bus usage
-#if defined( __i386 ) || defined( __x86_64 )
-	#define Pause() __asm__ __volatile__ ( "pause" : : : )
-//	#define Delay() for ( int i = random() & (512 - 1); i < 1000; i += 1 ) Pause()
-//	#define Delay() { for ( uint32_t r = (ThreadLocalRandom() & ( (1<<16) - 1)) + ((1<<16) - 1); r >= 8; r -= 8 ) { Pause(); Pause(); Pause(); Pause(); Pause(); Pause(); Pause(); Pause(); } }
-//	#define Delay() { for ( uint32_t r = 1 << (((ThreadLocalRandom() & (1<<4)) - 1) + 3); r >= 8; r -= 8 ) { Pause(); Pause(); Pause(); Pause(); Pause(); Pause(); Pause(); Pause(); } }
-#elif defined(__ARM_ARCH)
-	#define Pause() __asm__ __volatile__ ( "YIELD" ::: )
-#else
-	#error unsupported architecture
-#endif
-
-// memory allocator to align or not align storage
-#define Allocator( size ) memalign( CACHE_ALIGN, (size) )
-
 //------------------------------------------------------------------------------
-
-typedef uintptr_t TYPE;									// addressable word-size
-typedef volatile TYPE VTYPE;							// volatile addressable word-size
-typedef VTYPE ATYPE;									// volatile addressable word-size
-
-enum { RUNS = 5 };
 
 static __attribute__(( unused )) inline TYPE cycleUp( TYPE v, TYPE n ) { return ( ((v) >= (n - 1)) ? 0 : (v + 1) ); }
 static __attribute__(( unused )) inline TYPE cycleDown( TYPE v, TYPE n ) { return ( ((v) <= 0) ? (n - 1) : (v - 1) ); }
-
-//------------------------------------------------------------------------------
 
 #if defined( __GNUC__ )									// GNU gcc compiler ?
 // O(1) polymorphic integer log2, using clz, which returns the number of leading 0-bits, starting at the most
@@ -157,8 +155,6 @@ struct CALIGN cnts {
 static struct cnts ** counters CALIGN;
 #endif // CNT
 
-volatile int Run CALIGN = 0;
-
 //------------------------------------------------------------------------------
 
 static ATYPE stop CALIGN = 0;
@@ -166,26 +162,21 @@ static ATYPE Arrived CALIGN = 0;
 static uintptr_t N CALIGN, Threads CALIGN, Time CALIGN;
 static intptr_t Degree CALIGN = -1;
 
+enum { RUNS = 5 };
+volatile int Run CALIGN = 0;
+
 //------------------------------------------------------------------------------
 
-// Because of the race on the shared variable CurrTid, it is possible to get false negatives, that is, miss mutual
-// exclusion violations.  The assignment to CurrTid can delay in a store buffer, that is, committed but not pushed into
-// coherent space, so subsequent loads in the loop fetch the value from the store buffer via look aside instead of the
-// coherent version.  If this scenario occurs for multiple threads in the CS, these threads do not detect the violation
-// because their copy of CurrTid in the store buffer is unchanged.  The fence after the assignment of CurrTid guarantees
-// seeing a coherent value because the store to coherent space has occurred before any subsequent loads.  Hence, the
-// loads in the loop either see the value just stored or the value stored by another thread, which is sufficient to
-// detect violation of mutual exclusion.
+// memory allocator to align or not align storage
+#define Allocator( size ) memalign( CACHE_ALIGN, (size) )
 
-static TYPE HPAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
-static VTYPE CurrTid CALIGN = ULONG_MAX;				// shared, current thread id in critical section
-static VTYPE TidSum CALIGN;
-static TYPE HPAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
+//------------------------------------------------------------------------------
+
 enum { CSTimes = 50 };
 
 #ifdef NONCS
 static inline void NonCriticalSection( const TYPE id ) {
-	for ( volatile int i = 0; i < 550; i += 1 ); // Spinlock: 200
+	for ( volatile int i = 0; i < 550; i += 1 );		// Spinlock: 200
 	// Fence();											// optional
 	// for ( int i = 1; i <= CSTimes; i += 1 ) {		// delay
 	// 	if ( id == Threads ) {							// mutual exclusion violation ?
@@ -195,22 +186,36 @@ static inline void NonCriticalSection( const TYPE id ) {
 } // NonCriticalSection
 #endif // NONCS
 
-static inline void CriticalSection( const TYPE tid ) {
-#ifdef CNT
-	if ( UNLIKELY( CurrTid == tid ) ) {
-		counters[Run][tid].cnts[0] += 1;
-	} //if
-#endif // CNT
+static TYPE HPAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
+static volatile RTYPE randomChecksum CALIGN = 0;
+static volatile RTYPE sumOfThreadChecksums CALIGN = 0;
+static VTYPE CurrTid CALIGN = ULONG_MAX;				// shared, current thread id in critical section
+static TYPE HPAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
+
+//static int Identity(int v) { __asm__ __volatile__ (";" : "+r" (v)); return v; } 
+static inline RTYPE CriticalSection( const TYPE tid ) {
+	#ifdef CNT
+	if ( UNLIKELY( CurrTid == tid ) ) counters[Run][tid].cnts[0] += 1;
+	#endif // CNT
 	CurrTid = tid;
-	for ( int delay = 0; delay < CSTimes; delay += 1 ) { // delay
-		// If the critical section is violated, the additions to TidSum are corrupted because of the load/store race
-		// unless there is perfect interleaving.
-		TidSum += tid; // tid == 0 produces zero sum but only 1 thread => no violation
-		if ( CurrTid != tid ) {							// mutual exclusion violation ?
-			printf( "Interference Id:%zu\n", tid );
-			abort();
-		} // if
-	} // for
+
+	// If the critical section is violated, the additions are corrupted because of the load/store race unless there is
+	// perfect interleaving. Note, the load, delay, store to increase the cchance of detecting a violation.
+	RTYPE randomNumber = ThreadLocalRandom();			// belt and
+	volatile RTYPE copy = randomChecksum;
+	for ( volatile int delay = 0; delay < CSTimes; delay += 1 ) {} // delay
+	randomChecksum = copy + randomNumber;
+
+	// The assignment to CurrTid above can delay in a store buffer, that is, committed but not pushed into coherent
+	// space. Hence, the load below fetchs the value from the store buffer via look aside instead of the coherent
+	// version.  If this scenario occurs for multiple threads in the CS, these threads do not detect the violation
+	// because their copy of CurrTid in the store buffer is unchanged.
+	if ( CurrTid != tid ) {								// suspenders
+		printf( "Interference Id:%zu\n", tid );
+		abort();
+	} // if
+
+	return randomNumber;
 } // CriticalSection
 
 //------------------------------------------------------------------------------
@@ -229,7 +234,7 @@ static uint64_t * Startpoints CALIGN;
 
 void startpoints() {
 	Startpoints[0] = N;
-	for ( unsigned int i = 0; i < NoStartPoints; i += N ) {
+ 	for ( unsigned int i = 0; i < NoStartPoints; i += N ) {
 		for ( unsigned int j = i; j < i + N; j += 1 ) {
 			unsigned int v;
 		  L: v = rand() % N;
@@ -344,40 +349,28 @@ void affinity( pthread_t pthreadid, unsigned int tid ) {
 
 	CPU_ZERO( &mask );
 	int cpu;
+
 #if 0
 	// 4x8x2 : 4 sockets, 8 cores per socket, 2 hyperthreads per core
 	cpu = (tid & 0x30) | ((tid & 1) << 3) | ((tid & 0xE) >> 1) + 32;
 #endif // 0
-#if 0
-	static int cpus[] = { 0, 2, 4, 6, 8, 10, 12, 14,
-						  1, 3, 5, 7, 9, 11, 13, 15,
-						  16, 18, 20, 22, 24, 26, 28, 30,
-						  17, 19, 21, 23, 25, 27, 29, 31,
-	}; // cpus
-	cpu = cpus[tid] + 32;
-#endif // 0
+
 #if 1
-#if defined( nasus )
-	enum { OFFSET = 64 };
-#elif defined( c4arm )
-	enum { OFFSET = 48 };
+#if defined( c4arm )
+	enum { OFFSETSOCK = 1 /* 0 origin */, SOCKET = 2, CORES = 48, HYPER = 1 };
+#elif defined( nasus )
+	enum { OFFSETSOCK = 1 /* 0 origin */, SOCKET = 2, CORES = 64, HYPER = 1 };
 #elif defined( jax )
-	enum { OFFSET = 24, PACKAGE = 24 };
+	enum { OFFSETSOCK = 1 /* 0 origin */, SOCKET = 4, CORES = 24, HYPER = 2 /*wrap */ };
+#elif defined( pyke )
+	enum { OFFSETSOCK = 1 /* 0 origin */, SOCKET = 2, CORES = 24, HYPER = 2 /*wrap */ };
 #elif defined( cfapi1 )
-	enum { OFFSET = 0 };
+	enum { OFFSETSOCK = 0 /* 0 origin */, SOCKET = 1, CORES = 4, HYPER = 1 };
 #else // default
-	enum { OFFSET = 32 };
+	enum { OFFSETSOCK = 2 /* 0 origin */, SOCKET = 4, CORES = 16, HYPER = 1 };
 #endif // HOSTS
-
-	cpu = tid + OFFSET;
+	cpu = tid + ((tid < CORES) ? OFFSETSOCK * CORES : HYPER < 2 ? OFFSETSOCK * CORES : CORES * SOCKET);
 #endif // 0
-
-#ifdef nasus
-//	cpu = (tid < OFFSET) ? cpu : cpu + (192 - OFFSET);
-#endif // nasus
-#ifdef jax
-	cpu = (tid < PACKAGE) ? cpu : cpu + (96 - PACKAGE);
-#endif // jax
 
 	//printf( "%d\n", cpu );
 	CPU_SET( cpu, &mask );
@@ -472,7 +465,6 @@ int main( int argc, char * argv[] ) {
 	startpoints( N );
 #else
 	Threads = N;										// allow testing of T < N
-	//N = 32;
 #endif // FAST
 
 	entries = (typeof(entries[0]) *)malloc( sizeof(typeof(entries[0])) * RUNS );
@@ -543,24 +535,15 @@ int main( int argc, char * argv[] ) {
 	for ( ; Run < RUNS;  ) {							// global variable
 		// threads start first experiment immediately
 		sleep( Time );									// delay for experiment duration
-		//poll( NULL, 0, Time * 1000 );
 		stop = 1;										// stop threads
 		while ( Arrived != Threads ) Pause();			// all threads stopped ?
 
-		// alternate check for critical-section violation
-		TYPE checkSum = 0;
-		for ( typeof(N) id = 0; id < N; id += 1 ) {
-			checkSum += id * entries[Run][id];
-		} // for
-		checkSum *= CSTimes;
-		//printf( "TidSum %" COMMA "ju checkSum:%" COMMA "ju\n", TidSum, checkSum );
-		if ( TidSum != checkSum ) {
-			printf( "Interference TidSum %" COMMA "ju checkSum:%"  COMMA "ju\n", TidSum, checkSum );
+		if ( randomChecksum != sumOfThreadChecksums ) {
+			printf( "Interference run %d randomChecksum %u sumOfThreadChecksums %u\n", Run, randomChecksum, sumOfThreadChecksums );
 			abort();
 		} // if
-
+		randomChecksum = sumOfThreadChecksums = 0;
 		CurrTid = ULONG_MAX;							// reset for next run
-		TidSum = 0;
 
 		Run += 1;
 		stop = 0;										// start threads
@@ -587,7 +570,7 @@ int main( int argc, char * argv[] ) {
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		smalls[r] = totals[r] = 0;
 		for ( typeof(Threads) tid = 0; tid < Threads; tid += 1 ) {
-			if ( entries[r][tid] <= 5 ) smalls[r] += 1;
+			if ( entries[r][tid] <= 5 ) smalls[r] += 1;	// only 5 entries in CS => small
 			totals[r] += entries[r][tid];
 #ifdef DEBUG
 			printf( "%" COMMA "ju ", entries[r][tid] );

@@ -21,7 +21,9 @@ static void * Worker( void * arg ) {
 	typeof(N) j, t;
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
+		uint32_t randomThreadChecksum = 0;
 		t = 1;
+
 		for ( entry = 0; stop == 0; entry += 1 ) {
 			FCFSTestIntroTop();
 			D[id] = 1;									// phase 1, FCFS
@@ -49,7 +51,7 @@ static void * Worker( void * arg ) {
 			// T[id] = 0;								// original position
 			FCFSTestIntroBot();
 
-			CriticalSection( id );
+			randomThreadChecksum += CriticalSection( id );
 
 			FCFSTestExit();
 			D[id] = 0;									// B-L exit protocol
@@ -61,6 +63,8 @@ static void * Worker( void * arg ) {
 			cnt = cycleUp( cnt, NoStartPoints );
 #endif // FAST
 		} // for
+
+		__sync_fetch_and_add( &sumOfThreadChecksums, randomThreadChecksum );
 
 #ifdef FAST
 		id = oid;
@@ -93,5 +97,5 @@ void __attribute__((noinline)) dtor() {
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=AravindF3 Harness.c -lpthread -lm -DCFMT -DCNT=0" //
+// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=AravindF3 Harness.c -lpthread -lm -D`hostname` -DCFMT -DCNT=0" //
 // End: //

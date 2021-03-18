@@ -12,71 +12,80 @@
 // interesting information.
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
-static volatile TYPE lock CALIGN;						// Intel recommendation
-static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
+static VTYPE lock CALIGN;
+static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
+
+#define await( E ) while ( ! (E) ) Pause()
 
 void spin_lock( volatile TYPE * lock ) {
-#ifndef NOEXPBACK
+	#ifndef NOEXPBACK
 	enum { SPIN_START = 4, SPIN_END = 64 * 1024, };
 	unsigned int spin = SPIN_START;
-#endif // ! NOEXPBACK
+	#endif // ! NOEXPBACK
 
 	for ( unsigned int i = 1;; i += 1 ) {
-	  if ( *lock == 0 && __sync_lock_test_and_set( lock, 1 ) == 0 ) break;
-#ifndef NOEXPBACK
+	  if ( *lock == 0 && __sync_lock_test_and_set( lock, 1 ) == 0 ) break; // Fence
+		#ifndef NOEXPBACK
 		for ( unsigned int s = 0; s < spin; s += 1 ) Pause(); // exponential spin
 		spin += spin;									// powers of 2
 		//if ( i % 64 == 0 ) spin += spin;				// slowly increase by powers of 2
 		if ( spin > SPIN_END ) spin = SPIN_END;			// cap spinning
-#else
+		#else
 	    Pause();
-#endif // ! NOEXPBACK
+		#endif // ! NOEXPBACK
 	} // for
 } // spin_lock
 
 void spin_unlock( volatile TYPE * lock ) {
-	ARM( Fence(); )
-	__sync_lock_release( lock );
+	__sync_lock_release( lock );						// Fence
 } // spin_unlock
 
 static void * Worker( void * arg ) {
 	TYPE id = (size_t)arg;
 	uint64_t entry;
-#ifdef FAST
+
+	#ifdef FAST
 	unsigned int cnt = 0, oid = id;
-#endif // FAST
+	#endif // FAST
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
-		entry = 0;
-		while ( stop == 0 ) {
+		uint32_t randomThreadChecksum = 0;
+
+		for ( entry = 0; stop == 0; entry += 1 ) {
 			spin_lock( &lock );
-			CriticalSection( id );
+
+			randomThreadChecksum += CriticalSection( id );
+
 			spin_unlock( &lock );
-#ifdef FAST
+
+			#ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
 			cnt = cycleUp( cnt, NoStartPoints );
-#endif // FAST
-			entry += 1;
-		} // while
-#ifdef FAST
+			#endif // FAST
+		} // for
+
+		__sync_fetch_and_add( &sumOfThreadChecksums, randomThreadChecksum );
+
+		#ifdef FAST
 		id = oid;
-#endif // FAST
+		#endif // FAST
 		entries[r][id] = entry;
 		__sync_fetch_and_add( &Arrived, 1 );
 		while ( stop != 0 ) Pause();
 		__sync_fetch_and_add( &Arrived, -1 );
 	} // for
+
 	return NULL;
 } // Worker
 
-void ctor() {
+void __attribute__((noinline)) ctor() {
 	lock = 0;
 } // ctor
 
-void dtor() {
+void __attribute__((noinline)) dtor() {
 } // dtor
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=SpinLock Harness.c -lpthread -lm" //
+// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=SpinLock Harness.c -lpthread -lm -D`hostname` -DCFMT -DCNT=0" //
 // End: //

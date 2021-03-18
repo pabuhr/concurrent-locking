@@ -2,21 +2,25 @@
 // Communication Variables, TOPLAS, 13(4), 1991, Fig. 4, p. 569
 // Replaced pairs of bits by the values 0, 1, 2, respectively, and cycle through these values using modulo arithmetic.
 
-static volatile TYPE *c CALIGN, *v CALIGN, *intents CALIGN, *turn CALIGN;
+static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
+static volatile TYPE * c CALIGN, * v CALIGN, * intents CALIGN, * turn CALIGN;
+static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
-static void *Worker( void *arg ) {
+static void * Worker( void * arg ) {
 	TYPE id = (size_t)arg;
 	uint64_t entry;
+
 #ifdef FAST
 	unsigned int cnt = 0, oid = id;
 #endif // FAST
 
 	TYPE copy[N];
-	int j;
+	typeof(N) j;
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
-		entry = 0;
-		while ( stop == 0 ) {
+		uint32_t randomThreadChecksum = 0;
+
+		for ( entry = 0; stop == 0; entry += 1 ) {
 			c[id] = 1;									// stage 1, establish FCFS
 			Fence();									// force store before more loads
 			for ( j = 0; j < N; j += 1 )				// copy turn values
@@ -39,14 +43,22 @@ static void *Worker( void *arg ) {
 				} // if
 			for ( j = id + 1; j < N; j += 1 )			// stage 3, low priority search
 				while ( intents[j] != 0 ) Pause();
-			CriticalSection( id );
+			WO( Fence(); );
+
+			randomThreadChecksum += CriticalSection( id );
+
+			WO( Fence(); );
 			v[id] = intents[id] = 0;					// exit protocol
+			WO( Fence(); );
+
 #ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
 			cnt = cycleUp( cnt, NoStartPoints );
 #endif // FAST
-			entry += 1;
-		} // while
+		} // for
+
+		__sync_fetch_and_add( &sumOfThreadChecksums, randomThreadChecksum );
+
 #ifdef FAST
 		id = oid;
 #endif // FAST
@@ -58,17 +70,17 @@ static void *Worker( void *arg ) {
 	return NULL;
 } // Worker
 
-void ctor() {
+void __attribute__((noinline)) ctor() {
 	c = Allocator( sizeof(typeof(c[0])) * N );
 	v = Allocator( sizeof(typeof(v[0])) * N );
 	intents = Allocator( sizeof(typeof(intents[0])) * N );
 	turn = Allocator( sizeof(typeof(turn[0])) * N );
-	for ( int i = 0; i < N; i += 1 ) {
+	for ( typeof(N) i = 0; i < N; i += 1 ) {
 		c[i] = v[i] = intents[i] = turn[i] = 0;
 	} // for
 } // ctor
 
-void dtor() {
+void __attribute__((noinline)) dtor() {
 	free( (void *)turn );
 	free( (void *)intents );
 	free( (void *)v );
@@ -77,5 +89,5 @@ void dtor() {
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=LycklamaBuhr Harness.c -lpthread -lm" //
+// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=LycklamaBuhr Harness.c -lpthread -lm -D`hostname` -DCFMT -DCNT=0" //
 // End: //

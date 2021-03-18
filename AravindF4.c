@@ -17,7 +17,9 @@ static void * Worker( void * arg ) {
 	typeof(N) j, bit;
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
+		uint32_t randomThreadChecksum = 0;
 		bit = 0;
+
 		for ( entry = 0; stop == 0; entry += 1 ) {
 			D[id] = 1;
 			Fence();									// force store before more loads
@@ -49,7 +51,7 @@ static void * Worker( void * arg ) {
 			for ( j = 0; j < N; j += 1 )
 				while ( D[j] != 0 ) Pause();
 
-			CriticalSection( id );
+			randomThreadChecksum += CriticalSection( id );
 
 			X[id] = 0;
 			bit = ! bit;
@@ -59,6 +61,8 @@ static void * Worker( void * arg ) {
 			cnt = cycleUp( cnt, NoStartPoints );
 #endif // FAST
 		} // for
+
+		__sync_fetch_and_add( &sumOfThreadChecksums, randomThreadChecksum );
 
 #ifdef FAST
 		id = oid;
@@ -95,5 +99,5 @@ void __attribute__((noinline)) dtor() {
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -Wextra -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=AravindF4 Harness.c -lpthread -lm" //
+// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=AravindF4 Harness.c -lpthread -lm -D`hostname` -DCFMT -DCNT=0" //
 // End: //

@@ -1,4 +1,4 @@
-static volatile TYPE *intents, *serving;				// shared
+static volatile TYPE * intents, * serving;				// shared
 static volatile TYPE arbiter_stop = 0;
 static pthread_t arbiter;
 
@@ -6,7 +6,7 @@ static pthread_t arbiter;
 // 0.  It cannot reclaim CS until the arbiter has resumed its activity by exiting from while, and entering for.  There
 // it advances to the next id, and cycles through the other workers, before it can reach id again.
 
-static void *Worker( void *arg ) {
+static void * Worker( void * arg ) {
 	TYPE id = (size_t)arg;
 	uint64_t entry;
 #ifdef FAST
@@ -14,20 +14,24 @@ static void *Worker( void *arg ) {
 #endif // FAST
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
-		entry = 0;
-		while ( stop == 0 ) {
+		uint32_t randomThreadChecksum = 0;
 
+		for ( entry = 0; stop == 0; entry += 1 ) {
 			intents[id] = 1;							// entry protocol
 			while ( serving[id] == 0 ) Pause();			// busy wait
-			CriticalSection( id );
+
+			randomThreadChecksum += CriticalSection( id );
+
 			serving[id] = 0;							// exit protocol
 
 #ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
 			cnt = cycleUp( cnt, NoStartPoints );
 #endif // FAST
-			entry += 1;
-		} // while
+		} // for
+
+		__sync_fetch_and_add( &sumOfThreadChecksums, randomThreadChecksum );
+
 #ifdef FAST
 		id = oid;
 #endif // FAST
@@ -39,7 +43,7 @@ static void *Worker( void *arg ) {
 	return NULL;
 } // Worker
 
-void *Arbiter( void *arg ) {
+void * Arbiter( void * arg __attribute__((unused)) ) {
 	int id = N;											// force cycle to start at id=0
 	for ( ;; ) {
 		for ( ;; ) {									// circular search => no starvation
@@ -56,17 +60,17 @@ void *Arbiter( void *arg ) {
 	return NULL;
 } // Arbiter
 
-void ctor() {
+void __attribute__((noinline)) ctor() {
 	intents = Allocator( sizeof(typeof(intents[0])) * N );
 	serving = Allocator( sizeof(typeof(serving[0])) * N );
-	for ( int i = 0; i < N; i += 1 ) {					// initialize shared data
+	for ( typeof(N) i = 0; i < N; i += 1 ) {					// initialize shared data
 		intents[i] = serving[i] = 0;
 	} // for
 
 	if ( pthread_create( &arbiter, NULL, Arbiter, NULL ) != 0 ) abort();
 } // ctor
 
-void dtor() {
+void __attribute__((noinline)) dtor() {
 	arbiter_stop = 1;
 	if ( pthread_join( arbiter, NULL ) != 0 ) abort();
 
@@ -76,5 +80,5 @@ void dtor() {
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=Arbiter Harness.c -lpthread -lm" //
+// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=Arbiter Harness.c -lpthread -lm -D`hostname` -DCFMT -DCNT=0" //
 // End: //

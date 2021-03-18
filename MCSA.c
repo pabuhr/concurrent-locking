@@ -2,48 +2,45 @@
 // ACM Transactions on Computer Systems, 9(1), 1991, Fig. 6, p. 30
 
 #include <stdbool.h>
+#include <stdatomic.h>
 
 typedef struct mcs_node {								// cache align node at declaration
-	struct mcs_node * volatile next;
-	volatile TYPE spin;
-} MCS_node, * MCS_lock;
+	_Atomic(struct mcs_node *) next;
+	_Atomic TYPE spin;
+} MCS_node;
+typedef _Atomic(MCS_node *) MCS_lock;
 
 void mcs_lock( MCS_lock * lock, MCS_node * node ) {
 	MCS_node * pred;
 	node->next = NULL;
 	// node->spin = 1;									// alternative position and remove fence below
-	WO( Fence(); )										// write/write order matters
-	pred = __atomic_exchange_n( lock, node, __ATOMIC_ACQUIRE );
+	pred = atomic_exchange( lock, node );
 
 	if ( FASTPATH( pred != NULL ) ) {					// someone on list ?
 		node->spin = 1;									// mark as waiting
-		WO( Fence(); )									// write/write order matters
 		pred->next = node;								// add to list of waiting threads
 		while ( node->spin == 1 ) Pause();				// busy wait on my spin variable
-		WO( Fence(); )									// read/write order matters
 	} // if
 } // mcs_lock
 
 void mcs_unlock( MCS_lock * lock, MCS_node * node ) {
 #if 0  // original
-	if ( node->next == NULL ) {							// no one waiting ?
+	if ( FASTPATH( node->next == NULL ) ) {				// no one waiting ?
 		MCS_node * temp = node;							// copy because exchange overwrites expected
-  if ( __atomic_compare_exchange_n( lock, &temp, NULL, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST ) ) return; // Fence
+  if ( atomic_compare_exchange_strong( lock, &temp, NULL ) ) return; // Fence
 		while ( node->next == NULL ) Pause();			// busy wait until my node is modified
 	} // if
-	WO( Fence(); )										// read/write order matters
 	node->next->spin = 0;								// stop their busy wait
 #else  // Dice
 	MCS_node * succ = node->next;
 	if ( FASTPATH( succ == NULL ) ) {					// no one waiting ?
 		// node is potentially at the tail of the MCS chain 
 		MCS_node * temp = node;							// copy because exchange overwrites expected
-  if ( __atomic_compare_exchange_n( lock, &temp, NULL, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST ) ) return; // Fence
+  if ( atomic_compare_exchange_strong( lock, &temp, NULL ) ) return; // Fence
 		// Either a new thread arrived in the LD-CAS window above or fetched a false NULL
 		// as the successor has yet to store into node->next.
 		while ( (succ = node->next) == NULL ) Pause();	// busy wait until my node is modified
 	} // if
-	WO( Fence(); )										// read/write order matters
 	succ->spin = 0;
 #endif // 0
 } // mcs_unlock
@@ -100,5 +97,5 @@ void __attribute__((noinline)) dtor() {
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=MCS Harness.c -lpthread -lm -D`hostname` -DCFMT -DCNT=0" //
+// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=MCSA Harness.c -lpthread -lm -D`hostname` -DCFMT -DCNT=0" //
 // End: //

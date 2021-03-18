@@ -8,9 +8,9 @@ volatile TYPE color CALIGN;
 volatile TYPE * cho CALIGN, * pair CALIGN;
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
-#define fn(n, mcol) (1 + (n % 2 == mcol ? n / 2 : 0))
-#define guardA(n, mcol, lev, p, thr) (n / 2 == 0 || n % 2 != mcol || (lev <= n / 2 && (lev < n / 2 || p <= thr))) /* where <= is the lexical order */
-#define guardB(n, mcol) ((n / 2 == 0 || n % 2 == mcol))
+#define fn( n, mcol ) (1 + (n % 2 == mcol ? n / 2 : 0))
+#define guardA( n, mcol, lev, p, thr ) (n / 2 == 0 || n % 2 != mcol || lev < n / 2 || (p <= thr && lev <= n / 2))
+#define guardB( n, mcol ) ((n / 2 == 0 || n % 2 == mcol))
 
 #define max( x, y ) ((x) < (y) ? (y) : (x))
 #define await( E ) while ( ! (E) ) Pause()
@@ -19,52 +19,79 @@ static void * Worker( void * arg ) {
 	TYPE id = (size_t)arg;
 	uint64_t entry;
 
-	TYPE mcol;
-	TYPE lev;
-#ifdef FAST
+	TYPE mcol, lev, v;
+
+	#ifdef FAST
 	unsigned int cnt = 0, oid = id;
-#endif // FAST
+	#endif // FAST
+
+	ATYPE * mycho = &cho[id];							// optimization
+	ATYPE * mypair = &pair[id];
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
+		uint32_t randomThreadChecksum = 0;
+
 		for ( entry = 0; stop == 0; entry += 1 ) {
-			cho[id] = true;
-			mcol = color; lev = 1; 
+			*mycho = true;
 			Fence();
+			mcol = color;
+			lev = 1; 
 			for ( typeof(N) thr = 0; thr < N; thr += 1 ) {
-				if ( thr != id ) lev = max( lev, fn( pair[thr], mcol ) );
-			}
-			pair[id] = 2 * lev + mcol;
-			cho[id] = false;
+				// Macros fn has multiple reads of "n", which must only be read once, so variable pair[thr] is copied
+				// into local variable read "v" preventing multiple reads.
+				if ( thr != id ) {
+					v = pair[thr];
+					lev = max( lev, fn( v, mcol ) );
+				} // if
+			} // for
+			*mypair = 2 * lev + mcol;
+			WO( Fence(); );
+			*mycho = false;
 			Fence();
+
 			for ( typeof(N) thr = 0; thr < N; thr += 1 ) {
 				if ( thr != id ) {
-					await( ! cho[thr] );
-					if ( pair[thr] % 2 == mcol )
-						await( guardA( pair[thr], mcol, lev, id, thr ) );
+					ATYPE * othercho = &cho[thr];		// optimization
+					await( ! *othercho );
+					WO( Fence(); );
+					// Macros guardA and guardB have multiple reads of "n", but each read occurs in an independent
+					// disjunction, where reading different values for each disjunction does not affect correctness.
+					ATYPE * otherpair = &pair[thr];		// optimization
+					if ( *otherpair % 2 == mcol )
+						await( guardA( *otherpair, mcol, lev, id, thr ) );
 					else 
-						await( guardB( pair[thr], mcol ) || color != mcol ); 
-				}  // if
+						await( guardB( *otherpair, mcol ) || color != mcol ); 
+				} // if
 			} // for
+			WO( Fence(); );
 
-			CriticalSection( id );
+			randomThreadChecksum += CriticalSection( id );
 
+			WO( Fence(); );
 			color = 1 - mcol;
-			pair[id] = mcol;
+			WO( Fence(); );
+			*mypair = mcol;
+			WO( Fence(); );
 
-#ifdef FAST
+			#ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
+			mycho = &cho[id];							// optimization
+			mypair = &pair[id];
 			cnt = cycleUp( cnt, NoStartPoints );
-#endif // FAST
+			#endif // FAST
 		} // for
 
-#ifdef FAST
+		__sync_fetch_and_add( &sumOfThreadChecksums, randomThreadChecksum );
+
+		#ifdef FAST
 		id = oid;
-#endif // FAST
+		#endif // FAST
 		entries[r][id] = entry;
 		__sync_fetch_and_add( &Arrived, 1 );
 		while ( stop != 0 ) Pause();
 		__sync_fetch_and_add( &Arrived, -1 );
 	} // for
+
 	return NULL;
 } // Worker
 
@@ -85,5 +112,5 @@ void __attribute__((noinline)) dtor() {
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=TaubenfeldBWBakery Harness.c -lpthread -lm -DCFMT -DCNT=0" //
+// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=HesselinkBWBakery Harness.c -lpthread -lm -D`hostname` -DCFMT -DCNT=0" //
 // End: //

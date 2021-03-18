@@ -9,33 +9,32 @@
 
 #ifdef TB
 
-static volatile TYPE **intents CALIGN;					// triangular matrix of intents
-static volatile TYPE **turns CALIGN;					// triangular matrix of turns
+static volatile TYPE ** intents CALIGN;					// triangular matrix of intents
+static volatile TYPE ** turns CALIGN;					// triangular matrix of turns
 static unsigned int depth CALIGN;
 
 #else
 
 typedef struct CALIGN {
-	Token *ns;											// pointer to path node from leaf to root
+	Token * ns;											// pointer to path node from leaf to root
 	TYPE es;											// left/right opponent
 } Tuple;
 
-static Tuple **states CALIGN;							// handle N threads
-static int *levels CALIGN;								// minimal level for binary tree
+static Tuple ** states CALIGN;							// handle N threads
+static int * levels CALIGN;								// minimal level for binary tree
 //static Tuple states[64][6] CALIGN;						// handle 64 threads with maximal tree depth of 6 nodes (lg 64)
 //static int levels[64] = { -1 } CALIGN;					// minimal level for binary tree
-static Token *t CALIGN;
+static Token * t CALIGN;
 
 #endif // TB
 
 //======================================================
 
-
 static inline void entrySlow(
 #ifdef TB
 	TYPE id
 #else
-	int level, Tuple *state
+	int level, Tuple * state
 #endif // TB
 	) {
 #ifdef TB
@@ -62,7 +61,7 @@ static inline void exitSlow(
 #ifdef TB
 	TYPE id
 #else
-	int level, Tuple *state
+	int level, Tuple * state
 #endif // TB
 	) {
 #ifdef TB
@@ -96,7 +95,7 @@ typedef union {
 
 static volatile TYPE x CALIGN;
 static volatile Atomic y CALIGN, Reset CALIGN;
-static volatile TYPE *Name_Taken, *Obstacle;
+static volatile TYPE * Name_Taken, * Obstacle;
 static volatile TYPE Infast CALIGN;
 static volatile Token B; // = { { 0, 0 }, 0 };
 static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
@@ -106,7 +105,7 @@ static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false shar
 
 static inline void SLOW1( TYPE id
 #ifndef TB
-						  , int level, Tuple *state
+						  , int level, Tuple * state
 #endif // ! TB
 	) {
 	entrySlow(
@@ -131,7 +130,7 @@ static inline void SLOW1( TYPE id
 
 static inline void SLOW2( TYPE id, Atomic y
 #ifndef TB
-						  , int level, Tuple *state
+						  , int level, Tuple * state
 #endif // ! TB
 	) {
 	entrySlow(
@@ -166,7 +165,7 @@ static inline void SLOW2( TYPE id, Atomic y
 } // SLOW2
 
 
-static void *Worker( void *arg ) {
+static void * Worker( void * arg ) {
 	TYPE id = (size_t)arg;
 	uint64_t entry;
 #ifdef FAST
@@ -175,15 +174,15 @@ static void *Worker( void *arg ) {
 
 #ifndef TB
 	int level = levels[id];
-	Tuple *state = states[id];
+	Tuple * state = states[id];
 #endif // ! TB
 
 	Atomic ly;
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
-		entry = 0;
-		while ( stop == 0 ) {
+		uint32_t randomThreadChecksum = 0;
 
+		for ( entry = 0; stop == 0; entry += 1 ) {
 			x = id;
 			Fence();									// force store before more loads
 			ly.atom = y.atom;
@@ -216,7 +215,9 @@ static void *Worker( void *arg ) {
 					} else {
 						Infast = true;
 						binary_prologue( 1, &B );
-						CriticalSection( id );
+
+						randomThreadChecksum += CriticalSection( id );
+
 						Obstacle[id] = false;
 						Reset.atom = (Atomic){ .tuple = { .free = false, .indx = ly.tuple.indx } }.atom;
 						Fence();						// force store before more loads
@@ -238,8 +239,9 @@ static void *Worker( void *arg ) {
 			id = startpoint( cnt );						// different starting point each experiment
 			cnt = cycleUp( cnt, NoStartPoints );
 #endif // FAST
-			entry += 1;
-		} // while
+		} // for
+
+		__sync_fetch_and_add( &sumOfThreadChecksums, randomThreadChecksum );
 
 #ifdef FAST
 		id = oid;
@@ -296,7 +298,7 @@ void __attribute__((noinline)) ctor2() {
 void __attribute__((noinline)) ctor() {
 	Name_Taken = Allocator( sizeof(typeof(Name_Taken[0])) * N );
 	Obstacle = Allocator( sizeof(typeof(Obstacle[0])) * N );
-	for ( int i = 0; i < N; i += 1 ) {					// initialize shared data
+	for ( typeof(N) i = 0; i < N; i += 1 ) {					// initialize shared data
 		Name_Taken[i] = Obstacle[i] = false;
 	} // for
 	y.atom = (Atomic){ .tuple = { .free = true, .indx = 0 } }.atom;
@@ -328,5 +330,5 @@ void __attribute__((noinline)) dtor() {
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=AndersonKim Harness.c -lpthread -lm" //
+// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=AndersonKim Harness.c -lpthread -lm -D`hostname` -DCFMT -DCNT=0" //
 // End: //
