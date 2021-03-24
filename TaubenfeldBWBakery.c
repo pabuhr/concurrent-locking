@@ -5,13 +5,13 @@
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
 typedef enum { black, white } BW;
-volatile BW color CALIGN;
-volatile TYPE * choosing CALIGN;
+static volatile BW color CALIGN;
+static VTYPE * choosing CALIGN;
 typedef struct {
-	BW color;
-	TYPE number;
+	volatile BW color;
+	volatile TYPE number;
 } Ticket;
-static volatile Ticket * ticket CALIGN;
+static Ticket * ticket CALIGN;
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 #define await( E ) while ( ! (E) ) Pause()
@@ -22,12 +22,12 @@ static void * Worker( void * arg ) {
 
 	TYPE mycolor, number;
 
-#ifdef FAST
+	#ifdef FAST
 	unsigned int cnt = 0, oid = id;
-#endif // FAST
+	#endif // FAST
 
-	ATYPE * mychoosing = &choosing[id];					// optimization
-	volatile Ticket * myticket = &ticket[id];
+	typeof(&choosing[0]) mychoosing = &choosing[id];	// optimization
+	typeof(&ticket[0]) myticket = &ticket[id];
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		uint32_t randomThreadChecksum = 0;
@@ -50,10 +50,10 @@ static void * Worker( void * arg ) {
 
 			// step 2, wait for ticket to be selected
 			for ( typeof(N) j = 0; j < N; j += 1 ) {	// check other tickets
-				ATYPE * otherchoosing = &choosing[j];	// optimization
+				typeof(&choosing[0]) otherchoosing = &choosing[j]; // optimization
 				await( *otherchoosing == false );		// busy wait if thread selecting ticket
 				WO( Fence(); );
-				volatile Ticket * otherticket = &ticket[j];	// optimization
+				typeof(&ticket[0]) otherticket = &ticket[j]; // optimization
 				if ( otherticket->color == mycolor ) {
 					await( otherticket->number == 0 ||
 						   otherticket->number > number || (otherticket->number >= number && j >= id) ||
@@ -73,19 +73,19 @@ static void * Worker( void * arg ) {
 			myticket->number = 0;
 			WO( Fence(); );
 
-#ifdef FAST
+			#ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
 			mychoosing = &choosing[id];					// optimization
 			myticket = &ticket[id];
 			cnt = cycleUp( cnt, NoStartPoints );
-#endif // FAST
+			#endif // FAST
 		} // for
 
 		__sync_fetch_and_add( &sumOfThreadChecksums, randomThreadChecksum );
 
-#ifdef FAST
+		#ifdef FAST
 		id = oid;
-#endif // FAST
+		#endif // FAST
 		entries[r][id] = entry;
 		__sync_fetch_and_add( &Arrived, 1 );
 		while ( stop != 0 ) Pause();

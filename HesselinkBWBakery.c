@@ -4,8 +4,8 @@
 #include <stdbool.h>
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
-volatile TYPE color CALIGN;
-volatile TYPE * cho CALIGN, * pair CALIGN;
+static VTYPE color CALIGN;
+static VTYPE * cho CALIGN, * pair CALIGN;
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 #define fn( n, mcol ) (1 + (n % 2 == mcol ? n / 2 : 0))
@@ -25,8 +25,8 @@ static void * Worker( void * arg ) {
 	unsigned int cnt = 0, oid = id;
 	#endif // FAST
 
-	ATYPE * mycho = &cho[id];							// optimization
-	ATYPE * mypair = &pair[id];
+	typeof(&cho[0]) mycho = &cho[id];					// optimization
+	typeof(&pair[0]) mypair = &pair[id];
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		uint32_t randomThreadChecksum = 0;
@@ -51,12 +51,12 @@ static void * Worker( void * arg ) {
 
 			for ( typeof(N) thr = 0; thr < N; thr += 1 ) {
 				if ( thr != id ) {
-					ATYPE * othercho = &cho[thr];		// optimization
+					typeof(&cho[0]) othercho = &cho[thr]; // optimization
 					await( ! *othercho );
 					WO( Fence(); );
 					// Macros guardA and guardB have multiple reads of "n", but each read occurs in an independent
 					// disjunction, where reading different values for each disjunction does not affect correctness.
-					ATYPE * otherpair = &pair[thr];		// optimization
+					typeof(&pair[0]) otherpair = &pair[thr]; // optimization
 					if ( *otherpair % 2 == mcol )
 						await( guardA( *otherpair, mcol, lev, id, thr ) );
 					else 

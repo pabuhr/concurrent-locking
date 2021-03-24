@@ -14,8 +14,8 @@ static void * Worker( void * arg ) {
 	unsigned int cnt = 0, oid = id;
 	#endif // FAST
 
-	ATYPE * mychoosing = &choosing[id] ;			// optimization
-	ATYPE * myticket = &ticket[id];
+	typeof(&choosing[0]) mychoosing = &choosing[id];	// optimization
+	typeof(&ticket[0]) myticket = &ticket[id];
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		uint32_t randomThreadChecksum = 0;
@@ -38,10 +38,10 @@ static void * Worker( void * arg ) {
 
 			// step 2, wait for ticket to be selected
 			for ( typeof(N) j = 0; j < N; j += 1 ) {	// check other tickets
-				ATYPE * otherchoosing = &choosing[j];	// optimization
+				typeof(&choosing[0]) otherchoosing = &choosing[j]; // optimization
 				while ( *otherchoosing ) Pause();		// busy wait if thread selecting ticket
 				WO( Fence(); );
-				ATYPE * otherticket = &ticket[j];		// optimization
+				typeof(&ticket[0]) otherticket = &ticket[j]; // optimization
 				while ( *otherticket != 0 &&			// busy wait if choosing or
 						( *otherticket < max ||			//  greater ticket value or lower priority
 						( *otherticket == max && j < id ) ) ) Pause();

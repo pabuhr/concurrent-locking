@@ -2,16 +2,16 @@
 // Communication Variables, TOPLAS, 13(4), 1991, Fig. 4, p. 569
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
-static volatile TYPE * c CALIGN, * v CALIGN, * intents CALIGN, ** turn CALIGN;
+static VTYPE * c CALIGN, * v CALIGN, * intents CALIGN, ** turn CALIGN;
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 static void * Worker( void * arg ) {
 	TYPE id = (size_t)arg;
 	uint64_t entry;
 
-#ifdef FAST
+	#ifdef FAST
 	unsigned int cnt = 0, oid = id;
-#endif // FAST
+	#endif // FAST
 
 	TYPE copy[N][2];
 	typeof(N) j, bit;
@@ -53,17 +53,17 @@ static void * Worker( void * arg ) {
 			v[id] = intents[id] = 0;					// exit protocol
 			WO( Fence(); );
 
-#ifdef FAST
+			#ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
 			cnt = cycleUp( cnt, NoStartPoints );
-#endif // FAST
+			#endif // FAST
 		} // for
 
 		__sync_fetch_and_add( &sumOfThreadChecksums, randomThreadChecksum );
 
-#ifdef FAST
+		#ifdef FAST
 		id = oid;
-#endif // FAST
+		#endif // FAST
 		entries[r][id] = entry;
 		__sync_fetch_and_add( &Arrived, 1 );
 		while ( stop != 0 ) Pause();

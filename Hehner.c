@@ -11,11 +11,11 @@ static void * Worker( void * arg ) {
 	TYPE id = (size_t)arg;
 	uint64_t entry;
 
-#ifdef FAST
+	#ifdef FAST
 	unsigned int cnt = 0, oid = id;
-#endif // FAST
+	#endif // FAST
 
-	ATYPE * myticket = &ticket[id];						// optimization
+	VTYPE * myticket = &ticket[id];						// optimization
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		uint32_t randomThreadChecksum = 0;
@@ -36,7 +36,7 @@ static void * Worker( void * arg ) {
 
 			// step 2, wait for ticket to be selected
 			for ( typeof(N) j = 0; j < N; j += 1 ) {	// check other tickets
-				ATYPE * otherticket = &ticket[j];		// optimization
+				VTYPE * otherticket = &ticket[j];		// optimization
 				while ( *otherticket < max ||			// busy wait if choosing or
 						( *otherticket == max && j < id ) ) Pause(); //  greater ticket value or lower priority
 			} // for
@@ -47,18 +47,18 @@ static void * Worker( void * arg ) {
 			WO( Fence(); );
 			*myticket = MAX_TICKET;						// exit protocol
 
-#ifdef FAST
+			#ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
 			myticket = &ticket[id];						// optimization
 			cnt = cycleUp( cnt, NoStartPoints );
-#endif // FAST
+			#endif // FAST
 		} // for
 
 		__sync_fetch_and_add( &sumOfThreadChecksums, randomThreadChecksum );
 
-#ifdef FAST
+		#ifdef FAST
 		id = oid;
-#endif // FAST
+		#endif // FAST
 		entries[r][id] = entry;
 		__sync_fetch_and_add( &Arrived, 1 );
 		while ( stop != 0 ) Pause();
