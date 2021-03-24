@@ -86,7 +86,7 @@
 
 typedef uintptr_t TYPE;									// addressable word-size
 typedef volatile TYPE VTYPE;							// volatile addressable word-size
-typedef VTYPE ATYPE;									// volatile addressable word-size
+typedef _Atomic TYPE ATYPE;								// atomic addressable word-size
 typedef uint32_t RTYPE;									// unsigned 32-bit integer
 
 //------------------------------------------------------------------------------
@@ -500,10 +500,10 @@ int main( int argc, char * argv[] ) {
 	for ( typeof(Threads) i = 0; i < Threads; i += 1 ) set[ i ] = i;
 	// srand( getpid() );
 	// shuffle( set, Threads );							// randomize thread ids
-#ifdef DEBUG
+	#ifdef DEBUG
 	printf( "\nthread set: " );
 	for ( uintptr_t i = 0; i < Threads; i += 1 ) printf( "%u ", set[ i ] );
-#endif // DEBUG
+	#endif // DEBUG
 
 	ctor();												// global algorithm constructor
 
@@ -519,19 +519,6 @@ int main( int argc, char * argv[] ) {
 		affinity( workers[tid], tid );
 	} // for
 
-#ifdef STRESSINTERVAL
-	// Periodically change concurrency level. The time argument is ignored, although we could make it serve as a bound on
-	// the run duration.  Detection of progress failures requires the human eye, specifically noticing that we stop
-	// reporting in PollBarrier().  It's relatively easy to automate that aspect by waiting with timeouts.
-	printf( "Stress mode : Threads=%d Interval=%d\n"
-			"The program runs indefinitely in this mode.\n"
-			"Performance data has no meaning, and should not be reported or collected!\n",
-			Threads, StressInterval );
-	for ( ;; ) {
-		poll( NULL, 0, StressInterval );
-		BarHalt = 1;
-	} // for
-#else
 	for ( ; Run < RUNS;  ) {							// global variable
 		// threads start first experiment immediately
 		sleep( Time );									// delay for experiment duration
@@ -549,7 +536,6 @@ int main( int argc, char * argv[] ) {
 		stop = 0;										// start threads
 		while ( Arrived != 0 ) Pause();					// all threads started ?
 	} // for
-#endif // STRESSINTERVAL
 
 	for ( typeof(Threads) tid = 0; tid < Threads; tid += 1 ) { // terminate workers
 		int rc = pthread_join( workers[tid], NULL );
@@ -564,30 +550,41 @@ int main( int argc, char * argv[] ) {
 
 	uint64_t totals[RUNS], sort[RUNS], smalls[RUNS];
 
-#ifdef DEBUG
-	printf( "\n" );
-#endif // DEBUG
+	#ifdef DEBUG
+	printf( "\nruns: " );
+	#endif // DEBUG
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		smalls[r] = totals[r] = 0;
 		for ( typeof(Threads) tid = 0; tid < Threads; tid += 1 ) {
 			if ( entries[r][tid] <= 5 ) smalls[r] += 1;	// only 5 entries in CS => small
 			totals[r] += entries[r][tid];
-#ifdef DEBUG
+			#ifdef DEBUG
 			printf( "%" COMMA "ju ", entries[r][tid] );
-#endif // DEBUG
+			#endif // DEBUG
 		} // for
-#ifdef DEBUG
-		printf( "\n" );
-#endif // DEBUG
 		sort[r] = totals[r];
 	} // for
 	qsort( sort, RUNS, sizeof(typeof(sort[0])), compare );
 	uint64_t med = median( sort );
-	printf( "%" COMMA "ju", med );						// median round
+
+	double sum = 0.0;
+	for ( int r = 0; r < RUNS; r += 1 ) {
+		sum += totals[r];
+	} // for
+	double avg = sum / RUNS;							// average
+	sum = 0.0;
+	for ( int r = 0; r < RUNS; r += 1 ) {				// sum squared differences from average
+		double diff = totals[r] - avg;
+		sum += diff * diff;
+	} // for
+	double std = sqrt( sum / Threads );
+	avg = avg == 0 ? 0.0 : std / avg * 100;
+	if ( avg > 10.0 ) printf( "\nWarning relative standard deviation %.1f%% greater than 10%% over %d runs.\n", avg, RUNS );
 
 	unsigned int posn;									// run with median result
 	for ( posn = 0; posn < RUNS && totals[posn] != med; posn += 1 ); // assumes RUNS is odd
-#ifdef DEBUG
+
+	#ifdef DEBUG
 	printf( "\ntotals: " );
 	for ( int i = 0; i < RUNS; i += 1 ) {				// print values
 		printf( "%" COMMA "ju ", totals[i] );
@@ -597,14 +594,17 @@ int main( int argc, char * argv[] ) {
 		printf( "%" COMMA "ju ", sort[i] );
 	} // for
 	printf( "\nmedian posn:%d\n", posn );
-#endif // DEBUG
-	double avg = (double)totals[posn] / Threads;		// average
-	double sum = 0.0;
+	#endif // DEBUG
+
+	avg = (double)totals[posn] / Threads;				// average
+	sum = 0.0;
 	for ( typeof(Threads) tid = 0; tid < Threads; tid += 1 ) { // sum squared differences from average
 		double diff = entries[posn][tid] - avg;
 		sum += diff * diff;
 	} // for
-	double std = sqrt( sum / Threads );
+	std = sqrt( sum / Threads );
+
+	printf( "%" COMMA "ju", med );						// median round
 	printf( " %" COMMA ".1f %" COMMA ".1f %5.1f%%", avg, std, avg == 0 ? 0.0 : std / avg * 100 );
 
 
