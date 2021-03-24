@@ -1,5 +1,7 @@
-static volatile TYPE * intents, * serving;				// shared
-static volatile TYPE arbiter_stop = 0;
+static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
+static VTYPE * intents, * serving;				// shared
+static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
+static VTYPE arbiter_stop = 0;
 static pthread_t arbiter;
 
 // Worker id is only allowed into CS by the assignment serving[id] = 1 by the arbiter.  After CS, id sets serving[id] =

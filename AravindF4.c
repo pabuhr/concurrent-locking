@@ -2,7 +2,7 @@
 // Distrib. Comput. 73 (2013), Fig. 4, p. 1035.
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
-static volatile TYPE * D CALIGN, * X CALIGN, ** T CALIGN;
+static VTYPE * D CALIGN, * X CALIGN, ** T CALIGN;
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 static void * Worker( void * arg ) {

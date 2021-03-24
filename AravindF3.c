@@ -5,7 +5,7 @@
 #include "FCFS.h"
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
-static volatile TYPE * D CALIGN, * T CALIGN;
+static VTYPE * D CALIGN, * T CALIGN;
 FCFSTestGlobal();
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 

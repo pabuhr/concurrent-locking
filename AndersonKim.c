@@ -9,8 +9,8 @@
 
 #ifdef TB
 
-static volatile TYPE ** intents CALIGN;					// triangular matrix of intents
-static volatile TYPE ** turns CALIGN;					// triangular matrix of turns
+static VTYPE ** intents CALIGN;							// triangular matrix of intents
+static VTYPE ** turns CALIGN;							// triangular matrix of turns
 static unsigned int depth CALIGN;
 
 #else
@@ -93,10 +93,10 @@ typedef union {
 	WHOLESIZE atom;
 } Atomic;
 
-static volatile TYPE x CALIGN;
+static VTYPE x CALIGN;
 static volatile Atomic y CALIGN, Reset CALIGN;
-static volatile TYPE * Name_Taken, * Obstacle;
-static volatile TYPE Infast CALIGN;
+static VTYPE * Name_Taken, * Obstacle;
+static VTYPE Infast CALIGN;
 static volatile Token B; // = { { 0, 0 }, 0 };
 static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
 

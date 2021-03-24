@@ -2,10 +2,12 @@
 
 //======================================================
 
-static volatile TYPE fast CALIGN;
+static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
+static VTYPE fast CALIGN;
 #ifndef CAS
-static volatile TYPE *b CALIGN, x CALIGN, y CALIGN;
+static VTYPE * b CALIGN, x CALIGN, y CALIGN;
 #endif // ! CAS
+static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 #define await( E ) while ( ! (E) ) Pause()
 
@@ -49,7 +51,7 @@ static inline bool trylock( TYPE id ) {					// based on Lamport-Fast algorithm
 	if ( FASTPATH( x != id ) ) {
 		b[id] = false;
 		Fence();										// OPTIONAL, force store before more loads
-		for ( int k = 0; k < N; k += 1 )
+		for ( typeof(N) k = 0; k < N; k += 1 )
 			await( ! b[k] );
 		if ( FASTPATH( y != id ) ) return false;
 	} // if
@@ -69,22 +71,22 @@ static inline bool trylock( TYPE id ) {					// based on Lamport-Fast algorithm
 
 //======================================================
 
+static TYPE PAD3 CALIGN __attribute__(( unused ));		// protect further false sharing
 typedef struct CALIGN {
 	TYPE apply;
 #ifdef FLAG
 	TYPE flag;
 #endif // FLAG
 } Flags;
-static volatile Flags *flags CALIGN;
+static volatile Flags * flags CALIGN;
 
 #ifndef FLAG
-static volatile TYPE first CALIGN;
+static VTYPE first CALIGN;
 #endif // FLAG
+static TYPE PAD4 CALIGN __attribute__(( unused ));		// protect further false sharing
 
-static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
 
-
-static void *Worker( void *arg ) {
+static void * Worker( void * arg ) {
 	TYPE id = (size_t)arg;
 	uint64_t entry;
 
@@ -100,8 +102,7 @@ static void *Worker( void *arg ) {
 	typeof(id) thr;
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
-		entry = 0;
-		while ( stop == 0 ) {
+		for ( entry = 0; stop == 0; entry += 1 ) {
 			*applyId = true;							// entry protocol
 			if ( FASTPATH( trylock( id ) ) ) {			// true => leader
 #ifndef CAS
@@ -165,8 +166,8 @@ static void *Worker( void *arg ) {
 			flagN = &flags[N].flag;
 #endif // FLAG
 #endif // FAST
-			entry += 1;
-		} // while
+		} // for
+
 #ifdef FAST
 		id = oid;
 
@@ -218,5 +219,5 @@ void __attribute__((noinline)) dtor() {
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=ElevatorLinear -DWCasLF Harness.c -lpthread -lm" //
+// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=ElevatorLinear -DWCasLF Harness.c -lpthread -lm -D`hostname` -DCFMT -DCNT=0" //
 // End: //
