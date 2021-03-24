@@ -140,28 +140,31 @@ static void * Worker( void * arg ) {
 #endif // CNT
 
 		while ( stop == 0 ) {
+
 #if 0
 			for ( fa = 0; fa < K; fa += 1 ) {
 				fp = &fastpaths[fa];					// optimization
 				if ( FASTPATH( fp->y == N ) ) {
 					fp->b[id] = true;
+					WO( Fence(); )						// force store before more loads
 					fp->x = id;
 					Fence();							// force store before more loads
 					if ( FASTPATH( fp->y == N ) ) {
 						fp->y = id;
 						Fence();						// force store before more loads
-						if ( FASTPATH( fp->x == id ) ) {
-							fp->y = id;
-							goto Fast;
-						} else {
-							fp->b[id] = false;
-							Fence();					// OPTIONAL, force store before more loads
-							for ( uintptr_t k = 0; fp->y == id && k < N; k += 1 )
-								await( fp->y != id || ! fp->b[k] );
-							if ( FASTPATH( fp->y == id ) ) {
-								goto Fast;
-							} // if
-						} // if
+						if ( FASTPATH( fp->x == id ) ) goto Fast;
+						fp->b[id] = false;
+						Fence();						// OPTIONAL, force store before more loads
+						for ( uintptr_t k = 0; fp->y == id && k < N; k += 1 )
+							// For "while (A && B) pause;" (see await), the order A and B are read does not matter, because
+							// the loop terminates and must terminate whenever either !A or !B is observed (separately),
+							// modulo A and B have no side effects. Therefore, A && B can be read with interference.
+							await( fp->y != id || ! fp->b[k] );
+						// If the loop consistently reads an outdated value of y (== id from assignment above), there is only
+						// the danger of starvation, and that is unlikely. Correctness only requires the value read after the
+						// loop is recent.
+						WO( Fence(); )
+						if ( FASTPATH( fp->y == id ) ) goto Fast;
 					} else {
 						fp->b[id] = false;
 					} // if
@@ -173,6 +176,7 @@ static void * Worker( void * arg ) {
 				fp = &fastpaths[fa];					// optimization
 				if ( SLOWPATH( fp->y != N ) ) continue;
 				fp->b[id] = true;						// entry protocol
+				WO( Fence(); )							// force store before more loads
 				fp->x = id;
 				Fence();								// force store before more loads
 				if ( SLOWPATH( fp->y != N ) ) {
@@ -185,7 +189,14 @@ static void * Worker( void * arg ) {
 					fp->b[id] = false;
 					Fence();							// OPTIONAL, force store before more loads
 					for ( uintptr_t k = 0; fp->y == id && k < N; k += 1 )
+						// For "while (A && B) pause;" (see await), the order A and B are read does not matter, because
+						// the loop terminates and must terminate whenever either !A or !B is observed (separately),
+						// modulo A and B have no side effects. Therefore, A && B can be read with interference.
 						await( fp->y != id || ! fp->b[k] );
+					// If the loop consistently reads an outdated value of y (== id from assignment above), there is only
+					// the danger of starvation, and that is unlikely. Correctness only requires the value read after the
+					// loop is recent.
+					WO( Fence(); )						// read recent y
 					if ( SLOWPATH( fp->y != id ) ) continue;
 				} // if
 				goto Fast;
@@ -200,12 +211,16 @@ static void * Worker( void * arg ) {
 			for ( intptr_t i = fa; i >= 0; i -= 1 ) {
 				binary_prologue( i < fa, &fastpaths[i].B );
 			} // for
+
 			CriticalSection( id );
+
 			for ( unsigned int i = 0; i <= fa; i += 1 ) {
 				binary_epilogue( i < fa, &fastpaths[i].B );
 			} // for
 
-			fp->y = N;									// exit fast protocol
+			WO( Fence(); )								// prevent write floating up
+			fp->y = N;
+			WO( Fence(); )								// write order matters
 			fp->b[id] = false;
 			goto Fini;
 

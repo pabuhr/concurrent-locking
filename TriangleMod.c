@@ -87,46 +87,58 @@ static inline TYPE entryFast( TYPE id ) {
 #if 0
 	if ( FASTPATH( y == N ) ) {
 		b[id] = true;
+		WO( Fence(); )									// write order matters
 		x = id;
-		Fence();										// force store before more loads
+		Fence();										// write/read order matters
 		if ( FASTPATH( y == N ) ) {
 			y = id;
-			Fence();									// force store before more loads
-			if ( FASTPATH( x == id ) ) {
-				return true;
-			} else {
-				b[id] = false;
-				Fence();								// OPTIONAL, force store before more loads
-				for ( int k = 0; y == id && k < N; k += 1 )
-					await( y != id || ! b[k] );
-				if ( FASTPATH( y == id ) )
-					return true;
-			} // if
+			Fence();									// write/read order matters
+			if ( FASTPATH( x == id ) ) return true;
+			b[id] = false;
+			Fence();									// write/read order matters
+			for ( uintptr_t k = 0; y == id && k < N; k += 1 )
+				// For "while (A && B) pause;" (see await), the order A and B are read does not matter, because
+				// the loop terminates and must terminate whenever either !A or !B is observed (separately),
+				// modulo A and B have no side effects. Therefore, A && B can be read with interference.
+				await( y != id || ! b[k] );
+			// If the loop consistently reads an outdated value of y (== id from assignment above), there is only
+			// the danger of starvation, and that is unlikely. Correctness only requires the value read after the
+			// loop is recent.
+			WO( Fence(); )
+			if ( FASTPATH( y == id ) ) return true;
 		} else {
 			b[id] = false;
 		} // if
 	} // if
 	return false;
 #else
-	if ( FASTPATH( y != N ) ) return false;
+	if ( SLOWPATH( y != N ) ) return false;
 	b[id] = true;
+	WO( Fence(); )										// write order matters
 	x = id;
-	Fence();											// force store before more loads
-	if ( FASTPATH( y != N ) ) {
+	Fence();											// write/read order matters
+	if ( SLOWPATH( y != N ) ) {
 		b[id] = false;
 		return false;
 	} // if
 	y = id;
-	Fence();											// force store before more loads
-	if ( FASTPATH( x != id ) ) {
+	Fence();											// write/read order matters
+	if ( SLOWPATH( x != id ) ) {
 		b[id] = false;
 #ifdef ALT
 		return false;
 #else
-		Fence();										// OPTIONAL, force store before more loads
+		Fence();										// write/read order matters
 		for ( uintptr_t k = 0; y == id && k < N; k += 1 )
+			// For "while (A && B) pause;" (see await), the order A and B are read does not matter, because
+			// the loop terminates and must terminate whenever either !A or !B is observed (separately),
+			// modulo A and B have no side effects. Therefore, A && B can be read with interference.
 			await( y != id || ! b[k] );
-		if ( FASTPATH( y != id ) ) return false;
+				// If the loop consistently reads an outdated value of y (== id from assignment above), there is only
+				// the danger of starvation, and that is unlikely. Correctness only requires the value read after the
+				// loop is recent.
+		WO( Fence(); )									// read recent y
+		if ( SLOWPATH( y != id ) ) return false;
 #endif // ALT
 	} // if
 	return true;
@@ -134,7 +146,9 @@ static inline TYPE entryFast( TYPE id ) {
 } // entryFast
 
 static inline void exitFast( TYPE id ) {
+	WO( Fence(); )										// prevent write floating up
 	y = N;
+	WO( Fence(); )										// write order matters
 	b[id] = false;
 } // exitFast
 

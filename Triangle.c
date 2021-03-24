@@ -82,7 +82,6 @@ static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sha
 
 #define await( E ) while ( ! (E) ) Pause()
 
-
 static void * Worker( void * arg ) {
 	TYPE id = (size_t)arg;
 	uint64_t entry;
@@ -104,24 +103,25 @@ static void * Worker( void * arg ) {
 #if 0
 			if ( FASTPATH( y == N ) ) {
 				b[id] = true;
+				WO( Fence(); )							// write order matters
 				x = id;
-				Fence();								// force store before more loads
+				Fence();								// write/read order matters
 				if ( FASTPATH( y == N ) ) {
 					y = id;
-					Fence();							// force store before more loads
-					if ( FASTPATH( x == id ) ) {
-						y = id;
-						goto Fast;
-					} else {
-						b[id] = false;
-						Fence();						// OPTIONAL, force store before more loads
-						for ( uintptr_t k = 0; y == id && k < N; k += 1 )
-							await( y != id || ! b[k] );
-						if ( FASTPATH( y == id ) ) {
-							y = id;
-							goto Fast;
-						} // if
-					} // if
+					Fence();							// write/read order matters
+					if ( FASTPATH( x == id ) ) goto Fast;
+					b[id] = false;
+					Fence();							// write/read order matters
+					for ( typeof(N) k = 0; y == id && k < N; k += 1 )
+						// For "while (A && B) pause;" (see await), the order A and B are read does not matter, because
+						// the loop terminates and must terminate whenever either !A or !B is observed (separately),
+						// modulo A and B have no side effects. Therefore, A && B can be read with interference.
+						await( y != id || ! b[k] );
+						// If the loop consistently reads an outdated value of y (== id from assignment above), there is only
+						// the danger of starvation, and that is unlikely. Correctness only requires the value read after the
+						// loop is recent.
+						WO( Fence(); )
+						if ( FASTPATH( y == id ) ) goto Fast;
 				} else {
 					b[id] = false;
 				} // if
@@ -129,30 +129,42 @@ static void * Worker( void * arg ) {
 			goto Slow;
 #else
 			if ( SLOWPATH( y != N ) ) goto Slow;
-			b[id] = true;								// entry protocol
+			b[id] = true;
+			WO( Fence(); )								// write order matters
 			x = id;
-			Fence();									// force store before more loads
+			Fence();									// write/read order matters
 			if ( SLOWPATH( y != N ) ) {
 				b[id] = false;
 				goto Slow;
 			} // if
 			y = id;
-			Fence();									// force store before more loads
+			Fence();									// write/read order matters
 			if ( SLOWPATH( x != id ) ) {
 				b[id] = false;
-				Fence();								// OPTIONAL, force store before more loads
-				for ( uintptr_t k = 0; y == id && k < N; k += 1 )
+				Fence();								// write/read order matters
+				for ( typeof(N) k = 0; y == id && k < N; k += 1 )
+					// For "while (A && B) pause;" (see await), the order A and B are read does not matter, because
+					// the loop terminates and must terminate whenever either !A or !B is observed (separately),
+					// modulo A and B have no side effects. Therefore, A && B can be read with interference.
 					await( y != id || ! b[k] );
+				// If the loop consistently reads an outdated value of y (== id from assignment above), there is only
+				// the danger of starvation, and that is unlikely. Correctness only requires the value read after the
+				// loop is recent.
+				WO( Fence(); )							// read recent y
 				if ( SLOWPATH( y != id ) ) goto Slow;
 			} // if
 #endif
 
 		  Fast: __attribute__(( unused ));
 			binary_prologue( 1, &B );
+
 			CriticalSection( id );
+
 			binary_epilogue( 1, &B );
 
-			y = N;										// exit protocol
+			WO( Fence(); )								// prevent write floating up
+			y = N;
+			WO( Fence(); )								// write order matters
 			b[id] = false;
 			goto Fini;
 
@@ -165,7 +177,9 @@ static void * Worker( void * arg ) {
 #endif // TB
 				);
 			binary_prologue( 0, &B );
+
 			CriticalSection( id );
+
 			binary_epilogue( 0, &B );
 
 			exitSlow(
@@ -239,8 +253,8 @@ void __attribute__((noinline)) ctor2() {
 
 void __attribute__((noinline)) ctor() {
 	b = Allocator( sizeof(typeof(b[0])) * N );
-	for ( uintptr_t i = 0; i < N; i += 1 ) {			// initialize shared data
-		b[i] = 0;
+	for ( typeof(N) i = 0; i < N; i += 1 ) {			// initialize shared data
+		b[i] = false;
 	} // for
 	y = N;
 	ctor2();											// tournament allocation/initialization
