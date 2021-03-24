@@ -2,9 +2,15 @@
 
 # Experiments for: BW Bakery Algorithm
 
+# ARM -mno-outline-atomics => use LL/SC insteard of calls to atomic routines: __aarch64_swp_acq_rel, __aarch64_cas8_acq_rel
+# ARM -march=armv8.2-a+lse => generate Arm LSE extension instructions SWAP and CAS
+# https://community.arm.com/developer/tools-software/tools/b/tools-software-ides-blog/posts/making-the-most-of-the-arm-architecture-in-gcc-10
+
 algorithms="LamportBakery Hehner Lycklama LycklamaBuhr TaubenfeldBWBakery HesselinkBWBakery HesselinkBWBakery2 MCS"
+algorithms=${algorithms}" LamportBakeryA HehnerA LycklamaA LycklamaBuhrA TaubenfeldBWBakeryA HesselinkBWBakeryA HesselinkBWBakery2A MCSA"
 time=10
 outdir=`hostname`
+Exec=`hostname`.out
 mkdir -p ${outdir}
 
 if [ ${#} -ne 0 ] ; then
@@ -12,13 +18,16 @@ if [ ${#} -ne 0 ] ; then
 fi
 
 cflag="-Wall -Wextra -Werror -Wno-implicit-fallthrough -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN" #
+if [ ${outdir} = "c4arm" ] ; then
+    cflag=${cflag}" -mno-outline-atomics"	# use ARM LL/SC instructions for attomics
+fi
 
 runalgorithm() {
     for contention in "" "FAST" ; do
 	outfile=${outdir}/${1}${2}${contention}
 	echo "${outfile}"
-	gcc-9 ${cflag} ${contention:+-D${contention}} -D${outdir} -DAlgorithm=${1} Harness.c -lpthread -lm
-	./run1 Time=${time} > "${outfile}"
+	gcc-10 ${cflag} ${contention:+-D${contention}} -D${outdir} -DAlgorithm=${1} Harness.c -lpthread -lm -o ${outdir}.out
+	./run1 Time=${time} Exec="${Exec}" > "${outfile}"
 	if [ -f core ] ; then
 	    echo core generated for ${1}
 	    break
@@ -31,4 +40,4 @@ for algorithm in ${algorithms} ; do
     runalgorithm ${algorithm}
 done
 
-rm -f a.out
+rm -f "${Exec}"
