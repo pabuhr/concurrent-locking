@@ -7,7 +7,6 @@
 # https://community.arm.com/developer/tools-software/tools/b/tools-software-ides-blog/posts/making-the-most-of-the-arm-architecture-in-gcc-10
 
 algorithms="LamportBakery Hehner Lycklama LycklamaBuhr TaubenfeldBWBakery HesselinkBWBakery HesselinkBWBakery2 MCS"
-algorithms=${algorithms}" LamportBakeryA HehnerA LycklamaA LycklamaBuhrA TaubenfeldBWBakeryA HesselinkBWBakeryA HesselinkBWBakery2A MCSA"
 time=10
 outdir=`hostname`
 Exec=`hostname`.out
@@ -23,15 +22,17 @@ if [ ${outdir} = "c4arm" ] ; then
 fi
 
 runalgorithm() {
-    for contention in "" "FAST" ; do
-	outfile=${outdir}/${1}${2}${contention}
-	echo "${outfile}"
-	gcc-10 ${cflag} ${contention:+-D${contention}} -D${outdir} -DAlgorithm=${1} Harness.c -lpthread -lm -o ${outdir}.out
-	./run1 Time=${time} Exec="${Exec}" > "${outfile}"
-	if [ -f core ] ; then
-	    echo core generated for ${1}
-	    break
-	fi
+    for atomic in "" "ATOMIC" ; do
+	for contention in "" "FAST" ; do
+	    outfile=${outdir}/${1}${2}${contention}
+	    echo "${outfile}"
+	    gcc-10 ${cflag} ${atomic:+-D${atomic}} ${contention:+-D${contention}} -D${outdir} -DAlgorithm=${1} Harness.c -lpthread -lm -o ${outdir}.out
+	    ./run1 Time=${time} Exec="${Exec}" > "${outfile}"
+	    if [ -f core ] ; then
+		echo core generated for ${1}
+		break
+	    fi
+	done
     done
 }
 
