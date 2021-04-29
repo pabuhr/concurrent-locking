@@ -4,23 +4,32 @@
 #include <stdbool.h>
 
 typedef struct mcs_node {								// cache align node at declaration
+	#ifndef ATOMIC
 	struct mcs_node * volatile next;
-	volatile TYPE spin;
-} MCS_node, * MCS_lock;
+	#else
+	_Atomic(struct mcs_node *) next;
+	#endif // ! ATOMIC
+	VTYPE spin;
+} MCS_node;
+#ifndef ATOMIC
+typedef struct mcs_node * MCS_lock;
+#else
+typedef _Atomic(MCS_node *) MCS_lock;
+#endif // ! ATOMIC
 
 void mcs_lock( MCS_lock * lock, MCS_node * node ) {
 	MCS_node * pred;
 	node->next = NULL;
 	// node->spin = 1;									// alternative position and remove fence below
-	WO( Fence(); )										// write/write order matters
+	WO( Fence(); );
 	pred = __atomic_exchange_n( lock, node, __ATOMIC_ACQUIRE );
 
 	if ( FASTPATH( pred != NULL ) ) {					// someone on list ?
 		node->spin = 1;									// mark as waiting
-		WO( Fence(); )									// write/write order matters
+		WO( Fence(); );
 		pred->next = node;								// add to list of waiting threads
 		while ( node->spin == 1 ) Pause();				// busy wait on my spin variable
-		WO( Fence(); )									// read/write order matters
+		WO( Fence(); );
 	} // if
 } // mcs_lock
 
@@ -31,7 +40,7 @@ void mcs_unlock( MCS_lock * lock, MCS_node * node ) {
   if ( __atomic_compare_exchange_n( lock, &temp, NULL, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST ) ) return; // Fence
 		while ( node->next == NULL ) Pause();			// busy wait until my node is modified
 	} // if
-	WO( Fence(); )										// read/write order matters
+	WO( Fence(); );
 	node->next->spin = 0;								// stop their busy wait
 #else  // Dice
 	MCS_node * succ = node->next;
@@ -43,7 +52,7 @@ void mcs_unlock( MCS_lock * lock, MCS_node * node ) {
 		// as the successor has yet to store into node->next.
 		while ( (succ = node->next) == NULL ) Pause();	// busy wait until my node is modified
 	} // if
-	WO( Fence(); )										// read/write order matters
+	WO( Fence(); );
 	succ->spin = 0;
 #endif // 0
 } // mcs_unlock
@@ -56,9 +65,9 @@ static void * Worker( void * arg ) {
 	TYPE id = (size_t)arg;
 	uint64_t entry;
 
-#ifdef FAST
+	#ifdef FAST
 	unsigned int cnt = 0, oid = id;
-#endif // FAST
+	#endif // FAST
 
 	MCS_node node CALIGN;								// sufficient to cache align node
 
@@ -72,17 +81,17 @@ static void * Worker( void * arg ) {
 
 			mcs_unlock( &lock, &node );
 
-#ifdef FAST
+			#ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
 			cnt = cycleUp( cnt, NoStartPoints );
-#endif // FAST
+			#endif // FAST
 		} // for
 
 		__sync_fetch_and_add( &sumOfThreadChecksums, randomThreadChecksum );
 
-#ifdef FAST
+		#ifdef FAST
 		id = oid;
-#endif // FAST
+		#endif // FAST
 		entries[r][id] = entry;
 		__sync_fetch_and_add( &Arrived, 1 );
 		while ( stop != 0 ) Pause();

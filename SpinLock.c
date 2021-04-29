@@ -31,7 +31,7 @@ void spin_lock( volatile TYPE * lock ) {
 		//if ( i % 64 == 0 ) spin += spin;				// slowly increase by powers of 2
 		if ( spin > SPIN_END ) spin = SPIN_END;			// cap spinning
 		#else
-	    Pause();
+		Pause();
 		#endif // ! NOEXPBACK
 	} // for
 } // spin_lock

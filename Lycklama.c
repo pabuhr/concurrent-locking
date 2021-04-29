@@ -16,12 +16,19 @@ static void * Worker( void * arg ) {
 	TYPE copy[N][2];
 	typeof(N) j, bit;
 
+	typeof(&c[0]) myc = &c[id];							// optimization
+	typeof(&v[0]) myv = &v[id];
+	typeof(&intents[0]) myintent = &intents[id];
+	typeof(&c[0]) otherc;
+	typeof(&v[0]) otherv;
+	typeof(&intents[0]) otherintent;
+
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		uint32_t randomThreadChecksum = 0;
 		bit = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
-			c[id] = 1;									// stage 1, establish FCFS
+			*myc = 1;									// stage 1, establish FCFS
 			Fence();									// force store before more loads
 			for ( j = 0; j < N; j += 1 ) {				// copy turn values
 				copy[j][0] = turn[j][0];
@@ -29,28 +36,34 @@ static void * Worker( void * arg ) {
 			} // for
 			bit = 1 - bit;
 			turn[id][bit] = 1 - turn[id][bit];			// advance my turn
-			v[id] = 1;
-			c[id] = 0;
+			*myv = 1;
+			*myc = 0;
 			Fence();									// force store before more loads
-			for ( j = 0; j < N; j += 1 )
-				while ( c[j] != 0 || (v[j] != 0 && copy[j][0] == turn[j][0] && copy[j][1] == turn[j][1])) Pause();
-		  L: intents[id] = 1;							// B-L
+			for ( j = 0; j < N; j += 1 ) {
+				otherc = &c[j];							// optimization
+				otherv = &v[j];							// optimization
+				while ( *otherc != 0 || (*otherv != 0 && copy[j][0] == turn[j][0] && copy[j][1] == turn[j][1])) Pause();
+			} // for
+		  L: *myintent = 1;								// B-L
 			Fence();									// force store before more loads
 			for ( j = 0; j < id; j += 1 )				// stage 2, high priority search
 				if ( intents[j] != 0 ) {
-					intents[id] = 0;
+					*myintent = 0;
 					Fence();							// force store before more loads
-					while ( intents[j] != 0 ) Pause();
+					otherintent = &intents[j];			// optimization
+					while ( *otherintent != 0 ) Pause();
 					goto L;
 				} // if
-			for ( j = id + 1; j < N; j += 1 )			// stage 3, low priority search
-				while ( intents[j] != 0 ) Pause();
+			for ( j = id + 1; j < N; j += 1 ) {			// stage 3, low priority search
+				otherintent = &intents[j];				// optimization
+				while ( *otherintent != 0 ) Pause();
+			} // for
 			WO( Fence(); );
 
 			randomThreadChecksum += CriticalSection( id );
 
 			WO( Fence(); );
-			v[id] = intents[id] = 0;					// exit protocol
+			*myv = *myintent = 0;						// exit protocol
 			WO( Fence(); );
 
 			#ifdef FAST
