@@ -3,14 +3,19 @@
 
 #include <stdbool.h>
 
-static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
-typedef enum { black, white } BW;
-static volatile BW color CALIGN;
-static VTYPE * choosing CALIGN;
-typedef struct {
-	volatile BW color;
-	volatile TYPE number;
+typedef union {
+	struct {
+		volatile HALFSIZE color;
+		volatile HALFSIZE number;
+	};
+	WHOLESIZE atom;										// ensure atomic assignment
+	volatile WHOLESIZE vatom;							// volatile alias
 } Ticket;
+typedef enum { black, white } BW;
+
+static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
+static VTYPE color CALIGN;
+static VTYPE * choosing CALIGN;
 static Ticket * ticket CALIGN;
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
@@ -38,12 +43,14 @@ static void * Worker( void * arg ) {
 			Fence();									// force store before more loads
 			mycolor = color;
 			number = 0;
+			Ticket v;
 			for ( typeof(N) j = 0; j < N; j += 1 ) {	// O(N) search for largest ticket
-				Ticket v = ticket[j];					// could change so must copy
+				v.atom = ticket[j].vatom;				// could change so must copy
+				assert ( v.number <= N );
 				if ( number < v.number && mycolor == v.color ) number = v.number;
 			} // for
 			number += 1;								// advance ticket
-			*myticket = (Ticket){ mycolor, number };	// set public state
+			myticket->atom = (Ticket){ {mycolor, number} }.atom; // set public state
 			WO( Fence(); );
 			*mychoosing = false;						// finished ticket selection
 			Fence();									// force store before more loads
@@ -99,7 +106,7 @@ void __attribute__((noinline)) ctor() {
 	ticket = Allocator( sizeof(typeof(ticket[0])) * N );
 	for ( typeof(N) i = 0; i < N; i += 1 ) {			// initialize shared data
 		choosing[i] = false;
-		ticket[i] = (Ticket){ black, 0 };
+		ticket[i] = (Ticket){ {black, 0} };
 	} // for
 } // ctor
 

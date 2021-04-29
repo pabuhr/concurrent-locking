@@ -3,86 +3,89 @@
 
 #include <stdint.h>										// uint*_t
 
-#if __WORDSIZE == 64
-#define HALFSIZE uint32_t
-#define WHOLESIZE uint64_t
-#else  // SPARC
-#define HALFSIZE uint16_t
-#define WHOLESIZE uint32_t
-#endif // __WORDSIZE == 64
-
 typedef union {
 	struct {
-		HALFSIZE level;									// current level in tournament
-		HALFSIZE state;									// intent to enter critical section
-	} tuple;
+		volatile HALFSIZE level;						// current level in tournament
+		volatile HALFSIZE state;						// intent to enter critical section
+	};
 	WHOLESIZE atom;										// ensure atomic assignment
+	volatile WHOLESIZE vatom ;							// volatile alias
 } Tuple;
 
-#define L(t) ((t).tuple.level)
-#define R(s) ((s).tuple.state)
-#define EQ(a, b) ((a).tuple.state == (b).tuple.state)
+#define L(t) ((t).level)
+#define R(s) ((s).state)
+#define EQ(a, b) ((a).state == (b).state)
 static inline int bit( int i, int k ) { return (i & (1 << (k - 1))) != 0; }
 static inline int min( int a, int b ) { return a < b ? a : b; }
 
-static int depth, mask;
-static volatile Tuple *Q;
+static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
+static int depth CALIGN, mask CALIGN;
+static volatile Tuple * Q CALIGN;
+static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 WHOLESIZE QMAX( TYPE id, unsigned int k ) {
 	int low = ((id >> (k - 1)) ^ 1) << (k - 1);
 	int high = min( low | mask >> (depth - (k - 1)), N - 1 );
 	Tuple opp;
 	for ( int i = low; i <= high; i += 1 ) {
-		opp.atom = Q[i].atom;
+		opp.atom = Q[i].vatom;
 		if ( L(opp) >= k ) return opp.atom;
 	} // for
-	return (Tuple){ .tuple = { .level = 0, .state = 0 } }.atom;
+	return (Tuple){ { 0, 0 } }.atom;
 } // QMAX
 
-static void *Worker( void *arg ) {
+static void * Worker( void * arg ) {
 	TYPE id = (size_t)arg;
 	uint64_t entry;
-#ifdef FAST
-	unsigned int cnt = 0, oid = id;
-#endif // FAST
 
 	Tuple opp;
 
+	#ifdef FAST
+	unsigned int cnt = 0, oid = id;
+	#endif // FAST
+
 	for ( int r = 0; r < RUNS; r += 1 ) {
-		entry = 0;
-		while ( stop == 0 ) {
-			for ( int k = 1; k <= (HALFSIZE)depth; k += 1 ) { // entry protocol, round
+		uint32_t randomThreadChecksum = 0;
+
+		for ( entry = 0; stop == 0; entry += 1 ) {
+			for ( unsigned int k = 1; k <= (HALFSIZE)depth; k += 1 ) { // entry protocol, round
 				opp.atom = QMAX( id, k );
 				Fence();								// force store before more loads
-				Q[id].atom = L(opp) == k ? (Tuple){ .tuple = { .level = k, .state = (HALFSIZE)(bit(id,k) ^ R(opp)) } }.atom : (Tuple){ .tuple = {k, 1} }.atom;
+				Q[id].vatom = L(opp) == k ? (Tuple){ { k, (HALFSIZE)(bit(id,k) ^ R(opp)) } }.atom : (Tuple){ {k, 1} }.atom;
 				Fence();								// force store before more loads
 				opp.atom = QMAX( id, k );
 				Fence();								// force store before more loads
-				Q[id].atom = L(opp) == k ? (Tuple){ .tuple = { .level = k, .state = (HALFSIZE)(bit(id,k) ^ R(opp)) } }.atom : Q[id].atom;
-#if 0
-			  wait:	opp.atom = QMAX( id, k );
+				Q[id].vatom = L(opp) == k ? (Tuple){ { k, (HALFSIZE)(bit(id,k) ^ R(opp)) } }.atom : Q[id].vatom;
+				#if 0
+			  wait:
+				opp.atom = QMAX( id, k );
 				Fence();								// force store before more loads
 				if ( (L(opp) == k && (bit(id,k) ^ EQ(opp, Q[id]))) || L(opp) > k ) { Pause(); goto wait; }
-#else
+				#else
 				// modify to remove fence from loop
 				Fence();								// force store before more loads
 				while ( (L(opp) == k && (bit(id,k) ^ EQ(opp, Q[id]))) || L(opp) > k ) {
 					Pause();
 					opp.atom = QMAX( id, k );
 				} // while
-#endif // 0
+				#endif // 0
 			} // for
-			CriticalSection( id );
-			Q[id].atom = (Tuple){ .tuple = { .level = 0, .state = 0 } }.atom; // exit protocol
-#ifdef FAST
+
+			randomThreadChecksum += CriticalSection( id );
+
+			Q[id].vatom = (Tuple){ { 0, 0 } }.atom;		// exit protocol
+
+			#ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
 			cnt = cycleUp( cnt, NoStartPoints );
-#endif // FAST
-			entry += 1;
-		} // while
-#ifdef FAST
+			#endif // FAST
+		} // for
+
+		__sync_fetch_and_add( &sumOfThreadChecksums, randomThreadChecksum );
+
+		#ifdef FAST
 		id = oid;
-#endif // FAST
+		#endif // FAST
 		entries[r][id] = entry;
 		__sync_fetch_and_add( &Arrived, 1 );
 		while ( stop != 0 ) Pause();
@@ -91,21 +94,21 @@ static void *Worker( void *arg ) {
 	return NULL;
 } // Worker
 
-void ctor() {
+void __attribute__((noinline)) ctor() {
 	depth = Clog2( N );									// maximal depth of binary tree
 	int width = 1 << depth;								// maximal width of binary tree
 	mask = width - 1;									// 1 bits for masking
 	Q = Allocator( sizeof(typeof(Q[0])) * N );
-	for ( int i = 0; i < N; i += 1 ) {					// initialize shared data
-		Q[i].atom = (Tuple){ .tuple = { .level = 0, .state = 0 } }.atom;
+	for ( typeof(N) i = 0; i < N; i += 1 ) {			// initialize shared data
+		Q[i].atom = (Tuple){ { 0, 0 } }.atom;
 	} // for
 } // ctor
 
-void dtor() {
+void __attribute__((noinline)) dtor() {
 	free( (void *)Q );
 } // dtor
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=PetersonT Harness.c -lpthread -lm" //
+// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=PetersonT Harness.c -lpthread -lm -D`hostname` -DCFMT -DCNT=0" //
 // End: //

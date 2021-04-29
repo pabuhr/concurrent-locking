@@ -9,9 +9,11 @@
 
 #ifdef TB
 
+static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
 static VTYPE ** intents CALIGN;							// triangular matrix of intents
 static VTYPE ** turns CALIGN;							// triangular matrix of turns
 static unsigned int depth CALIGN;
+static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 #else
 
@@ -20,11 +22,13 @@ typedef struct CALIGN {
 	TYPE es;											// left/right opponent
 } Tuple;
 
+static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
 static Tuple ** states CALIGN;							// handle N threads
 static int * levels CALIGN;								// minimal level for binary tree
 //static Tuple states[64][6] CALIGN;						// handle 64 threads with maximal tree depth of 6 nodes (lg 64)
 //static int levels[64] = { -1 } CALIGN;					// minimal level for binary tree
 static Token * t CALIGN;
+static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 #endif // TB
 
@@ -77,33 +81,27 @@ static inline void exitSlow(
 
 //=========================================================================
 
-#if __WORDSIZE == 64
-#define HALFSIZE uint32_t
-#define WHOLESIZE uint64_t
-#else  // SPARC
-#define HALFSIZE uint16_t
-#define WHOLESIZE uint32_t
-#endif // __WORDSIZE == 64
-
 typedef union {
 	struct {
-		HALFSIZE free;
-		HALFSIZE indx;
-	} tuple;
-	WHOLESIZE atom;
+		volatile HALFSIZE free;
+		volatile HALFSIZE indx;
+	};
+	WHOLESIZE atom;										// ensure atomic assignment
+	volatile WHOLESIZE vatom ;							// volatile alias
 } Atomic;
 
+static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
 static VTYPE x CALIGN;
 static volatile Atomic y CALIGN, Reset CALIGN;
 static VTYPE * Name_Taken, * Obstacle;
 static VTYPE Infast CALIGN;
 static volatile Token B; // = { { 0, 0 }, 0 };
-static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
+static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 #define await( E ) while ( ! (E) ) Pause()
 
 
-static inline void SLOW1( TYPE id
+static inline void SLOW1( TYPE id, uint32_t * randomThreadChecksum
 #ifndef TB
 						  , int level, Tuple * state
 #endif // ! TB
@@ -116,7 +114,7 @@ static inline void SLOW1( TYPE id
 #endif // TB
 		);
 	binary_prologue( 0, &B );
-	CriticalSection( id );
+	*randomThreadChecksum += CriticalSection( id );
 	binary_epilogue( 0, &B );
 	exitSlow(
 #ifdef TB
@@ -128,7 +126,7 @@ static inline void SLOW1( TYPE id
 } // SLOW1
 
 
-static inline void SLOW2( TYPE id, Atomic y
+static inline void SLOW2( TYPE id, Atomic y, uint32_t * randomThreadChecksum
 #ifndef TB
 						  , int level, Tuple * state
 #endif // ! TB
@@ -141,18 +139,18 @@ static inline void SLOW2( TYPE id, Atomic y
 #endif // TB
 		);
 	binary_prologue( 0, &B );
-	CriticalSection( id );
-	y.atom = 0;
+	*randomThreadChecksum += CriticalSection( id );
+	y.vatom = 0;
 	x = id;
 	Fence();											// force store before more loads
-	y.atom = Reset.atom;
+	y.vatom = Reset.vatom;
 	Obstacle[id] = false;
-	Reset.atom = (Atomic){ .tuple = { .free = false, .indx = y.tuple.indx } }.atom;
+	Reset.vatom = (Atomic){ { false, y.indx } }.atom;
 	Fence();											// force store before more loads
-	if ( ! Name_Taken[ y.tuple.indx ] && ! Obstacle[ y.tuple.indx ] ) {
-		HALFSIZE temp = (HALFSIZE)(y.tuple.indx + 1 < N ? y.tuple.indx + 1 : 0);
-		Reset.atom = (Atomic){ .tuple = { .free = true, .indx = temp } }.atom;
-		y.atom = (Atomic){ .tuple = { .free = true, .indx = temp } }.atom;
+	if ( ! Name_Taken[ y.indx ] && ! Obstacle[ y.indx ] ) {
+		HALFSIZE temp = (HALFSIZE)(y.indx + 1 < N ? y.indx + 1 : 0);
+		Reset.vatom = (Atomic){ { true, temp } }.atom;
+		y.vatom = (Atomic){ { true, temp } }.atom;
 	} // if
 	binary_epilogue( 0, &B );
 	exitSlow(
@@ -185,29 +183,29 @@ static void * Worker( void * arg ) {
 		for ( entry = 0; stop == 0; entry += 1 ) {
 			x = id;
 			Fence();									// force store before more loads
-			ly.atom = y.atom;
-			if ( FASTPATH( ! ly.tuple.free ) ) {
-				SLOW1( id
+			ly.atom = y.vatom;
+			if ( FASTPATH( ! ly.free ) ) {
+				SLOW1( id, &randomThreadChecksum
 #ifndef TB
 					   , level, state
 #endif // ! TB
 					    );
 			} else {
-				y.atom = 0;
+				y.vatom = 0;
 				Obstacle[id] = true;
 				Fence();								// force store before more loads
 				if ( FASTPATH( x != id || Infast ) ) {
-					SLOW2( id, ly
+					SLOW2( id, ly, &randomThreadChecksum
 #ifndef TB
 						   , level, state
 #endif // ! TB
 						);
 				} else {
-					Name_Taken[ly.tuple.indx] = true;
+					Name_Taken[ly.indx] = true;
 					Fence();							// force store before more loads
-					if ( FASTPATH( Reset.atom != ly.atom ) ) {
-						Name_Taken[ly.tuple.indx] = false;
-						SLOW2( id, ly
+					if ( FASTPATH( Reset.vatom != ly.atom ) ) {
+						Name_Taken[ly.indx] = false;
+						SLOW2( id, ly, &randomThreadChecksum
 #ifndef TB
 							   , level, state
 #endif // ! TB
@@ -219,16 +217,16 @@ static void * Worker( void * arg ) {
 						randomThreadChecksum += CriticalSection( id );
 
 						Obstacle[id] = false;
-						Reset.atom = (Atomic){ .tuple = { .free = false, .indx = ly.tuple.indx } }.atom;
+						Reset.vatom = (Atomic){ { false, ly.indx } }.atom;
 						Fence();						// force store before more loads
-						// Obstacle[ ly.tuple.indx ] is always false for minimal contentions, and almost always false for
+						// Obstacle[ ly.indx ] is always false for minimal contentions, and almost always false for
 						// maximal contention => LIKELY for both minimal and maximal contention.
-						if ( LIKELY( ! Obstacle[ ly.tuple.indx ] ) ) { // always
-							HALFSIZE temp = (HALFSIZE)(ly.tuple.indx + 1 < N ? ly.tuple.indx + 1 : 0);
-							Reset.atom = (Atomic){ .tuple = { .free = true, .indx = temp } }.atom;
-							y.atom = (Atomic){ .tuple = { .free = true, .indx = temp } }.atom;
+						if ( LIKELY( ! Obstacle[ ly.indx ] ) ) { // always
+							HALFSIZE temp = (HALFSIZE)(ly.indx + 1 < N ? ly.indx + 1 : 0);
+							Reset.vatom = (Atomic){ { true, temp } }.atom;
+							y.vatom = (Atomic){ { true, temp } }.atom;
 						} // if
-						Name_Taken[ly.tuple.indx] = false;
+						Name_Taken[ly.indx] = false;
 						binary_epilogue( 1, &B );
 						Infast = false;
 					} // if
@@ -298,11 +296,11 @@ void __attribute__((noinline)) ctor2() {
 void __attribute__((noinline)) ctor() {
 	Name_Taken = Allocator( sizeof(typeof(Name_Taken[0])) * N );
 	Obstacle = Allocator( sizeof(typeof(Obstacle[0])) * N );
-	for ( typeof(N) i = 0; i < N; i += 1 ) {					// initialize shared data
+	for ( typeof(N) i = 0; i < N; i += 1 ) {			// initialize shared data
 		Name_Taken[i] = Obstacle[i] = false;
 	} // for
-	y.atom = (Atomic){ .tuple = { .free = true, .indx = 0 } }.atom;
-	Reset.atom = (Atomic){ .tuple = { .free = true, .indx = 0 } }.atom;
+	y.vatom = (Atomic){ { true, 0 } }.atom;
+	Reset.vatom = (Atomic){ { true, 0 } }.atom;
 	Infast = false;
 	ctor2();											// tournament allocation/initialization
 } // ctor
