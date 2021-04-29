@@ -59,16 +59,20 @@
 // implementations of both __sync and C++11 atomic operators is sub-optimal.  On x86 these facilities use MFENCE, which
 // is a poor choice.
 
-#if defined(__x86_64)
-	//#define Fence() __asm__ __volatile__ ( "mfence" )
-	#define Fence() __asm__ __volatile__ ( "lock; addq $0,(%%rsp);" ::: "cc" )
-#elif defined(__i386)
-	#define Fence() __asm__ __volatile__ ( "lock; addl $0,(%%esp);" ::: "cc" )
-#elif defined(__ARM_ARCH)
-	#define Fence() __asm__ __volatile__ ( "DMB ISH" ::: )
+#ifdef ATOMIC
+	#define Fence()
 #else
-	#error unsupported architecture
-#endif
+	#if defined(__x86_64)
+		//#define Fence() __asm__ __volatile__ ( "mfence" )
+		#define Fence() __asm__ __volatile__ ( "lock; addq $0,(%%rsp);" ::: "cc" )
+	#elif defined(__i386)
+		#define Fence() __asm__ __volatile__ ( "lock; addl $0,(%%esp);" ::: "cc" )
+	#elif defined(__ARM_ARCH)
+		#define Fence() __asm__ __volatile__ ( "DMB ISH" ::: )
+	#else
+		#error unsupported architecture
+	#endif
+#endif // ATOMIC
 
 // pause to prevent excess processor bus usage
 #if defined( __i386 ) || defined( __x86_64 )
@@ -77,7 +81,7 @@
 //	#define Delay() { for ( uint32_t r = (ThreadLocalRandom() & ( (1<<16) - 1)) + ((1<<16) - 1); r >= 8; r -= 8 ) { Pause(); Pause(); Pause(); Pause(); Pause(); Pause(); Pause(); Pause(); } }
 //	#define Delay() { for ( uint32_t r = 1 << (((ThreadLocalRandom() & (1<<4)) - 1) + 3); r >= 8; r -= 8 ) { Pause(); Pause(); Pause(); Pause(); Pause(); Pause(); Pause(); Pause(); } }
 #elif defined(__ARM_ARCH)
-	#define Pause() __asm__ __volatile__ ( "YIELD" ::: )
+	#define Pause() __asm__ __volatile__ ( "YIELD" : : : )
 #else
 	#error unsupported architecture
 #endif
@@ -88,6 +92,18 @@ typedef uintptr_t TYPE;									// addressable word-size
 typedef volatile TYPE VTYPE;							// volatile addressable word-size
 typedef _Atomic TYPE ATYPE;								// atomic addressable word-size
 typedef uint32_t RTYPE;									// unsigned 32-bit integer
+
+#ifdef ATOMIC
+#define VTYPE ATYPE
+#endif // ATOMIC
+
+#if __WORDSIZE == 64
+	#define HALFSIZE uint32_t
+	#define WHOLESIZE uint64_t
+#else
+	#define HALFSIZE uint16_t
+	#define WHOLESIZE uint32_t
+#endif // __WORDSIZE == 64
 
 //------------------------------------------------------------------------------
 
@@ -189,7 +205,8 @@ static inline void NonCriticalSection( const TYPE id ) {
 static TYPE HPAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
 static volatile RTYPE randomChecksum CALIGN = 0;
 static volatile RTYPE sumOfThreadChecksums CALIGN = 0;
-static VTYPE CurrTid CALIGN = ULONG_MAX;				// shared, current thread id in critical section
+// Do not use VTYPE because -DATOMIC changes it to ATYPE
+static volatile TYPE CurrTid CALIGN = ULONG_MAX;		// shared, current thread id in critical section
 static TYPE HPAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 //static int Identity(int v) { __asm__ __volatile__ (";" : "+r" (v)); return v; } 
@@ -357,19 +374,19 @@ void affinity( pthread_t pthreadid, unsigned int tid ) {
 
 #if 1
 #if defined( c4arm )
-	enum { OFFSETSOCK = 1 /* 0 origin */, SOCKET = 2, CORES = 48, HYPER = 1 };
+	enum { OFFSETSOCK = 1 /* 0 origin */, SOCKETS = 2, CORES = 48, HYPER = 1 };
 #elif defined( nasus )
-	enum { OFFSETSOCK = 1 /* 0 origin */, SOCKET = 2, CORES = 64, HYPER = 1 };
+	enum { OFFSETSOCK = 1 /* 0 origin */, SOCKETS = 2, CORES = 64, HYPER = 1 };
 #elif defined( jax )
-	enum { OFFSETSOCK = 1 /* 0 origin */, SOCKET = 4, CORES = 24, HYPER = 2 /*wrap */ };
+	enum { OFFSETSOCK = 1 /* 0 origin */, SOCKETS = 4, CORES = 24, HYPER = 2 /* wrap on socket */ };
 #elif defined( pyke )
-	enum { OFFSETSOCK = 1 /* 0 origin */, SOCKET = 2, CORES = 24, HYPER = 2 /*wrap */ };
+	enum { OFFSETSOCK = 1 /* 0 origin */, SOCKETS = 2, CORES = 24, HYPER = 2 /* wrap on socket */ };
 #elif defined( cfapi1 )
-	enum { OFFSETSOCK = 0 /* 0 origin */, SOCKET = 1, CORES = 4, HYPER = 1 };
+	enum { OFFSETSOCK = 0 /* 0 origin */, SOCKETS = 1, CORES = 4, HYPER = 1 };
 #else // default
-	enum { OFFSETSOCK = 2 /* 0 origin */, SOCKET = 4, CORES = 16, HYPER = 1 };
+	enum { OFFSETSOCK = 2 /* 0 origin */, SOCKETS = 4, CORES = 16, HYPER = 1 };
 #endif // HOSTS
-	cpu = tid + ((tid < CORES) ? OFFSETSOCK * CORES : HYPER < 2 ? OFFSETSOCK * CORES : CORES * SOCKET);
+	cpu = tid + ((tid < CORES) ? OFFSETSOCK * CORES : HYPER < 2 ? OFFSETSOCK * CORES : CORES * SOCKETS);
 #endif // 0
 
 	//printf( "%d\n", cpu );
