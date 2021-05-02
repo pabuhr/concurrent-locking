@@ -90,20 +90,24 @@
 
 typedef uintptr_t TYPE;									// addressable word-size
 typedef volatile TYPE VTYPE;							// volatile addressable word-size
-typedef _Atomic TYPE ATYPE;								// atomic addressable word-size
 typedef uint32_t RTYPE;									// unsigned 32-bit integer
 
-#ifdef ATOMIC
-#define VTYPE ATYPE
-#endif // ATOMIC
-
 #if __WORDSIZE == 64
-	#define HALFSIZE uint32_t
-	#define WHOLESIZE uint64_t
+typedef uint32_t HALFSIZE;
+typedef volatile uint32_t VHALFSIZE;
+typedef uint64_t WHOLESIZE;
+typedef volatile uint64_t VWHOLESIZE;
 #else
-	#define HALFSIZE uint16_t
-	#define WHOLESIZE uint32_t
+typedef uint16_t HALFSIZE;
+typedef volatile uint16_t VHALFSIZE;
+typedef uint32_t WHOLESIZE;
+typedef volatile uint32_t VWHOLESIZE;
 #endif // __WORDSIZE == 64
+
+#ifdef ATOMIC
+#define VTYPE _Atomic TYPE
+#define VWHOLESIZE _Atomic WHOLESIZE
+#endif // ATOMIC
 
 //------------------------------------------------------------------------------
 
@@ -173,8 +177,9 @@ static struct cnts ** counters CALIGN;
 
 //------------------------------------------------------------------------------
 
-static ATYPE stop CALIGN = 0;
-static ATYPE Arrived CALIGN = 0;
+// Do not use VTYPE because -DATOMIC changes it.
+static volatile TYPE stop CALIGN = 0;
+static volatile TYPE Arrived CALIGN = 0;
 static uintptr_t N CALIGN, Threads CALIGN, Time CALIGN;
 static intptr_t Degree CALIGN = -1;
 
@@ -205,7 +210,7 @@ static inline void NonCriticalSection( const TYPE id ) {
 static TYPE HPAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
 static volatile RTYPE randomChecksum CALIGN = 0;
 static volatile RTYPE sumOfThreadChecksums CALIGN = 0;
-// Do not use VTYPE because -DATOMIC changes it to ATYPE
+// Do not use VTYPE because -DATOMIC changes it.
 static volatile TYPE CurrTid CALIGN = ULONG_MAX;		// shared, current thread id in critical section
 static TYPE HPAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
@@ -467,6 +472,9 @@ int main( int argc, char * argv[] ) {
 	#else
 						  ".c"
 	#endif // __cplusplus
+	#ifdef ATOMIC
+						  " ATOMIC"
+	#endif // ATOMIC
 						  "\n  N   T    CS Entries           AVG           STD   RSTD   CAVG        SMALLS\n", xstr(Algorithm) );
 #else
 	#define COMMA ""
