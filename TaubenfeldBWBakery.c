@@ -5,18 +5,18 @@
 
 typedef union {
 	struct {
-		volatile HALFSIZE color;
-		volatile HALFSIZE number;
+		VHALFSIZE color;
+		VHALFSIZE number;
 	};
 	WHOLESIZE atom;										// ensure atomic assignment
-	volatile WHOLESIZE vatom;							// volatile alias
+	VWHOLESIZE vatom;									// volatile alias
 } Ticket;
 typedef enum { black, white } BW;
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
 static VTYPE color CALIGN;
 static VTYPE * choosing CALIGN;
-static Ticket * ticket CALIGN;
+static Ticket * ticket CALIGN;							// volatile fields
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 #define await( E ) while ( ! (E) ) Pause()

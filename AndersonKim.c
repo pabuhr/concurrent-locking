@@ -35,13 +35,13 @@ static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sha
 //======================================================
 
 static inline void entrySlow(
-#ifdef TB
+	#ifdef TB
 	TYPE id
-#else
+	#else
 	int level, Tuple * state
-#endif // TB
+	#endif // TB
 	) {
-#ifdef TB
+	#ifdef TB
 	unsigned int ridt, ridi;
 
 //	ridi = id;
@@ -54,92 +54,95 @@ static inline void entrySlow(
 		while ( intents[lv][ridi ^ 1] == 1 && turns[lv][ridt] == ridi ) Pause();
 //		ridi = ridi >> 1;
 	} // for
-#else
+	#else
 	for ( int s = 0; s <= level; s += 1 ) {				// entry protocol
 		binary_prologue( state[s].es, state[s].ns );
 	} // for
-#endif // TB
+	#endif // TB
 } // entrySlow
 
 static inline void exitSlow(
-#ifdef TB
+	#ifdef TB
 	TYPE id
-#else
+	#else
 	int level, Tuple * state
-#endif // TB
+	#endif // TB
 	) {
-#ifdef TB
+	#ifdef TB
 	for ( int lv = depth - 1; lv >= 0; lv -= 1 ) {		// exit protocol
 		intents[lv][id >> lv] = 0;						// retract all intents in reverse order
 	} // for
-#else
+	#else
 	for ( int s = level; s >= 0; s -= 1 ) {				// exit protocol, reverse order
 		binary_epilogue( state[s].es, state[s].ns );
 	} // for
-#endif // TB
+	#endif // TB
 } // exitSlow
 
-//=========================================================================
+//======================================================
 
 typedef union {
 	struct {
-		volatile HALFSIZE free;
-		volatile HALFSIZE indx;
+		VHALFSIZE free;
+		VHALFSIZE indx;
 	};
 	WHOLESIZE atom;										// ensure atomic assignment
-	volatile WHOLESIZE vatom ;							// volatile alias
+	VWHOLESIZE vatom;									// volatile alias
 } Atomic;
 
-static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
+static TYPE PAD3 CALIGN __attribute__(( unused ));		// protect further false sharing
 static VTYPE x CALIGN;
-static volatile Atomic y CALIGN, Reset CALIGN;
+static Atomic y CALIGN, Reset CALIGN;					// volatile fields
 static VTYPE * Name_Taken, * Obstacle;
 static VTYPE Infast CALIGN;
-static volatile Token B; // = { { 0, 0 }, 0 };
-static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
+static Token B; // = { { 0, 0 }, 0 };
+static TYPE PAD4 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 #define await( E ) while ( ! (E) ) Pause()
 
-
 static inline void SLOW1( TYPE id, uint32_t * randomThreadChecksum
-#ifndef TB
+						  #ifndef TB
 						  , int level, Tuple * state
-#endif // ! TB
+						  #endif // ! TB
 	) {
 	entrySlow(
-#ifdef TB
+		#ifdef TB
 		id
-#else
+		#else
 		level, state
-#endif // TB
+		#endif // TB
 		);
 	binary_prologue( 0, &B );
+
 	*randomThreadChecksum += CriticalSection( id );
+
 	binary_epilogue( 0, &B );
 	exitSlow(
-#ifdef TB
+		#ifdef TB
 		id
-#else
+		#else
 		level, state
-#endif // TB
+		#endif // TB
 		);
 } // SLOW1
 
 
 static inline void SLOW2( TYPE id, Atomic y, uint32_t * randomThreadChecksum
-#ifndef TB
+						  #ifndef TB
 						  , int level, Tuple * state
-#endif // ! TB
+						  #endif // ! TB
 	) {
 	entrySlow(
-#ifdef TB
+		#ifdef TB
 		id
-#else
+		#else
 		level, state
-#endif // TB
+		#endif // TB
 		);
 	binary_prologue( 0, &B );
+
 	*randomThreadChecksum += CriticalSection( id );
+
 	y.vatom = 0;
 	x = id;
 	Fence();											// force store before more loads
@@ -154,11 +157,11 @@ static inline void SLOW2( TYPE id, Atomic y, uint32_t * randomThreadChecksum
 	} // if
 	binary_epilogue( 0, &B );
 	exitSlow(
-#ifdef TB
+		#ifdef TB
 		id
-#else
+		#else
 		level, state
-#endif // TB
+		#endif // TB
 		);
 } // SLOW2
 
@@ -166,14 +169,15 @@ static inline void SLOW2( TYPE id, Atomic y, uint32_t * randomThreadChecksum
 static void * Worker( void * arg ) {
 	TYPE id = (size_t)arg;
 	uint64_t entry;
-#ifdef FAST
-	unsigned int cnt = 0, oid = id;
-#endif // FAST
 
-#ifndef TB
+	#ifdef FAST
+	unsigned int cnt = 0, oid = id;
+	#endif // FAST
+
+	#ifndef TB
 	int level = levels[id];
 	Tuple * state = states[id];
-#endif // ! TB
+	#endif // ! TB
 
 	Atomic ly;
 
@@ -186,19 +190,19 @@ static void * Worker( void * arg ) {
 			ly.atom = y.vatom;
 			if ( FASTPATH( ! ly.free ) ) {
 				SLOW1( id, &randomThreadChecksum
-#ifndef TB
+					   #ifndef TB
 					   , level, state
-#endif // ! TB
-					    );
+					   #endif // ! TB
+					);
 			} else {
 				y.vatom = 0;
 				Obstacle[id] = true;
 				Fence();								// force store before more loads
 				if ( FASTPATH( x != id || Infast ) ) {
 					SLOW2( id, ly, &randomThreadChecksum
-#ifndef TB
+						   #ifndef TB
 						   , level, state
-#endif // ! TB
+						   #endif // ! TB
 						);
 				} else {
 					Name_Taken[ly.indx] = true;
@@ -206,9 +210,9 @@ static void * Worker( void * arg ) {
 					if ( FASTPATH( Reset.vatom != ly.atom ) ) {
 						Name_Taken[ly.indx] = false;
 						SLOW2( id, ly, &randomThreadChecksum
-#ifndef TB
+							   #ifndef TB
 							   , level, state
-#endif // ! TB
+							   #endif // ! TB
 							);
 					} else {
 						Infast = true;
@@ -233,17 +237,17 @@ static void * Worker( void * arg ) {
 				} // if
 			} // if
 
-#ifdef FAST
+			#ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
 			cnt = cycleUp( cnt, NoStartPoints );
-#endif // FAST
+			#endif // FAST
 		} // for
 
 		__sync_fetch_and_add( &sumOfThreadChecksums, randomThreadChecksum );
 
-#ifdef FAST
+		#ifdef FAST
 		id = oid;
-#endif // FAST
+		#endif // FAST
 		entries[r][id] = entry;
 		__sync_fetch_and_add( &Arrived, 1 );
 		while ( stop != 0 ) Pause();
@@ -255,7 +259,7 @@ static void * Worker( void * arg ) {
 //=========================================================================
 
 void __attribute__((noinline)) ctor2() {
-#ifdef TB
+	#ifdef TB
 	depth = Clog2( N );									// maximal depth of binary tree
 	int width = 1 << depth;								// maximal width of binary tree
 	intents = Allocator( sizeof(typeof(intents[0])) * depth ); // allocate matrix columns
@@ -268,7 +272,7 @@ void __attribute__((noinline)) ctor2() {
 		} // for
 		turns[r] = Allocator( sizeof(typeof(turns[0][0])) * (size >> 1) ); // half maximal row size
 	} // for
-#else
+	#else
 	// element 0 not used
 	t = Allocator( sizeof(typeof(t[0])) * N );
 
@@ -290,7 +294,7 @@ void __attribute__((noinline)) ctor2() {
 			states[id][s].ns = &t[start >> 1];
 		} // for
 	} // for
-#endif // TB
+	#endif // TB
 } // ctor2
 
 void __attribute__((noinline)) ctor() {
@@ -306,18 +310,18 @@ void __attribute__((noinline)) ctor() {
 } // ctor
 
 void __attribute__((noinline)) dtor2() {
-#ifdef TB
-	for ( int r = 0; r < depth; r += 1 ) {				// deallocate matrix rows
+	#ifdef TB
+	for ( typeof(depth) r = 0; r < depth; r += 1 ) {	// deallocate matrix rows
 		free( (void *)turns[r] );
 		free( (void *)intents[r] );
 	} // for
 	free( (void *)turns );								// deallocate matrix columns
 	free( (void *)intents );
-#else
+	#else
 	free( (void *)levels );
 	free( (void *)states );
 	free( (void *)t );
-#endif // TB
+	#endif // TB
 } // dtor2
 
 void __attribute__((noinline)) dtor() {

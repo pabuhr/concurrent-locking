@@ -5,11 +5,11 @@
 
 typedef union {
 	struct {
-		volatile HALFSIZE level;						// current level in tournament
-		volatile HALFSIZE state;						// intent to enter critical section
+		VHALFSIZE level;								// current level in tournament
+		VHALFSIZE state;								// intent to enter critical section
 	};
 	WHOLESIZE atom;										// ensure atomic assignment
-	volatile WHOLESIZE vatom ;							// volatile alias
+	VWHOLESIZE vatom;									// volatile alias
 } Tuple;
 
 #define L(t) ((t).level)
@@ -20,7 +20,7 @@ static inline int min( int a, int b ) { return a < b ? a : b; }
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
 static int depth CALIGN, mask CALIGN;
-static volatile Tuple * Q CALIGN;
+static Tuple * Q CALIGN;								// volatile fields
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 WHOLESIZE QMAX( TYPE id, unsigned int k ) {

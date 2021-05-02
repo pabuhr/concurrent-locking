@@ -12,7 +12,7 @@ typedef struct mcs_node {								// cache align node at declaration
 	VTYPE spin;
 } MCS_node;
 #ifndef ATOMIC
-typedef struct mcs_node * MCS_lock;
+typedef MCS_node * MCS_lock;
 #else
 typedef _Atomic(MCS_node *) MCS_lock;
 #endif // ! ATOMIC

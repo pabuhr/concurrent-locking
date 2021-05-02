@@ -3,8 +3,8 @@
 //#define inv( c ) ((c) ^ 1)
 
 typedef struct CALIGN {
-	volatile TYPE Q[2];
-	volatile TYPE
+	VTYPE Q[2];
+	VTYPE
 #if defined( KESSELS2 )
 	R[2];
 #else
