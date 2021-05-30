@@ -475,6 +475,9 @@ int main( int argc, char * argv[] ) {
 	#ifdef ATOMIC
 						  " ATOMIC"
 	#endif // ATOMIC
+	#ifdef FAST
+						  " FAST"
+	#endif // FAST
 						  "\n  N   T    CS Entries           AVG           STD   RSTD   CAVG        SMALLS\n", xstr(Algorithm) );
 #else
 	#define COMMA ""
@@ -602,9 +605,9 @@ int main( int argc, char * argv[] ) {
 		double diff = totals[r] - avg;
 		sum += diff * diff;
 	} // for
-	double std = sqrt( sum / Threads );
+	double std = sqrt( sum / Threads ), percent = 15.0;
 	avg = avg == 0 ? 0.0 : std / avg * 100;
-	if ( avg > 10.0 ) printf( "\nWarning relative standard deviation %.1f%% greater than 10%% over %d runs.\n", avg, RUNS );
+	if ( avg > percent ) printf( "\nWarning relative standard deviation %.1f%% greater than %.0f%% over %d runs.\n", avg, percent, RUNS );
 
 	unsigned int posn;									// run with median result
 	for ( posn = 0; posn < RUNS && totals[posn] != med; posn += 1 ); // assumes RUNS is odd
