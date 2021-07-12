@@ -457,7 +457,7 @@ int main( int argc, char * argv[] ) {
 		break;
 	  USAGE:
 	  default:
-		printf( "Usage: %s %ju (number of threads) %ju (time in seconds threads spend entering critical section) %jd (Zhang D-ary)\n",
+		printf( "Usage: %s [ threads (> 0) %ju ] [ experiment duration (> 0, seconds) %ju ] [ Zhang D-ary (> 1) %jd ]\n",
 				argv[0], N, Time, Degree );
 		exit( EXIT_FAILURE );
 	} // switch
@@ -466,19 +466,23 @@ int main( int argc, char * argv[] ) {
 	#define COMMA "'13"
 	setlocale( LC_NUMERIC, "en_US.UTF-8" );
 
-	if ( N == 1 ) printf( "%s"
+	if ( N == 1 ) {										// title
+		printf( "%s"
 	#ifdef __cplusplus
-						  ".cc"
+				".cc"
 	#else
-						  ".c"
+				".c"
 	#endif // __cplusplus
 	#ifdef ATOMIC
-						  " ATOMIC"
+				" ATOMIC"
 	#endif // ATOMIC
 	#ifdef FAST
-						  " FAST"
+				" FAST"
 	#endif // FAST
-						  "\n  N   T    CS Entries           AVG           STD   RSTD   CAVG        SMALLS\n", xstr(Algorithm) );
+				, xstr(Algorithm) );
+		if ( Degree != -1 ) printf( " %jd-ary", Degree ); // Zhang only
+		printf( "\n  N   T    CS Entries           AVG           STD   RSTD   CAVG        SMALLS\n" );
+	} // if
 #else
 	#define COMMA ""
 #endif // CFMT
