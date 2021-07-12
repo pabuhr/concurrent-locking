@@ -73,110 +73,115 @@ static inline bool trylock( TYPE id ) {					// based on Lamport-Fast algorithm
 
 static TYPE PAD3 CALIGN __attribute__(( unused ));		// protect further false sharing
 typedef struct CALIGN {
-	TYPE apply;
+	VTYPE apply;
 #ifdef FLAG
-	TYPE flag;
+	VTYPE flag;
 #endif // FLAG
 } Flags;
-static volatile Flags * flags CALIGN;
+static Flags * flags CALIGN;
 
 #ifndef FLAG
 static VTYPE first CALIGN;
 #endif // FLAG
 static TYPE PAD4 CALIGN __attribute__(( unused ));		// protect further false sharing
 
-
 static void * Worker( void * arg ) {
 	TYPE id = (size_t)arg;
 	uint64_t entry;
 
-	volatile typeof(flags[0].apply) *applyId = &flags[id].apply; // optimizations
-#ifdef FLAG
-	volatile typeof(flags[0].flag) *flagId = &flags[id].flag;
-	volatile typeof(flags[0].flag) *flagN = &flags[N].flag;
-#endif // FLAG
+	// _Atomic qualifier not preserved in typeof => VTYPE
+	VTYPE * applyId = &flags[id].apply;					// optimizations
+	#ifdef FLAG
+	VTYPE * flagId = &flags[id].flag;
+	VTYPE * flagN = &flags[N].flag;
+	#endif // FLAG
 
-#ifdef FAST
+	#ifdef FAST
 	typeof(id) cnt = 0, oid = id;
-#endif // FAST
+	#endif // FAST
 	typeof(id) thr;
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
+		RTYPE randomThreadChecksum = 0;
+
 		for ( entry = 0; stop == 0; entry += 1 ) {
 			*applyId = true;							// entry protocol
 			if ( FASTPATH( trylock( id ) ) ) {			// true => leader
-#ifndef CAS
+				#ifndef CAS
 				Fence();								// force store before more loads
-#endif // ! CAS
+				#endif // ! CAS
 
-#ifdef FLAG
+				#ifdef FLAG
 				await( *flagId || *flagN );
 				*flagN = false;
-#else
+				#else
 				await( first == id || first == N );
 				first = id;
-#endif // FLAG
+				#endif // FLAG
 				unlock();
 			} else {
-#ifdef FLAG
+				#ifdef FLAG
 				await( *flagId );
-#else
+				#else
 				await( first == id );
-#endif // FLAG
+				#endif // FLAG
 			} // if
-#ifdef FLAG
+			#ifdef FLAG
 			*flagId = false;
-#endif // FLAG
+			#endif // FLAG
 
-			CriticalSection( id );
+			randomThreadChecksum += CriticalSection( id );
 
-#ifdef CYCLEUP
+			#ifdef CYCLEUP
 			for ( thr = cycleUp( id, N ); ! flags[thr].apply; thr = cycleUp( thr, N ) );
-#else // CYCLEDOWN
+			#else // CYCLEDOWN
 			#define Mod( a, b, N ) ((a + b) < N ? (a + b) : (a + b - N))
 			for ( thr = N - 1; ! flags[Mod(id, thr, N)].apply; thr -= 1 );
-#endif // CYCLEUP
+			#endif // CYCLEUP
 
 			*applyId = false;							// must appear before setting first
-#ifdef CYCLEUP
+			#ifdef CYCLEUP
 			if ( FASTPATH( thr != id ) )
-#ifdef FLAG
+				#ifdef FLAG
 				flags[thr].flag = true; else *flagN = true;
-#else // NOFLAG
+				#else // NOFLAG
 				first = thr; else first = N;
-#endif // FLAG
+				#endif // FLAG
 
-#else // CYCLEDOWN
+			#else // CYCLEDOWN
 
 			if ( FASTPATH( thr != 0 ) )
-#ifdef FLAG
+				#ifdef FLAG
 				flags[Mod(id, thr, N)].flag = true; else *flagN = true;
-#else // NOFLAG
+				#else // NOFLAG
 				first = Mod(id, thr, N); else first = N;
-#endif // FLAG
-#endif // CYCLEUP
+				#endif // FLAG
+			#endif // CYCLEUP
 
-#ifdef FAST
+			#ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
 			cnt = cycleUp( cnt, NoStartPoints );
 
 			applyId = &flags[id].apply;				// must reset for new id
-#ifdef FLAG
+
+			#ifdef FLAG
 			flagId = &flags[id].flag;
 			flagN = &flags[N].flag;
-#endif // FLAG
-#endif // FAST
+			#endif // FLAG
+			#endif // FAST
 		} // for
 
-#ifdef FAST
+		__sync_fetch_and_add( &sumOfThreadChecksums, randomThreadChecksum );
+
+		#ifdef FAST
 		id = oid;
 
 		applyId = &flags[id].apply;					// must reset for new id
-#ifdef FLAG
+		#ifdef FLAG
 		flagId = &flags[id].flag;
 		flagN = &flags[N].flag;
-#endif // FLAG
-#endif // FAST
+		#endif // FLAG
+		#endif // FAST
 		entries[r][id] = entry;
 		__sync_fetch_and_add( &Arrived, 1 );
 		while ( stop != 0 ) Pause();
@@ -187,33 +192,33 @@ static void * Worker( void * arg ) {
 
 void __attribute__((noinline)) ctor() {
 	flags = Allocator( (N + 1) * sizeof(typeof(flags[0])) );
-	for ( TYPE id = 0; id <= N; id += 1 ) {				// initialize shared data
+	for ( typeof(N) id = 0; id <= N; id += 1 ) {		// initialize shared data
 		flags[id].apply = false;
-#ifdef FLAG
+		#ifdef FLAG
 		flags[id].flag = false;
-#endif // FLAG
+		#endif // FLAG
 	} // for
 
-#ifdef FLAG
+	#ifdef FLAG
 	flags[N].flag = true;
-#else
+	#else
 	first = N;
-#endif // FLAG
+	#endif // FLAG
 
-#ifndef CAS
+	#ifndef CAS
 	b = Allocator( N * sizeof(typeof(b[0])) );
-	for ( TYPE id = 0; id < N; id += 1 ) {				// initialize shared data
+	for ( typeof(N) id = 0; id < N; id += 1 ) {			// initialize shared data
 		b[id] = false;
 	} // for
 	y = N;
-#endif // CAS
+	#endif // CAS
 	unlock();
 } // ctor
 
 void __attribute__((noinline)) dtor() {
-#ifndef CAS
+	#ifndef CAS
 	free( (void *)b );
-#endif // ! CAS
+	#endif // ! CAS
 	free( (void *)flags );
 } // dtor
 

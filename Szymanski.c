@@ -2,22 +2,26 @@
 // Proceedings of the 2nd International Conference on Supercomputing, 1988, Figure 2, Page 624.
 // Waiting after CS can be moved before it.
 
-static volatile TYPE *flag CALIGN;
+static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
+static VTYPE * flag CALIGN;
+static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 #define await( E ) while ( ! (E) ) Pause()
 
-static void *Worker( void *arg ) {
+static void * Worker( void * arg ) {
 	TYPE id = (size_t)arg;
 	uint64_t entry;
-#ifdef FAST
-	unsigned int cnt = 0, oid = id;
-#endif // FAST
 
-	int j;
+	#ifdef FAST
+	unsigned int cnt = 0, oid = id;
+	#endif // FAST
+
+	typeof(N) j;
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
-		entry = 0;
-		while ( stop == 0 ) {
+		RTYPE randomThreadChecksum = 0;
+
+		for ( entry = 0; stop == 0; entry += 1 ) {
 			flag[id] = 1;
 			Fence();									// force store before more loads
 			for ( j = 0; j < N; j += 1 )				// wait until doors open
@@ -28,7 +32,7 @@ static void *Worker( void *arg ) {
 				if ( flag[j] == 1 ) {					//   others in group ?
 					flag[id] = 2;						// enter waiting room
 					Fence();							// force store before more loads
-				  L: for ( int k = 0; k < N; k += 1 )	// wait for
+				  L: for ( typeof(N) k = 0; k < N; k += 1 )	// wait for
 						if ( flag[k] == 4 ) goto fini;	//   door 2 to open
 					goto L;
 				  fini: ;
@@ -39,19 +43,24 @@ static void *Worker( void *arg ) {
 //				await( flag[j] < 2 || flag[j] > 3 );	//    to pass through door 2
 			for ( j = 0; j < id; j += 1 )				// service threads in priority order
 				await( flag[j] < 2 );
-			CriticalSection( id );
+
+			randomThreadChecksum += CriticalSection( id );
+
 			for ( j = id + 1; j < N; j += 1 )			// wait for all threads in waiting room
 				await( flag[j] < 2 || flag[j] > 3 );	//    to pass through door 2
 			flag[id] = 0;
-#ifdef FAST
+
+			#ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
 			cnt = cycleUp( cnt, NoStartPoints );
-#endif // FAST
-			entry += 1;
-		} // while
-#ifdef FAST
+			#endif // FAST
+		} // for
+
+		__sync_fetch_and_add( &sumOfThreadChecksums, randomThreadChecksum );
+
+		#ifdef FAST
 		id = oid;
-#endif // FAST
+		#endif // FAST
 		entries[r][id] = entry;
 		__sync_fetch_and_add( &Arrived, 1 );
 		while ( stop != 0 ) Pause();
@@ -60,18 +69,18 @@ static void *Worker( void *arg ) {
 	return NULL;
 } // Worker
 
-void ctor() {
+void __attribute__((noinline)) ctor() {
 	flag = Allocator( sizeof(typeof(flag[0])) * N );
-	for ( int i = 0; i < N; i += 1 ) {					// initialize shared data
+	for ( typeof(N) i = 0; i < N; i += 1 ) {			// initialize shared data
 		flag[i] = 0;
 	} // for
 } // ctor
 
-void dtor() {
+void __attribute__((noinline)) dtor() {
 	free( (void *)flag );
 } // dtor
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=Szymanski Harness.c -lpthread -lm" //
+// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=Szymanski Harness.c -lpthread -lm -D`hostname` -DCFMT -DCNT=0" //
 // End: //

@@ -100,7 +100,7 @@ static void * Worker( void * arg ) {
 	#endif // ! TB
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
-		uint32_t randomThreadChecksum = 0;
+		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
 #if 0
@@ -170,7 +170,7 @@ static void * Worker( void * arg ) {
 			b[id] = false;
 			goto Fini;
 
-		  Slow:
+		  Slow: ;
 			entrySlow(
 				#ifdef TB
 				id
@@ -191,7 +191,6 @@ static void * Worker( void * arg ) {
 				level, state
 				#endif // TB
 				);
-
 		  Fini: ;
 
 			#ifdef FAST
@@ -241,7 +240,7 @@ void __attribute__((noinline)) ctor2() {
 	states = Allocator( sizeof(typeof(states[0])) * N );
 	levels = Allocator( sizeof(typeof(levels[0])) * N );
 	levels[0] = -1;										// default for N=1
-	for ( TYPE id = 0; id < N; id += 1 ) {
+	for ( typeof(N) id = 0; id < N; id += 1 ) {
 		t[id].Q[0] = t[id].Q[1] = t[id].R = 0;
 		unsigned int start = N + id, level = Log2( start );
 		states[id] = Allocator( sizeof(typeof(states[0][0])) * level );

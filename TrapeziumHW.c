@@ -6,9 +6,11 @@
 
 #ifdef TB
 
-static volatile TYPE ** intents CALIGN;					// triangular matrix of intents
-static volatile TYPE ** turns CALIGN;					// triangular matrix of turns
+static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
+static VTYPE ** intents CALIGN;							// triangular matrix of intents
+static VTYPE ** turns CALIGN;							// triangular matrix of turns
 static unsigned int depth CALIGN;
+static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 #else
 
@@ -17,24 +19,26 @@ typedef struct CALIGN {
 	TYPE es;											// left/right opponent
 } Tuple;
 
+static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
 static Tuple ** states CALIGN;							// handle N threads
 static int * levels CALIGN;								// minimal level for binary tree
 //static Tuple states[64][6] CALIGN;						// handle 64 threads with maximal tree depth of 6 nodes (lg 64)
 //static int levels[64] = { -1 } CALIGN;					// minimal level for binary tree
 static Token * t CALIGN;
+static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 #endif // TB
 
 //======================================================
 
 static inline void entrySlow(
-#ifdef TB
+	#ifdef TB
 	TYPE id
-#else
+	#else
 	int level, Tuple * state
-#endif // TB
+	#endif // TB
 	) {
-#ifdef TB
+	#ifdef TB
 	unsigned int ridt, ridi;
 
 //	ridi = id;
@@ -47,80 +51,82 @@ static inline void entrySlow(
 		while ( intents[lv][ridi ^ 1] == 1 && turns[lv][ridt] == ridi ) Pause();
 //		ridi = ridi >> 1;
 	} // for
-#else
+	#else
 	for ( int s = 0; s <= level; s += 1 ) {				// entry protocol
 		binary_prologue( state[s].es, state[s].ns );
 	} // for
-#endif // TB
+	#endif // TB
 } // entrySlow
 
 static inline void exitSlow(
-#ifdef TB
+	#ifdef TB
 	TYPE id
-#else
+	#else
 	int level, Tuple * state
-#endif // TB
+	#endif // TB
 	) {
-#ifdef TB
+	#ifdef TB
 	for ( int lv = depth - 1; lv >= 0; lv -= 1 ) {		// exit protocol
 		intents[lv][id >> lv] = 0;						// retract all intents in reverse order
 	} // for
-#else
+	#else
 	for ( int s = level; s >= 0; s -= 1 ) {				// exit protocol, reverse order
 		binary_epilogue( state[s].es, state[s].ns );
 	} // for
-#endif // TB
+	#endif // TB
 } // exitSlow
 
 //======================================================
 
-static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
 enum { K = NEST };
+
+static TYPE PAD3 CALIGN __attribute__(( unused ));		// protect further false sharing
 static TYPE mutex[K] CALIGN;
 static Token B[K] CALIGN;
-static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
+static TYPE PAD4 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 #define await( E ) while ( ! (E) ) Pause()
-
 
 static void * Worker( void * arg ) {
 	TYPE id = (size_t)arg;
 	uint64_t entry;
 
-#ifdef FAST
+	#ifdef FAST
 	unsigned int cnt = 0, oid = id;
-#endif // FAST
+	#endif // FAST
 
-#ifndef TB
+	#ifndef TB
 	int level = levels[id];
 	Tuple * state = states[id];
-#endif // ! TB
+	#endif // ! TB
 
 	intptr_t fa;
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
-		entry = 0;
+		RTYPE randomThreadChecksum = 0;
 
-#ifdef CNT
+		#ifdef CNT
 		for ( unsigned int i = 0; i < CNT + 1; i += 1 ) { // reset for each run
 			counters[r][id].cnts[i] = 0;
 		} // for
-#endif // CNT
+		#endif // CNT
 
-		while ( stop == 0 ) {
+		for ( entry = 0; stop == 0; entry += 1 ) {
 			for ( fa = 0; fa < K; fa += 1 ) {
 			  if ( mutex[fa] == N && __sync_bool_compare_and_swap( &mutex[fa], N, id ) ) goto Fast;
 			} // for
 			goto Slow;
  
 		  Fast: ;
-#ifdef CNT
+			#ifdef CNT
 			counters[r][id].cnts[fa] += 1;
-#endif // CNT
+			#endif // CNT
 			for ( intptr_t i = fa; i >= 0; i -= 1 ) {
 				binary_prologue( i < fa, &B[i] );
 			} // for
-			CriticalSection( id );
+
+			randomThreadChecksum += CriticalSection( id );
+
 			for ( unsigned int i = 0; i <= fa; i += 1 ) {
 				binary_epilogue( i < fa, &B[i] );
 			} // for
@@ -130,45 +136,48 @@ static void * Worker( void * arg ) {
 
 		  Slow:
 			entrySlow(
-#ifdef TB
+				#ifdef TB
 				id
-#else
+				#else
 				level, state
-#endif // TB
+				#endif // TB
 				);
 
-#ifdef CNT
+			#ifdef CNT
 			counters[r][id].cnts[fa] += 1;
-#endif // CNT
+			#endif // CNT
 			fa -= 1;
 			for ( intptr_t i = fa; i >= 0; i -= 1 ) {
 				binary_prologue( 1, &B[i] );
 			} // for
-			CriticalSection( id );
+
+			randomThreadChecksum += CriticalSection( id );
+
 			for ( unsigned int i = 0; i <= fa; i += 1 ) {
 				binary_epilogue( 1, &B[i] );
 			} // for
 
 			exitSlow(
-#ifdef TB
+				#ifdef TB
 				id
-#else
+				#else
 				level, state
-#endif // TB
+				#endif // TB
 				);
 
 		  Fini: ;
 
-#ifdef FAST
+			#ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
 			cnt = cycleUp( cnt, NoStartPoints );
-#endif // FAST
-			entry += 1;
-		} // while
+			#endif // FAST
+		} // for
 
-#ifdef FAST
+		__sync_fetch_and_add( &sumOfThreadChecksums, randomThreadChecksum );
+
+		#ifdef FAST
 		id = oid;
-#endif // FAST
+		#endif // FAST
 		entries[r][id] = entry;
 		__sync_fetch_and_add( &Arrived, 1 );
 		while ( stop != 0 ) Pause();
@@ -180,7 +189,7 @@ static void * Worker( void * arg ) {
 //=========================================================================
 
 void __attribute__((noinline)) ctor2() {
-#ifdef TB
+	#ifdef TB
 	depth = Clog2( N );									// maximal depth of binary tree
 	int width = 1 << depth;								// maximal width of binary tree
 	intents = Allocator( sizeof(typeof(intents[0])) * depth ); // allocate matrix columns
@@ -193,7 +202,7 @@ void __attribute__((noinline)) ctor2() {
 		} // for
 		turns[r] = Allocator( sizeof(typeof(turns[0][0])) * (size >> 1) ); // half maximal row size
 	} // for
-#else
+	#else
 	// element 0 not used
 	t = Allocator( sizeof(typeof(t[0])) * N );
 
@@ -205,7 +214,7 @@ void __attribute__((noinline)) ctor2() {
 	states = Allocator( sizeof(typeof(states[0])) * N );
 	levels = Allocator( sizeof(typeof(levels[0])) * N );
 	levels[0] = -1;										// default for N=1
-	for ( TYPE id = 0; id < N; id += 1 ) {
+	for ( typeof(N) id = 0; id < N; id += 1 ) {
 		t[id].Q[0] = t[id].Q[1] = t[id].R = 0;
 		unsigned int start = N + id, level = Log2( start );
 		states[id] = Allocator( sizeof(typeof(states[0][0])) * level );
@@ -215,7 +224,7 @@ void __attribute__((noinline)) ctor2() {
 			states[id][s].ns = &t[start >> 1];
 		} // for
 	} // for
-#endif // TB
+	#endif // TB
 } // ctor2
 
 void __attribute__((noinline)) ctor() {
@@ -226,18 +235,18 @@ void __attribute__((noinline)) ctor() {
 } // ctor
 
 void __attribute__((noinline)) dtor2() {
-#ifdef TB
+	#ifdef TB
 	for ( int r = 0; r < depth; r += 1 ) {				// deallocate matrix rows
 		free( (void *)turns[r] );
 		free( (void *)intents[r] );
 	} // for
 	free( (void *)turns );								// deallocate matrix columns
 	free( (void *)intents );
-#else
+	#else
 	free( (void *)levels );
 	free( (void *)states );
 	free( (void *)t );
-#endif // TB
+	#endif // TB
 } // dtor2
 
 void __attribute__((noinline)) dtor() {
@@ -246,5 +255,5 @@ void __attribute__((noinline)) dtor() {
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DNEST=1 -DAlgorithm=TrapeziumHW Harness.c -lpthread -lm" //
+// compile-command: "gcc -DNEST=1 -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=TrapeziumHW Harness.c -lpthread -lm -D`hostname` -DCFMT -DCNT=0" //
 // End: //

@@ -11,7 +11,6 @@ typedef union {
 	WHOLESIZE atom;										// ensure atomic assignment
 	VWHOLESIZE vatom;									// volatile alias
 } Ticket;
-typedef enum { black, white } BW;
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
 static VTYPE color CALIGN;
@@ -35,7 +34,7 @@ static void * Worker( void * arg ) {
 	typeof(&ticket[0]) myticket = &ticket[id];
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
-		uint32_t randomThreadChecksum = 0;
+		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
 			// step 1, select a ticket
@@ -46,7 +45,6 @@ static void * Worker( void * arg ) {
 			Ticket v;
 			for ( typeof(N) j = 0; j < N; j += 1 ) {	// O(N) search for largest ticket
 				v.atom = ticket[j].vatom;				// could change so must copy
-				assert ( v.number <= N );
 				if ( number < v.number && mycolor == v.color ) number = v.number;
 			} // for
 			number += 1;								// advance ticket
@@ -106,7 +104,7 @@ void __attribute__((noinline)) ctor() {
 	ticket = Allocator( sizeof(typeof(ticket[0])) * N );
 	for ( typeof(N) i = 0; i < N; i += 1 ) {			// initialize shared data
 		choosing[i] = false;
-		ticket[i] = (Ticket){ {black, 0} };
+		ticket[i] = (Ticket){ {0, 0} };
 	} // for
 } // ctor
 

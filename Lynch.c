@@ -1,7 +1,7 @@
 // Nancy A. Lynch, Distributed Algorithms, Morgan Kaufmann, 1996, Section 10.5.3
 // Significant parts of this algorithm are written in prose, and therefore, left to our interpretation with respect to implementation.
 
-static volatile TYPE *intents, *turns;
+static VTYPE *intents, *turns;
 static int depth, width, mask;
 
 static inline TYPE min( TYPE a, TYPE b ) { return a < b ? a : b; }

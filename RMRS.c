@@ -69,10 +69,10 @@ typedef struct CALIGN {
 } Tstate;
 
 static volatile Queue * q CALIGN;
-static volatile TYPE ** tournament CALIGN;
+static VTYPE ** tournament CALIGN;
 static volatile Tstate * arrState CALIGN;
-static volatile TYPE first CALIGN;
-static volatile TYPE exits CALIGN;
+static VTYPE first CALIGN;
+static VTYPE exits CALIGN;
 static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
 
 #define await( E ) while ( ! (E) ) Pause()

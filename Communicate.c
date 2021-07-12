@@ -1,16 +1,15 @@
-static volatile TYPE turn CALIGN;
+static VTYPE turn CALIGN;
 
-static void *Worker( void *arg ) {
-	const TYPE id = (size_t)arg;
+static void * Worker( void * arg ) {
+	TYPE id = (size_t)arg;
 	uint64_t entry;
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
-		entry = 0;
-		while ( stop == 0 ) {
+		for ( entry = 0; stop == 0; entry += 1 ) {
 			turn = id;									// perturb cache
 			Fence();									// force store before more loads
-			entry += 1;
-		} // while
+		} // for
+
 		entries[r][id] = entry;
 		__sync_fetch_and_add( &Arrived, 1 );
 		while ( stop != 0 ) Pause();
@@ -19,14 +18,14 @@ static void *Worker( void *arg ) {
 	return NULL;
 } // Worker
 
-void ctor() {
+void __attribute__((noinline)) ctor() {
 	turn = 0;											// initialize shared data
 } // ctor
 
-void dtor() {
+void __attribute__((noinline)) dtor() {
 } // dtor
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=Communicate Harness.c -lpthread -lm" //
+// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=Communicate Harness.c -lpthread -lm -D`hostname` -DCFMT -DCNT=0" //
 // End: //

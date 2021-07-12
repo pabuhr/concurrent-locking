@@ -222,7 +222,7 @@ static inline RTYPE CriticalSection( const TYPE tid ) {
 	CurrTid = tid;
 
 	// If the critical section is violated, the additions are corrupted because of the load/store race unless there is
-	// perfect interleaving. Note, the load, delay, store to increase the cchance of detecting a violation.
+	// perfect interleaving. Note, the load, delay, store to increase the chance of detecting a violation.
 	RTYPE randomNumber = ThreadLocalRandom();			// belt and
 	volatile RTYPE copy = randomChecksum;
 	for ( volatile int delay = 0; delay < CSTimes; delay += 1 ) {} // delay

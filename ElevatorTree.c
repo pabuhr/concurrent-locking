@@ -40,10 +40,12 @@ Queue queue CALIGN;
 
 //======================================================
 
-static volatile TYPE fast CALIGN;
+static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
+static VTYPE fast CALIGN;
 #ifndef CAS
-static volatile TYPE * b CALIGN, x CALIGN, y CALIGN;
+static VTYPE * b CALIGN, x CALIGN, y CALIGN;
 #endif // ! CAS
+static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 #define await( E ) while ( ! (E) ) Pause()
 
@@ -107,31 +109,25 @@ static inline bool trylock( TYPE id ) {					// based on Lamport-Fast algorithm
 
 //======================================================
 
+static TYPE PAD3 CALIGN __attribute__(( unused ));		// protect further false sharing
 #ifdef FLAG
-typedef struct CALIGN {
-	TYPE flag;
-} Flages;
-static volatile Flages * flags CALIGN;
+static VTYPE * flags CALIGN;
 #else
 static VTYPE first CALIGN;
 #endif // FLAG
-
-typedef struct CALIGN {
-	TYPE val;
-} Vals;
-static volatile Vals * vals CALIGN;
-
-static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
+static VTYPE * vals CALIGN;
+static TYPE PAD4 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 static void * Worker( void * arg ) {
 	TYPE id = (size_t)arg;
 	uint64_t entry;
 
 	const unsigned int n = N + id, dep = Log2( n );
-	volatile typeof(vals[0].val) * valId = &vals[n].val;	// optimizations
+	// _Atomic qualifier not preserved in typeof => VTYPE
+	VTYPE * valId = &vals[n];							// optimizations
 	#ifdef FLAG
-	volatile typeof(flags[0].flag) * flagId = &flags[id].flag;
-	volatile typeof(flags[0].flag) * flagN = &flags[N].flag;
+	VTYPE * flagId = &flags[id];
+	VTYPE * flagN = &flags[N];
 	#endif // FLAG
 
 	#ifdef FAST
@@ -139,12 +135,12 @@ static void * Worker( void * arg ) {
 	#endif // FAST
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
-		uint32_t randomThreadChecksum = 0;
+		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
 			// loop goes from leaf to child of root
 			for ( unsigned int j = n; j > 1; j >>= 1 )	// entry protocol
-				vals[j].val = id;
+				vals[j] = id;
 
 			if ( FASTPATH( trylock( id ) ) ) {			// true => leader
 				#ifndef CAS
@@ -175,7 +171,7 @@ static void * Worker( void * arg ) {
 
 			// loop goes from child of root to leaf and inspects siblings
 			for ( int j = dep - 1; j >= 0; j -= 1 ) {	// must be "signed"
-				typeof(vals[0].val) k = vals[(n >> j) ^ 1].val, *wid = &(vals[N + k].val);
+				VTYPE k = vals[(n >> j) ^ 1], *wid = &(vals[N + k]);
 				if ( FASTPATH( *wid < N ) ) {
 					*wid = N;
 					Qenqueue( &queue, k );
@@ -184,7 +180,7 @@ static void * Worker( void * arg ) {
 
 			if ( FASTPATH( QnotEmpty( &queue ) ) )
 			#ifdef FLAG
-				flags[Qdequeue( &queue )].flag = true;
+				flags[Qdequeue( &queue )] = true;
 			else
 				*flagN = true;
 			#else
@@ -228,25 +224,25 @@ void __attribute__((noinline)) ctor() {
 	Qctor( &queue );
 	#ifdef FLAG
 	flags = Allocator( (N + 1) * sizeof(typeof(flags[0])) );
-	for ( TYPE id = 0; id <= N; id += 1 ) {				// initialize shared data
-		flags[id].flag = false;
+	for ( typeof(N) id = 0; id <= N; id += 1 ) {		// initialize shared data
+		flags[id] = false;
 	} // for
 	#endif // FLAG
 
 	#ifdef FLAG
-	flags[N].flag = true;
+	flags[N] = true;
 	#else
 	first = N;
 	#endif // FLAG
 
 	vals = Allocator( (2 * N + 1) * sizeof(typeof(vals[0])) );
-	for ( TYPE id = 0; id <= 2 * N; id += 1 ) {
-		vals[id].val = N;
+	for ( typeof(N) id = 0; id <= 2 * N; id += 1 ) {
+		vals[id] = N;
 	} // for
 
 	#ifndef CAS
 	b = Allocator( N * sizeof(typeof(b[0])) );
-	for ( TYPE id = 0; id < N; id += 1 ) {				// initialize shared data
+	for ( typeof(N) id = 0; id < N; id += 1 ) {			// initialize shared data
 		b[id] = false;
 	} // for
 	y = N;
@@ -267,5 +263,5 @@ void __attribute__((noinline)) dtor() {
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=ElevatorTree Harness.c -lpthread -lm -D`hostname` -DCFMT -DCNT=0" //
+// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=ElevatorTree -DWCasLF Harness.c -lpthread -lm -D`hostname` -DCFMT -DCNT=0" //
 // End: //

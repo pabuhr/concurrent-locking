@@ -18,7 +18,7 @@ static void * Worker( void * arg ) {
 	VTYPE * myticket = &ticket[id];						// optimization
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
-		uint32_t randomThreadChecksum = 0;
+		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
 			// step 1, select a ticket
@@ -74,7 +74,7 @@ void __attribute__((noinline)) ctor() {
 	} // for
 } // ctor
 
-void dtor() {
+void __attribute__((noinline)) dtor() {
 	free( (void *)ticket );
 } // dtor
 

@@ -3,7 +3,7 @@
 
 enum Intent { DontWantIn, WantIn };
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
-static volatile TYPE intents[2] CALIGN = { DontWantIn, DontWantIn }, last CALIGN;
+static VTYPE intents[2] CALIGN = { DontWantIn, DontWantIn }, last CALIGN;
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 #define inv( c ) ((c) ^ 1)

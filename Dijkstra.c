@@ -1,17 +1,21 @@
 // Edsger W. Dijkstra, Solution of a Problem in Concurrent Programming Control, CACM, 8(9), 1965, p. 569
 
-static volatile TYPE *b CALIGN, *c CALIGN, turn CALIGN;
+static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
+static VTYPE * b CALIGN, * c CALIGN, turn CALIGN;
+static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
-static void *Worker( void *arg ) {
+static void * Worker( void * arg ) {
 	TYPE id = (size_t)arg + 1;							// id 0 => don't-want-in
 	uint64_t entry;
-#ifdef FAST
+
+	#ifdef FAST
 	unsigned int cnt = 0, oid = id;
-#endif // FAST
+	#endif // FAST
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
-		entry = 0;
-		while ( stop == 0 ) {
+		RTYPE randomThreadChecksum = 0;
+
+		for ( entry = 0; stop == 0; entry += 1 ) {
 			b[id] = 0;									// entry protocol
 		  L: c[id] = 1;
 			Fence();									// force store before more loads
@@ -22,20 +26,25 @@ static void *Worker( void *arg ) {
 			} // if
 			c[id] = 0;
 			Fence();									// force store before more loads
-			for ( int j = 1; j <= N; j += 1 )
-				if ( j != id && c[j] == 0 ) goto L;
-			CriticalSection( id );
+			for ( typeof(N) j = 1; j <= N; j += 1 )
+				if ( j != (typeof(N))id && c[j] == 0 ) goto L;
+
+			randomThreadChecksum += CriticalSection( id );
+
 			b[id] = c[id] = 1;							// exit protocol
 			turn = 0;
-#ifdef FAST
+
+			#ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
 			cnt = cycleUp( cnt, NoStartPoints );
-#endif // FAST
-			entry += 1;
-		} // while
-#ifdef FAST
+			#endif // FAST
+		} // for
+
+		__sync_fetch_and_add( &sumOfThreadChecksums, randomThreadChecksum );
+
+		#ifdef FAST
 		id = oid;
-#endif // FAST
+		#endif // FAST
 		entries[r][id - 1] = entry;						// adjust for id + 1
 		__sync_fetch_and_add( &Arrived, 1 );
 		while ( stop != 0 ) Pause();
@@ -44,21 +53,21 @@ static void *Worker( void *arg ) {
 	return NULL;
 } // Worker
 
-void ctor() {
+void __attribute__((noinline)) ctor() {
 	b = Allocator( sizeof(typeof(b[0])) * (N + 1) );
 	c = Allocator( sizeof(typeof(c[0])) * (N + 1) );
-	for ( int i = 0; i <= N; i += 1 ) {					// initialize shared data
+	for ( typeof(N) i = 0; i <= N; i += 1 ) {			// initialize shared data
 		c[i] = b[i] = 1;
 	} // for
 	turn = 0;
 } // ctor
 
-void dtor() {
+void __attribute__((noinline)) dtor() {
 	free( (void *)c );
 	free( (void *)b );
 } // dtor
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=Dijkstra Harness.c -lpthread -lm" //
+// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=Dijkstra Harness.c -lpthread -lm -D`hostname` -DCFMT -DCNT=0" //
 // End: //

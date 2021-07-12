@@ -115,7 +115,7 @@ struct ElevatorTree : rl::test_suite<ElevatorTree, N> {
 	void before() {
 		Qctor( &queue );
 #ifdef FLAG
-		for ( TYPE id = 0; id <= N; id += 1 ) {			// initialize shared data
+		for ( typeof(N) id = 0; id <= N; id += 1 ) {			// initialize shared data
 			flags[id].flag($) = false;
 		} // for
 #endif // FLAG
@@ -126,12 +126,12 @@ struct ElevatorTree : rl::test_suite<ElevatorTree, N> {
 		first($) = N;
 #endif // FLAG
 
-		for ( TYPE id = 0; id <= 2 * N; id += 1 ) {		// initialize shared data
+		for ( typeof(N) id = 0; id <= 2 * N; id += 1 ) { // initialize shared data
 			vals[id].val($) = N;
 		} // for
 
 #ifndef CAS
-		for ( TYPE id = 0; id < N; id += 1 ) {			// initialize shared data
+		for ( typeof(N) id = 0; id < N; id += 1 ) {		// initialize shared data
 			b[id]($) = false;
 		} // for
 		y($) = N;

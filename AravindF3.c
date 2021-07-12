@@ -2,37 +2,32 @@
 // Distrib. Comput. 73 (2013), Fig. 3, p. 1033.
 // Moved turn[id] = 0; after the critical section for performance reasons.
 
-#include "FCFS.h"
-
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
 static VTYPE * D CALIGN, * T CALIGN;
-FCFSTestGlobal();
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 static void * Worker( void * arg ) {
 	TYPE id = (size_t)arg;
 	uint64_t entry;
 
-#ifdef FAST
+	#ifdef FAST
 	unsigned int cnt = 0, oid = id;
-#endif // FAST
+	#endif // FAST
 
 	TYPE S[N];
 	typeof(N) j, t;
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
-		uint32_t randomThreadChecksum = 0;
+		RTYPE randomThreadChecksum = 0;
 		t = 1;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
-			FCFSTestIntroTop();
 			D[id] = 1;									// phase 1, FCFS
 			Fence();									// force store before more loads
 			for ( j = 0; j < N; j += 1 )				// copy turn values
 				S[j] = T[j];
 			T[id] = t;									// advance turn
 			D[id] = 0;
-			FCFSTestIntroMid();
 			Fence();									// force store before more loads
 			for ( j = 0; j < N; j += 1 )
 				if ( S[j] != 0 )						// want in ?
@@ -49,26 +44,24 @@ static void * Worker( void * arg ) {
 			for ( j = id + 1; j < N; j += 1 )			// B-L entry protocol, stage 2
 				while ( D[j] != 0 ) Pause();
 			// T[id] = 0;								// original position
-			FCFSTestIntroBot();
 
 			randomThreadChecksum += CriticalSection( id );
 
-			FCFSTestExit();
 			D[id] = 0;									// B-L exit protocol
 			T[id] = 0;									// new position
 			t = t < 3 ? t + 1 : 1;						// [1..3]
 
-#ifdef FAST
+			#ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
 			cnt = cycleUp( cnt, NoStartPoints );
-#endif // FAST
+			#endif // FAST
 		} // for
 
 		__sync_fetch_and_add( &sumOfThreadChecksums, randomThreadChecksum );
 
-#ifdef FAST
+		#ifdef FAST
 		id = oid;
-#endif // FAST
+		#endif // FAST
 		entries[r][id] = entry;
 		__sync_fetch_and_add( &Arrived, 1 );
 		while ( stop != 0 ) Pause();
@@ -86,11 +79,9 @@ void __attribute__((noinline)) ctor() {
 	for ( typeof(N) i = 0; i < N; i += 1 ) {
 		T[i] = 0;
 	} // for
-	FCFSTestCtor();
 } // ctor
 
 void __attribute__((noinline)) dtor() {
-	FCFSTestDtor();
 	free( (void *)T );
 	free( (void *)D );
 } // dtor

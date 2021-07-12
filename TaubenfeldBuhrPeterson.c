@@ -1,19 +1,23 @@
-static volatile TYPE **intents CALIGN;					// triangular matrix of intents
-static volatile TYPE **turns CALIGN;					// triangular matrix of turns
+static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
+static VTYPE ** intents CALIGN;							// triangular matrix of intents
+static VTYPE ** turns CALIGN;							// triangular matrix of turns
 static unsigned int depth CALIGN;
-static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
+static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
-static void *Worker( void *arg ) {
+static void * Worker( void * arg ) {
 	TYPE id = (size_t)arg;
 	uint64_t entry;
-#ifdef FAST
+
+	#ifdef FAST
 	unsigned int cnt = 0, oid = id;
-#endif // FAST
+	#endif // FAST
+
 	unsigned int ridi, ridt;
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
-		entry = 0;
-		while ( stop == 0 ) {
+		RTYPE randomThreadChecksum = 0;
+
+		for ( entry = 0; stop == 0; entry += 1 ) {
 			ridi = id;									// this version fastest on SPARC
 			for ( unsigned int lv = 0; lv < depth; lv += 1 ) { // entry protocol
 //				ridi = id >> lv;						// round id for intent
@@ -24,19 +28,24 @@ static void *Worker( void *arg ) {
 				while ( intents[lv][ridi ^ 1] == 1 && turns[lv][ridt] == ridi ) Pause();
 				ridi >>= 1;
 			} // for
-			CriticalSection( id );
+
+			randomThreadChecksum += CriticalSection( id );
+
 			for ( int lv = depth - 1; lv >= 0; lv -= 1 ) { // exit protocol
 				intents[lv][id >> lv] = 0;				// retract all intents in reverse order
 			} // for
-#ifdef FAST
+
+			#ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
 			cnt = cycleUp( cnt, NoStartPoints );
-#endif // FAST
-			entry += 1;
-		} // while
-#ifdef FAST
+			#endif // FAST
+		} // for
+
+		__sync_fetch_and_add( &sumOfThreadChecksums, randomThreadChecksum );
+
+		#ifdef FAST
 		id = oid;
-#endif // FAST
+		#endif // FAST
 		entries[r][id] = entry;
 		__sync_fetch_and_add( &Arrived, 1 );
 		while ( stop != 0 ) Pause();
@@ -61,7 +70,7 @@ void __attribute__((noinline)) ctor() {
 } // ctor
 
 void __attribute__((noinline)) dtor() {
-	for ( int r = 0; r < depth; r += 1 ) {				// deallocate matrix rows
+	for ( typeof(depth) r = 0; r < depth; r += 1 ) {	// deallocate matrix rows
 		free( (void *)turns[r] );
 		free( (void *)intents[r] );
 	} // for
@@ -71,5 +80,5 @@ void __attribute__((noinline)) dtor() {
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=TaubenfeldBuhrPeterson Harness.c -lpthread -lm" //
+// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=TaubenfeldBuhrPeterson Harness.c -lpthread -lm -D`hostname` -DCFMT -DCNT=0" //
 // End: //

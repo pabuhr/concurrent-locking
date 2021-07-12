@@ -1,4 +1,4 @@
-static volatile TYPE Q[2];
+static VTYPE Q[2];
 
 #define await( E ) while ( ! (E) ) Pause()
 

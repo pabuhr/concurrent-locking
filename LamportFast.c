@@ -21,7 +21,7 @@ static void * Worker( void * arg ) {
 	#endif // FAST
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
-		uint32_t randomThreadChecksum = 0;
+		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
 		  START: ;

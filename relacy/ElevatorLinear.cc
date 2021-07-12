@@ -79,7 +79,7 @@ struct ElevatorLinear : rl::test_suite<ElevatorLinear, N> {
 	//======================================================
 
 	void before() {
-		for ( TYPE id = 0; id <= N; id += 1 ) {				// initialize shared data
+		for ( typeof(N) id = 0; id <= N; id += 1 ) {	// initialize shared data
 			tstate[id].apply($) = false;
 #ifdef FLAG
 			tstate[id].flag($) = false;
@@ -93,7 +93,7 @@ struct ElevatorLinear : rl::test_suite<ElevatorLinear, N> {
 #endif // FLAG
 
 #ifndef CAS
-		for ( TYPE id = 0; id < N; id += 1 ) {				// initialize shared data
+		for ( typeof(N) id = 0; id < N; id += 1 ) {		// initialize shared data
 			b[id]($) = false;
 		} // for
 		y($) = N;

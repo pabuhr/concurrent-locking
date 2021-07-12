@@ -72,7 +72,7 @@ static void * Worker( void * arg ) {
 	MCS_node node CALIGN;								// sufficient to cache align node
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
-		uint32_t randomThreadChecksum = 0;
+		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
 			mcs_lock( &lock, &node );

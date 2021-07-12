@@ -1,7 +1,7 @@
 // G. L. Peterson, Myths About the Mutual Exclusion Problem, Information Processing Letters, 1981, 12(3), Fig. 3, p. 116
 // cnt is used to prove threads do not move evenly through levels.
 
-static volatile TYPE *Q CALIGN, *turns CALIGN;
+static VTYPE *Q CALIGN, *turns CALIGN;
 
 static void *Worker( void *arg ) {
 	TYPE id = (size_t)arg + 1;					// id 0 => don't-want-in

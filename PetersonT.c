@@ -26,6 +26,7 @@ static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sha
 WHOLESIZE QMAX( TYPE id, unsigned int k ) {
 	int low = ((id >> (k - 1)) ^ 1) << (k - 1);
 	int high = min( low | mask >> (depth - (k - 1)), N - 1 );
+	WO( Fence(); );
 	Tuple opp;
 	for ( int i = low; i <= high; i += 1 ) {
 		opp.atom = Q[i].vatom;
@@ -45,7 +46,7 @@ static void * Worker( void * arg ) {
 	#endif // FAST
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
-		uint32_t randomThreadChecksum = 0;
+		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
 			for ( unsigned int k = 1; k <= (HALFSIZE)depth; k += 1 ) { // entry protocol, round
@@ -70,9 +71,11 @@ static void * Worker( void * arg ) {
 				} // while
 				#endif // 0
 			} // for
+			WO( Fence(); );
 
 			randomThreadChecksum += CriticalSection( id );
 
+			WO( Fence(); );
 			Q[id].vatom = (Tuple){ { 0, 0 } }.atom;		// exit protocol
 
 			#ifdef FAST
