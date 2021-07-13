@@ -24,16 +24,18 @@
 T=1
 N=32		# T to N threads tested
 Time=10 	# R x Time = length of experiment
+D=""		# tree degree (d-ary) for Zhang (optional)
 Exec=a.out	# name of executable file
 
 while [ ${#} -gt 0 ] ; do		# process command-line arguments
     case "${1}" in
-	"Time="* | "N="* | "T="* | "Exec="* )
+	"Time="* | "N="* | "T="* | "D="* | "Exec="* )
 	    eval ${1}
 	    ;;
 	* )
-	    # optional argument D is the degree of the tree (d-ary) for Zhang
-	    Zhang=${1}
+	    echo "Usage: invalid command-line option ${1}"
+	    exit 1
+	    ;;
     esac
     shift				# remove argument
 done
@@ -42,7 +44,7 @@ rm -rf core
 
 while [ ${T} -le ${N} ] ; do
 #    perf stat -B -e L1-dcache-load-misses -e L1-dcache-prefetch-misses -e branch-load-misses ./a.out ${T} ${Time} ${Zhang}	# Zhang d-ary
-    ./${Exec} ${T} ${Time} ${Zhang}	# Zhang d-ary
+    ./${Exec} ${T} ${Time} ${D}		# Zhang d-ary
     if [ -f core ] ; then
 	echo core generated for ${T} ${Time}
 	break
