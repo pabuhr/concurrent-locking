@@ -178,8 +178,8 @@ static struct cnts ** counters CALIGN;
 //------------------------------------------------------------------------------
 
 // Do not use VTYPE because -DATOMIC changes it.
-static volatile TYPE stop CALIGN = 0;
-static volatile TYPE Arrived CALIGN = 0;
+static _Atomic(TYPE) stop CALIGN = 0;
+static _Atomic(TYPE) Arrived CALIGN = 0;
 static uintptr_t N CALIGN, Threads CALIGN, Time CALIGN;
 static intptr_t Degree CALIGN = -1;
 
@@ -367,18 +367,8 @@ void affinity( pthread_t pthreadid, unsigned int tid ) {
 // On the AMD, we find starting at core 32 and sequential assignment is sufficient.
 // Below are alternative approaches.
 #if defined( __linux ) && defined( PIN )
-	cpu_set_t mask;
-
-	CPU_ZERO( &mask );
-	int cpu;
-
-#if 0
-	// 4x8x2 : 4 sockets, 8 cores per socket, 2 hyperthreads per core
-	cpu = (tid & 0x30) | ((tid & 1) << 3) | ((tid & 0xE) >> 1) + 32;
-#endif // 0
-
 #if 1
-#if defined( c4arm )
+#if defined( algol )
 	enum { OFFSETSOCK = 1 /* 0 origin */, SOCKETS = 2, CORES = 48, HYPER = 1 };
 #elif defined( nasus )
 	enum { OFFSETSOCK = 1 /* 0 origin */, SOCKETS = 2, CORES = 64, HYPER = 1 };
@@ -391,15 +381,22 @@ void affinity( pthread_t pthreadid, unsigned int tid ) {
 #else // default
 	enum { OFFSETSOCK = 2 /* 0 origin */, SOCKETS = 4, CORES = 16, HYPER = 1 };
 #endif // HOSTS
-	cpu = tid + ((tid < CORES) ? OFFSETSOCK * CORES : HYPER < 2 ? OFFSETSOCK * CORES : CORES * SOCKETS);
+	int cpu = tid + ((tid < CORES) ? OFFSETSOCK * CORES : HYPER < 2 ? OFFSETSOCK * CORES : CORES * SOCKETS);
 #endif // 0
 
+#if 0
+	// 4x8x2 : 4 sockets, 8 cores per socket, 2 hyperthreads per core
+	int cpu = (tid & 0x30) | ((tid & 1) << 3) | ((tid & 0xE) >> 1) + 32;
+#endif // 0
 	//printf( "%d\n", cpu );
+
+	cpu_set_t mask;
+	CPU_ZERO( &mask );
 	CPU_SET( cpu, &mask );
 	int rc = pthread_setaffinity_np( pthreadid, sizeof(cpu_set_t), &mask );
 	if ( rc != 0 ) {
 		errno = rc;
-		perror( "setaffinity" );
+		perror( "***ERROR*** setaffinity failure" );
 		abort();
 	} // if
 #endif // linux && PIN
@@ -545,7 +542,7 @@ int main( int argc, char * argv[] ) {
 		int rc = pthread_create( &workers[tid], NULL, Worker, (void *)(size_t)set[tid] );
 		if ( rc != 0 ) {
 			errno = rc;
-			perror( "pthread create" );
+			perror( "***ERROR*** pthread create" );
 			abort();
 		} // if
 		affinity( workers[tid], tid );
@@ -573,7 +570,7 @@ int main( int argc, char * argv[] ) {
 		int rc = pthread_join( workers[tid], NULL );
 		if ( rc != 0 ) {
 			errno = rc;
-			perror( "pthread join" );
+			perror( "***ERROR*** pthread join" );
 			abort();
 		} // if
 	} // for
