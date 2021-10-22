@@ -12,12 +12,16 @@
 // interesting information.
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
+#ifndef ATOMIC
 static VTYPE lock CALIGN;
+#else
+_Atomic(TYPE) lock CALIGN;
+#endif // ! ATOMIC
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 #define await( E ) while ( ! (E) ) Pause()
 
-void spin_lock( volatile TYPE * lock ) {
+void spin_lock( VTYPE * lock ) {
 	#ifndef NOEXPBACK
 	enum { SPIN_START = 4, SPIN_END = 64 * 1024, };
 	unsigned int spin = SPIN_START;
@@ -26,7 +30,7 @@ void spin_lock( volatile TYPE * lock ) {
 	for ( unsigned int i = 1;; i += 1 ) {
 	  if ( *lock == 0 && __sync_lock_test_and_set( lock, 1 ) == 0 ) break; // Fence
 		#ifndef NOEXPBACK
-		for ( unsigned int s = 0; s < spin; s += 1 ) Pause(); // exponential spin
+		for ( VTYPE s = 0; s < spin; s += 1 ) Pause();	// exponential spin
 		spin += spin;									// powers of 2
 		//if ( i % 64 == 0 ) spin += spin;				// slowly increase by powers of 2
 		if ( spin > SPIN_END ) spin = SPIN_END;			// cap spinning
@@ -34,9 +38,11 @@ void spin_lock( volatile TYPE * lock ) {
 		Pause();
 		#endif // ! NOEXPBACK
 	} // for
+	WO( Fence(); );
 } // spin_lock
 
-void spin_unlock( volatile TYPE * lock ) {
+void spin_unlock( VTYPE * lock ) {
+	WO( Fence(); );
 	__sync_lock_release( lock );						// Fence
 } // spin_unlock
 
