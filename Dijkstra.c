@@ -32,7 +32,7 @@ static void * Worker( void * arg ) {
 			randomThreadChecksum += CriticalSection( id );
 
 			b[id] = c[id] = 1;							// exit protocol
-			turn = 0;
+			turn = 0;									// optional, but increases fairness
 
 			#ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
@@ -50,6 +50,7 @@ static void * Worker( void * arg ) {
 		while ( stop != 0 ) Pause();
 		__sync_fetch_and_add( &Arrived, -1 );
 	} // for
+
 	return NULL;
 } // Worker
 
