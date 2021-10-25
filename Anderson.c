@@ -1,6 +1,21 @@
-// Thomas E. Anderson, The Performance of Spin Lock Alternatives for Shared-Memoiy Multiprocessors, IEEE Transactions on
-// Parallel and Distributed Systems, (1)1, Jan 1990, Table V, p. 12.
-// Modified to remove excessive use of modulus.
+// James H. Anderson, Yong-Jik Kim, and Ted Herman. Shared-memory Mutual Exclusion: Major Research Trends Since 1986,
+// Distributed Computing, 16 2003, Fig 2, p 78.
+//
+// Note the original version of this algorithm:
+//
+//   Thomas E. Anderson, The Performance of Spin Lock Alternatives for Shared-Memory Multiprocessors, IEEE Transactions
+//   on Parallel and Distributed Systems, (1)1, Jan 1990, Table V, p. 12.
+//
+// fails when queueLast overflows back to 0 and N mod (maxint + 1) != 0.
+//
+// For example, assume a 3 bit number (values 0-7), N = 3, and threads interleave execution:
+//
+//   queueLast: 0, 1, 2, 3, 4, 5, 6, 7, 0 (reset to 0)
+//   myPlace1 : 0,       0,       0,    
+//   myPlace2 :    1,       1,       1, 
+//   myPlace3 :       2,       2,       0
+//
+// Threads 1 and 3 now have the same ticket.
 
 enum { MUST_WAIT = 0, HAS_LOCK = 1 };
 typedef struct {
@@ -25,18 +40,13 @@ static void * Worker( void * arg ) {
 		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
-			#ifndef OPT1
-			myPlace = __sync_fetch_and_add( &queueLast, 1 ) % N;
-			#else
 			myPlace = __sync_fetch_and_add( &queueLast, 1 );
-			// modified, restore queueLast to [0,N) on roll over => no modulus but an extra atomic instruction every N
-			// times.
+			// Restore queueLast to [0,N) on roll over, but modified Fig 2 to remove modulus in the fast path by adding
+			// an extra atomic instruction every Nth entry.
 			if ( myPlace >= N ) {
 				if ( myPlace == N ) __sync_fetch_and_add( &queueLast, -N );
 				myPlace -= N;
 			} // if
-			#endif // ! OPT1
-			WO( Fence(); );
 			while ( flags[myPlace].v == MUST_WAIT ) Pause(); // busy wait
 			WO( Fence(); );
 
