@@ -16,6 +16,12 @@
 //   myPlace3 :       2,       2,       0
 //
 // Threads 1 and 3 now have the same ticket.
+//
+// Michael Scott suggests moving "flags[myPlace].v = MUST_WAIT" before the cricital section:
+//
+//    https://www.cs.rochester.edu/research/synchronization/pseudocode/ss.html#anderson
+//
+// but performance seems slower.
 
 enum { MUST_WAIT = 0, HAS_LOCK = 1 };
 typedef struct {
@@ -43,7 +49,7 @@ static void * Worker( void * arg ) {
 			myPlace = __sync_fetch_and_add( &queueLast, 1 );
 			// Restore queueLast to [0,N) on roll over, but modified Fig 2 to remove modulus in the fast path by adding
 			// an extra atomic instruction every Nth entry.
-			if ( myPlace >= N ) {
+			if ( UNLIKELY( myPlace >= N ) ) {
 				if ( myPlace == N ) __sync_fetch_and_add( &queueLast, -N );
 				myPlace -= N;
 			} // if
