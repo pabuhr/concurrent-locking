@@ -28,9 +28,11 @@ static void * Worker( void * arg ) {
 			Fence();									// force store before more loads
 			for ( typeof(N) j = 1; j <= N; j += 1 )
 				if ( j != (typeof(N))id && c[j] == 0 ) goto L;
+			Fence();									// force store before more loads
 
 			randomThreadChecksum += CriticalSection( id );
 
+			Fence();									// force store before more loads
 			b[id] = c[id] = 1;							// exit protocol
 			turn = 0;									// optional, but increases fairness
 

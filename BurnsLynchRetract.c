@@ -1,4 +1,4 @@
-// James E. Burns and Nancy A. Lynch, {Mutual Exclusion using Indivisible Reads and Writes, Proceedings of the 18th
+// James E. Burns and Nancy A. Lynch, Mutual Exclusion using Indivisible Reads and Writes, Proceedings of the 18th
 // Annual Allerton Conference on Communications, Control and Computing, 1980, p. 836
 
 enum Intent { DontWantIn, WantIn };
@@ -31,9 +31,11 @@ static void * Worker( void * arg ) {
 				if ( intents[j] == WantIn ) goto L0;
 		  L1: for ( j = id + 1; j < N; j += 1 )
 				if ( intents[j] == WantIn ) { Pause(); goto L1; }
+			Fence();									// force store before more loads
 
 			randomThreadChecksum += CriticalSection( id );
 
+			Fence();									// force store before more loads
 			intents[id] = DontWantIn;					// exit protocol
 
 			#ifdef FAST

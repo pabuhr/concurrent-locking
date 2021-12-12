@@ -22,7 +22,7 @@ static void * Worker( void * arg ) {
 		  L: intents[id] = WantIn;
 			Fence();									// force store before more loads
 			for ( typeof(id) j = 0; j < id; j += 1 ) {	// check if thread with higher id wants in
-//			for ( int j = id - 1; j >= 0; j -= 1 ) {
+			// for ( int j = id - 1; j >= 0; j -= 1 ) {	// search opposite direction
 				if ( intents[j] == WantIn ) {
 					intents[id] = DontWantIn;
 					Fence();							// force store before more loads
@@ -32,9 +32,11 @@ static void * Worker( void * arg ) {
 			} // for
 			for ( typeof(N) j = id + 1; j < N; j += 1 )
 				while ( intents[j] == WantIn ) Pause();
+			Fence();									// force store before more loads
 
 			randomThreadChecksum += CriticalSection( id );
 
+			Fence();									// force store before more loads
 			intents[id] = DontWantIn;					// exit protocol
 
 			#ifdef FAST
