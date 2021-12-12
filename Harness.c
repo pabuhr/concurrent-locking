@@ -217,7 +217,7 @@ static TYPE HPAD2 CALIGN __attribute__(( unused ));		// protect further false sh
 //static int Identity(int v) { __asm__ __volatile__ (";" : "+r" (v)); return v; } 
 static inline RTYPE CriticalSection( const TYPE tid ) {
 	#ifdef CNT
-	if ( UNLIKELY( CurrTid == tid ) ) counters[Run][tid].cnts[0] += 1;
+	if ( UNLIKELY( CurrTid == tid ) ) counters[Run][tid].cnts[0] += 1; // consecutive entries in the critical section
 	#endif // CNT
 	CurrTid = tid;
 
