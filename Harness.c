@@ -460,7 +460,7 @@ int main( int argc, char * argv[] ) {
 	} // switch
 
 #ifdef CFMT
-	#define COMMA "'13"
+	#define QUOTE "'13"
 	setlocale( LC_NUMERIC, "en_US.UTF-8" );
 
 	if ( N == 1 ) {										// title
@@ -481,7 +481,7 @@ int main( int argc, char * argv[] ) {
 		printf( "\n  N   T    CS Entries           AVG           STD   RSTD   CAVG        SMALLS\n" );
 	} // if
 #else
-	#define COMMA ""
+	#define QUOTE ""
 #endif // CFMT
 
 	printf( "%3ju %3jd ", N, Time );
@@ -588,7 +588,7 @@ int main( int argc, char * argv[] ) {
 			if ( entries[r][tid] <= 5 ) smalls[r] += 1;	// only 5 entries in CS => small
 			totals[r] += entries[r][tid];
 			#ifdef DEBUG
-			printf( "%" COMMA "ju ", entries[r][tid] );
+			printf( "%" QUOTE "ju ", entries[r][tid] );
 			#endif // DEBUG
 		} // for
 		sort[r] = totals[r];
@@ -616,11 +616,11 @@ int main( int argc, char * argv[] ) {
 	#ifdef DEBUG
 	printf( "\ntotals: " );
 	for ( int i = 0; i < RUNS; i += 1 ) {				// print values
-		printf( "%" COMMA "ju ", totals[i] );
+		printf( "%" QUOTE "ju ", totals[i] );
 	} // for
 	printf( "\nsorted: " );
 	for ( int i = 0; i < RUNS; i += 1 ) {				// print values
-		printf( "%" COMMA "ju ", sort[i] );
+		printf( "%" QUOTE "ju ", sort[i] );
 	} // for
 	printf( "\nmedian posn:%d\n", posn );
 	#endif // DEBUG
@@ -633,8 +633,8 @@ int main( int argc, char * argv[] ) {
 	} // for
 	std = sqrt( sum / Threads );
 
-	printf( "%" COMMA "ju", med );						// median round
-	printf( " %" COMMA ".1f %" COMMA ".1f %5.1f%%", avg, std, avg == 0 ? 0.0 : std / avg * 100 );
+	printf( "%" QUOTE "ju", med );						// median round
+	printf( " %" QUOTE ".1f %" QUOTE ".1f %5.1f%%", avg, std, avg == 0 ? 0.0 : std / avg * 100 );
 
 
 #if 0
@@ -649,7 +649,7 @@ int main( int argc, char * argv[] ) {
 		for ( uintptr_t tid = 0; tid < Threads; tid += 1 ) {
 			cntsum2 += counters[r][tid].cnts[0];
 #endif // FAST
-			printf( "%" COMMA "ju ", counters[r][tid].cnts[0] );
+			printf( "%" QUOTE "ju ", counters[r][tid].cnts[0] );
 		} // for
 		printf( "= %lu\n", cntsum2 );
 	} // for
@@ -674,7 +674,7 @@ int main( int argc, char * argv[] ) {
 	} // for
 #endif // CNT
 
-	printf( " %" COMMA "ju", smalls[posn] );
+	printf( " %" QUOTE "ju", smalls[posn] );
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		free( entries[r] );
