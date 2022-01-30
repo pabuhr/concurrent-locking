@@ -1,6 +1,22 @@
 // John M. Mellor-Crummey and Michael L. Scott, Algorithm for Scalable Synchronization on Shared-Memory Multiprocessors,
 // ACM Transactions on Computer Systems, 9(1), 1991, Fig. 5, p. 30
 
+// Architectural fences are unnecssary on TSO for MCS and CLH. An atomic instruction is a hardware fence, hence the only
+// reordering is store-load: stores in program order followed by loads being inverted in memory order by the CPU because
+// of a store buffer.  (Peter Sewell et al showed all TSO reorderings, even those not arising from the store buffer, are
+// attributable to a simple store buffer model, which is a helpful simplification).  In the lock() path, the store to
+// clear the flag in the node happens before the atomic preventing movement and that store cannot be reorder in any
+// meaningful way.
+//
+// The other interesting store releases the lock.  Loads after the CS in program order can by lifted by the CPU up above
+// the release store into the CS, but these are benign, as it is always safe to move accesses that are outside and after
+// the CS "up" into the CS.  Critically, loads and stores in the CS body itself cannot be reordered past the store that
+// releases the lock.  Hence, accesses can only "leak" one direction: from outside the CS into the CS, but not the other
+// direction. That covers acquire-release memory ordering.
+//
+// The other concern is compiler-based reordering, but the store to the release the lock should be to a volatile/atomic,
+// which protects against compile-time movement.
+
 #include <stdbool.h>
 
 typedef struct mcs_node {
