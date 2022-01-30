@@ -24,12 +24,9 @@
 // but performance seems slower.
 
 enum { MUST_WAIT = 0, HAS_LOCK = 1 };
-typedef struct {
-	VTYPE v;
-} Flag CALIGN;
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
-static Flag * flags CALIGN;								// shared
+static VTYPE * flags CALIGN;							// shared
 static TYPE queueLast CALIGN;
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
@@ -53,15 +50,15 @@ static void * Worker( void * arg ) {
 				if ( myPlace == N ) __sync_fetch_and_add( &queueLast, -N );
 				myPlace -= N;
 			} // if
-			while ( flags[myPlace].v == MUST_WAIT ) Pause(); // busy wait
+			while ( flags[myPlace] == MUST_WAIT ) Pause(); // busy wait
 			WO( Fence(); );
 
 			randomThreadChecksum += CriticalSection( id );
 
 			WO( Fence(); );
-			flags[myPlace].v = MUST_WAIT;				// exit protocol, myPlace must be <= N
+			flags[myPlace] = MUST_WAIT;					// exit protocol, myPlace must be <= N
 			WO( Fence(); );
-			flags[cycleUp( myPlace, N )].v = HAS_LOCK;	// cycleUp has no modulus
+			flags[cycleUp( myPlace, N )] = HAS_LOCK;	// cycleUp has no modulus
 
 			#ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
@@ -85,9 +82,9 @@ static void * Worker( void * arg ) {
 
 void __attribute__((noinline)) ctor() {
 	flags = Allocator( sizeof(typeof(flags[0])) * N );
-	flags[0].v = HAS_LOCK;								// initialize shared data
+	flags[0] = HAS_LOCK;								// initialize shared data
 	for ( typeof(N) i = 1; i < N; i += 1 ) {
-		flags[i].v = MUST_WAIT;
+		flags[i] = MUST_WAIT;
 	} // for
 	queueLast = 0;
 } // ctor
