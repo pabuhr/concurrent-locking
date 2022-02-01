@@ -1,0 +1,44 @@
+#!/bin/sh -
+
+# Experiments for: CLH
+
+# ARM -mno-outline-atomics => use LL/SC instead of calls to atomic routines: __aarch64_swp_acq_rel, __aarch64_cas8_acq_rel
+# ARM -march=armv8.2-a+lse => generate Arm LSE extension instructions SWAP and CAS
+# https://community.arm.com/developer/tools-software/tools/b/tools-software-ides-blog/posts/making-the-most-of-the-arm-architecture-in-gcc-10
+
+algorithms="CLH CLH2 CLH_Scott_F12 CLH_Scott_F14 MCS"
+time=10
+outdir=`hostname`
+Exec=`hostname`.out
+mkdir -p ${outdir}
+
+if [ ${#} -ne 0 ] ; then
+    algorithms="${@}"
+fi
+
+cflag="-Wall -Wextra -Werror -Wno-implicit-fallthrough -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN" #
+if [ ${outdir} = "algol" ] ; then
+    cflag=${cflag}" -mno-outline-atomics"	# use ARM LL/SC instructions for attomics
+fi
+
+runalgorithm() {
+    for atomic in "" "ATOMIC" ; do
+	for contention in "" "FAST" ; do
+	    outfile=${outdir}/${1}${2}${atomic}${contention}
+	    echo "${outfile}"
+	    gcc-10 ${cflag} ${atomic:+-D${atomic}} ${contention:+-D${contention}} -D${outdir} -DAlgorithm=${1} Harness.c -lpthread -lm -o ${outdir}.out
+	    ./run1 Time=${time} Exec="${Exec}" > "${outfile}"
+	    if [ -f core ] ; then
+		echo core generated for ${1}
+		break
+	    fi
+	done
+    done
+}
+
+rm -rf core
+for algorithm in ${algorithms} ; do
+    runalgorithm ${algorithm}
+done
+
+rm -f "${Exec}"
