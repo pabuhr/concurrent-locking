@@ -2,7 +2,7 @@
 
 # Experiments for: BW Bakery Algorithm
 
-# ARM -mno-outline-atomics => use LL/SC insteard of calls to atomic routines: __aarch64_swp_acq_rel, __aarch64_cas8_acq_rel
+# ARM -mno-outline-atomics => use LL/SC instead of calls to atomic routines: __aarch64_swp_acq_rel, __aarch64_cas8_acq_rel
 # ARM -march=armv8.2-a+lse => generate Arm LSE extension instructions SWAP and CAS
 # https://community.arm.com/developer/tools-software/tools/b/tools-software-ides-blog/posts/making-the-most-of-the-arm-architecture-in-gcc-10
 
@@ -17,14 +17,14 @@ if [ ${#} -ne 0 ] ; then
 fi
 
 cflag="-Wall -Wextra -Werror -Wno-implicit-fallthrough -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN" #
-if [ ${outdir} = "c4arm" ] ; then
+if [ ${outdir} = "algol" ] ; then
     cflag=${cflag}" -mno-outline-atomics"	# use ARM LL/SC instructions for attomics
 fi
 
 runalgorithm() {
     for atomic in "" "ATOMIC" ; do
 	for contention in "" "FAST" ; do
-	    outfile=${outdir}/${1}${2}${contention}
+	    outfile=${outdir}/${1}${2}${atomic}${contention}
 	    echo "${outfile}"
 	    gcc-10 ${cflag} ${atomic:+-D${atomic}} ${contention:+-D${contention}} -D${outdir} -DAlgorithm=${1} Harness.c -lpthread -lm -o ${outdir}.out
 	    ./run1 Time=${time} Exec="${Exec}" > "${outfile}"
