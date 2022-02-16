@@ -116,8 +116,6 @@ static TYPE PAD3 CALIGN __attribute__(( unused ));		// protect further false sha
 static FastPaths fastpaths[K] CALIGN;					// zero filled
 static TYPE PAD4 CALIGN __attribute__(( unused ));		// protect further false sharing
 
-#define await( E ) while ( ! (E) ) Pause()
-
 static void * Worker( void * arg ) {
 	TYPE id = (size_t)arg;
 	uint64_t entry;
@@ -268,15 +266,15 @@ static void * Worker( void * arg ) {
 			#endif // FAST
 		} // for
 
-		__sync_fetch_and_add( &sumOfThreadChecksums, randomThreadChecksum );
+		Fai( &sumOfThreadChecksums, randomThreadChecksum );
 
 		#ifdef FAST
 		id = oid;
 		#endif // FAST
 		entries[r][id] = entry;
-		__sync_fetch_and_add( &Arrived, 1 );
+		Fai( &Arrived, 1 );
 		while ( stop != 0 ) Pause();
-		__sync_fetch_and_add( &Arrived, -1 );
+		Fai( &Arrived, -1 );
 	} // for
 	return NULL;
 } // Worker

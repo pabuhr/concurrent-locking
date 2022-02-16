@@ -19,8 +19,6 @@ _Atomic(TYPE) lock CALIGN;
 #endif // ! ATOMIC
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
-#define await( E ) while ( ! (E) ) Pause()
-
 void spin_lock( VTYPE * lock ) {
 	#ifndef NOEXPBACK
 	enum { SPIN_START = 4, SPIN_END = 64 * 1024, };
@@ -28,12 +26,12 @@ void spin_lock( VTYPE * lock ) {
 	#endif // ! NOEXPBACK
 
 	for ( unsigned int i = 1;; i += 1 ) {
-	  if ( *lock == 0 && __sync_lock_test_and_set( lock, 1 ) == 0 ) break; // Fence
+	  if ( *lock == 0 && Tas( lock ) == 0 ) break;		// Fence
 		#ifndef NOEXPBACK
 		for ( VTYPE s = 0; s < spin; s += 1 ) Pause();	// exponential spin
 		spin += spin;									// powers of 2
 		//if ( i % 64 == 0 ) spin += spin;				// slowly increase by powers of 2
-		if ( spin > SPIN_END ) spin = SPIN_END;			// cap spinning
+		if ( spin > SPIN_END ) spin = SPIN_END;			// cap spinning length
 		#else
 		Pause();
 		#endif // ! NOEXPBACK
@@ -43,7 +41,7 @@ void spin_lock( VTYPE * lock ) {
 
 void spin_unlock( VTYPE * lock ) {
 	WO( Fence(); );
-	__sync_lock_release( lock );						// Fence
+	Clr( lock );										// Fence
 } // spin_unlock
 
 static void * Worker( void * arg ) {
@@ -70,15 +68,15 @@ static void * Worker( void * arg ) {
 			#endif // FAST
 		} // for
 
-		__sync_fetch_and_add( &sumOfThreadChecksums, randomThreadChecksum );
+		Fai( &sumOfThreadChecksums, randomThreadChecksum );
 
 		#ifdef FAST
 		id = oid;
 		#endif // FAST
 		entries[r][id] = entry;
-		__sync_fetch_and_add( &Arrived, 1 );
+		Fai( &Arrived, 1 );
 		while ( stop != 0 ) Pause();
-		__sync_fetch_and_add( &Arrived, -1 );
+		Fai( &Arrived, -1 );
 	} // for
 
 	return NULL;

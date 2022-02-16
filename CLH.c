@@ -19,8 +19,6 @@ static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sha
 static qnode_ptr tail CALIGN;
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
-#define await( E ) while ( ! (E) ) Pause()
-
 static void * Worker( void * arg ) {
 	TYPE id = (size_t)arg;
 	uint64_t entry;
@@ -36,7 +34,7 @@ static void * Worker( void * arg ) {
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
 			*n = false;
-			qnode_ptr prev = __atomic_exchange_n( &tail, n, __ATOMIC_SEQ_CST );
+			qnode_ptr prev = Faa( &tail, n );
 			await( *prev );
 			WO( Fence(); );
 
@@ -52,15 +50,15 @@ static void * Worker( void * arg ) {
 			#endif // FAST
 		} // for
 
-		__sync_fetch_and_add( &sumOfThreadChecksums, randomThreadChecksum );
+		Fai( &sumOfThreadChecksums, randomThreadChecksum );
 
 		#ifdef FAST
 		id = oid;
 		#endif // FAST
 		entries[r][id] = entry;
-		__sync_fetch_and_add( &Arrived, 1 );
+		Fai( &Arrived, 1 );
 		while ( stop != 0 ) Pause();
-		__sync_fetch_and_add( &Arrived, -1 );
+		Fai( &Arrived, -1 );
 	} // for
 
 	free( (TYPE *)n );									// remove volatile

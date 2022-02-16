@@ -3,8 +3,6 @@
 
 #include<stdbool.h>
 
-#define await( E ) while ( ! (E) ) Pause()
-
 typedef struct {										// cache align array elements 
 	VTYPE bit;
 } Bit CALIGN;
@@ -36,7 +34,7 @@ static void * Worker( void * arg ) {
 		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
-			temp.atom = __atomic_exchange_n( &Tail.atom, (Tailtype){ { &Slots[id], Slots[id].bit } }.atom, __ATOMIC_SEQ_CST );
+			temp.atom = Faa( &Tail.atom, ((Tailtype){ { &Slots[id], Slots[id].bit } }.atom) );
 			await( (*temp.last).bit != temp.bit );
 
 			randomThreadChecksum += CriticalSection( id );
@@ -49,15 +47,15 @@ static void * Worker( void * arg ) {
 			#endif // FAST
 		} // for
 
-		__sync_fetch_and_add( &sumOfThreadChecksums, randomThreadChecksum );
+		Fai( &sumOfThreadChecksums, randomThreadChecksum );
 
 		#ifdef FAST
 		id = oid;
 		#endif // FAST
 		entries[r][id] = entry;
-		__sync_fetch_and_add( &Arrived, 1 );
+		Fai( &Arrived, 1 );
 		while ( stop != 0 ) Pause();
-		__sync_fetch_and_add( &Arrived, -1 );
+		Fai( &Arrived, -1 );
 	} // for
 
 	return NULL;

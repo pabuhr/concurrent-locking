@@ -85,8 +85,6 @@ static TYPE mutex[K] CALIGN;
 static Token B[K] CALIGN;
 static TYPE PAD4 CALIGN __attribute__(( unused ));		// protect further false sharing
 
-#define await( E ) while ( ! (E) ) Pause()
-
 static void * Worker( void * arg ) {
 	TYPE id = (size_t)arg;
 	uint64_t entry;
@@ -113,7 +111,7 @@ static void * Worker( void * arg ) {
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
 			for ( fa = 0; fa < K; fa += 1 ) {
-			  if ( mutex[fa] == N && __sync_bool_compare_and_swap( &mutex[fa], N, id ) ) goto Fast;
+			  if ( mutex[fa] == N && Cas( &mutex[fa], N, id ) ) goto Fast;
 			} // for
 			goto Slow;
  
@@ -173,15 +171,15 @@ static void * Worker( void * arg ) {
 			#endif // FAST
 		} // for
 
-		__sync_fetch_and_add( &sumOfThreadChecksums, randomThreadChecksum );
+		Fai( &sumOfThreadChecksums, randomThreadChecksum );
 
 		#ifdef FAST
 		id = oid;
 		#endif // FAST
 		entries[r][id] = entry;
-		__sync_fetch_and_add( &Arrived, 1 );
+		Fai( &Arrived, 1 );
 		while ( stop != 0 ) Pause();
-		__sync_fetch_and_add( &Arrived, -1 );
+		Fai( &Arrived, -1 );
 	} // for
 	return NULL;
 } // Worker

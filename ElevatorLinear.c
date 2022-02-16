@@ -9,11 +9,9 @@ static VTYPE * b CALIGN, x CALIGN, y CALIGN;
 #endif // ! CAS
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
-#define await( E ) while ( ! (E) ) Pause()
-
 #ifdef CAS
 
-#define trylock( x ) __sync_bool_compare_and_swap( &(fast), false, true )
+#define trylock( x ) Cas( &(fast), false, true )
 
 #elif defined( WCasBL )
 
@@ -171,7 +169,7 @@ static void * Worker( void * arg ) {
 			#endif // FAST
 		} // for
 
-		__sync_fetch_and_add( &sumOfThreadChecksums, randomThreadChecksum );
+		Fai( &sumOfThreadChecksums, randomThreadChecksum );
 
 		#ifdef FAST
 		id = oid;
@@ -183,9 +181,9 @@ static void * Worker( void * arg ) {
 		#endif // FLAG
 		#endif // FAST
 		entries[r][id] = entry;
-		__sync_fetch_and_add( &Arrived, 1 );
+		Fai( &Arrived, 1 );
 		while ( stop != 0 ) Pause();
-		__sync_fetch_and_add( &Arrived, -1 );
+		Fai( &Arrived, -1 );
 	} // for
 	return NULL;
 } // Worker

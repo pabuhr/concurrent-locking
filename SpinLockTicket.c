@@ -16,7 +16,7 @@ TYPE
 void
 #endif // PASS
 spin_lock( Lock * lock ) {
-	TYPE myticket = __sync_fetch_and_add( &lock->ticket, 1 );
+	TYPE myticket = Fai( &lock->ticket, 1 );
 	while ( myticket != lock->serving ) Pause();
 #ifdef PASS
 	return myticket;
@@ -31,7 +31,7 @@ void spin_unlock(
 #ifdef PASS
 	lock->serving = ticket + 1;
 #else
-//	__sync_fetch_and_add( &lock->serving, 1 );
+//	Fai( &lock->serving, 1 );
 	lock->serving += 1;
 #endif // PASS
 } // spin_unlock
@@ -67,15 +67,15 @@ static void * Worker( void * arg ) {
 			#endif // FAST
 		} // for
 
-		__sync_fetch_and_add( &sumOfThreadChecksums, randomThreadChecksum );
+		Fai( &sumOfThreadChecksums, randomThreadChecksum );
 
 		#ifdef FAST
 		id = oid;
 		#endif // FAST
 		entries[r][id] = entry;
-		__sync_fetch_and_add( &Arrived, 1 );
+		Fai( &Arrived, 1 );
 		while ( stop != 0 ) Pause();
-		__sync_fetch_and_add( &Arrived, -1 );
+		Fai( &Arrived, -1 );
 	} // for
 
 	return NULL;

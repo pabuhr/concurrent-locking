@@ -41,7 +41,7 @@ inline void mcs_lock( MCS_lock * lock, MCS_node * node ) {
 	node->spin = true;									// alternative position and remove fence below
 	WO( Fence(); ); // 2
 #endif // MCS_OPT1
-	MCS_node * prev = __atomic_exchange_n( lock, node, __ATOMIC_SEQ_CST );
+	MCS_node * prev = Faa( lock, node );
   if ( SLOWPATH( prev == NULL ) ) return;				// no one on list ?
 #ifdef MCS_OPT1
 	node->spin = true;									// mark as waiting
@@ -57,18 +57,16 @@ inline void mcs_unlock( MCS_lock * lock, MCS_node * node ) {
 	WO( Fence(); ); // 6
 #ifndef MCS_OPT2										// original, default option
 	if ( FASTPATH( node->next == NULL ) ) {				// no one waiting ?
-		MCS_node * temp = node;							// copy because exchange overwrites expected
-  if ( __atomic_compare_exchange_n( lock, &temp, NULL, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST ) ) return; // Fence
+  if ( Cas( lock, node, NULL ) ) return;				// Fence
 		while ( node->next == NULL ) Pause();			// busy wait until my node is modified
 	} // if
 	WO( Fence(); ); // 7
 	node->next->spin = false;							// stop their busy wait
-#else													// Dice option
+#else													// Scott book Figure 4.8
 	MCS_node * succ = node->next;
 	if ( FASTPATH( succ == NULL ) ) {					// no one waiting ?
 		// node is potentially at the tail of the MCS chain 
-		MCS_node * temp = node;							// copy because exchange overwrites expected
-  if ( __atomic_compare_exchange_n( lock, &temp, NULL, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST ) ) return; // Fence
+  if (Cas( lock, node, NULL ) ) return;					// Fence
 		// Either a new thread arrived in the LD-CAS window above or fetched a false NULL
 		// as the successor has yet to store into node->next.
 		while ( (succ = node->next) == NULL ) Pause();	// busy wait until my node is modified
@@ -108,15 +106,15 @@ static void * Worker( void * arg ) {
 			#endif // FAST
 		} // for
 
-		__sync_fetch_and_add( &sumOfThreadChecksums, randomThreadChecksum );
+		Fai( &sumOfThreadChecksums, randomThreadChecksum );
 
 		#ifdef FAST
 		id = oid;
 		#endif // FAST
 		entries[r][id] = entry;
-		__sync_fetch_and_add( &Arrived, 1 );
+		Fai( &Arrived, 1 );
 		while ( stop != 0 ) Pause();
-		__sync_fetch_and_add( &Arrived, -1 );
+		Fai( &Arrived, -1 );
 	} // for
 
 	return NULL;

@@ -18,13 +18,11 @@ static qnode_ptr tail CALIGN = { &dummy };
 static qnode_ptr head CALIGN;
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
-#define await( E ) while ( ! (E) ) Pause()
-
 static inline void clh_lock( TYPE id ) {
 	qnode_ptr p = thread_qnode_ptrs[id];
 	(*p.qnode_ptr).qnode = true;
 	qnode_ptr pred;
-	pred.qnode_ptr = __atomic_exchange_n( &(tail.qnode_ptr), p.qnode_ptr, __ATOMIC_SEQ_CST );
+	pred.qnode_ptr = Faa( &(tail.qnode_ptr), p.qnode_ptr );
 	thread_qnode_ptrs[id] = pred;
 	await( ! (*pred.qnode_ptr).qnode );
 	head = p;
@@ -60,15 +58,15 @@ static void * Worker( void * arg ) {
 			#endif // FAST
 		} // for
 
-		__sync_fetch_and_add( &sumOfThreadChecksums, randomThreadChecksum );
+		Fai( &sumOfThreadChecksums, randomThreadChecksum );
 
 		#ifdef FAST
 		id = oid;
 		#endif // FAST
 		entries[r][id] = entry;
-		__sync_fetch_and_add( &Arrived, 1 );
+		Fai( &Arrived, 1 );
 		while ( stop != 0 ) Pause();
-		__sync_fetch_and_add( &Arrived, -1 );
+		Fai( &Arrived, -1 );
 	} // for
 
 	return NULL;

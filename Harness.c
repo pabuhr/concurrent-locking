@@ -53,11 +53,10 @@
 	#define SLOWPATH(x) __builtin_expect(!!(x), 0)
 #endif // FASTPATH
 
-// Architectural ST-LD barrier -- memory fences
-// In theory these should be obviated by the C++11 std::atomic_thread_fence() primitives.  Another option is the gcc
-// _sync* primitives, but those are deprecated in favor of the new C++11 operators.  Unfortunately the current
-// implementations of both __sync and C++11 atomic operators is sub-optimal.  On x86 these facilities use MFENCE, which
-// is a poor choice.
+// Architectural ST-LD memory fences: In theory explicit memory fences should be obviated by the C11 automated atomic
+// declarations, which is provided by specifying -DATOMIC.  Unfortunately, the current implementations of C11 atomic
+// operators is still sub-optimal compared to hand fencing. Manually annotating every load/store with atomic macros is
+// more error prone because there is more to get wrong than manually fencing.
 
 #ifdef ATOMIC
 	#define Fence()
@@ -108,6 +107,23 @@ typedef volatile uint32_t VWHOLESIZE;
 #define VTYPE _Atomic TYPE
 #define VWHOLESIZE _Atomic WHOLESIZE
 #endif // ATOMIC
+
+//------------------------------------------------------------------------------
+
+#define Clr( lock ) __atomic_clear( lock, __ATOMIC_RELEASE )
+#define Clrm( lock, memorder ) __atomic_clear( lock, memorder )
+#define Tas( lock ) __atomic_test_and_set( (lock), __ATOMIC_SEQ_CST )
+#define Tasm( lock, memorder ) __atomic_test_and_set( (lock), memorder )
+#define Cas( change, comp, assn ) ({typeof(comp) __temp = (comp); __atomic_compare_exchange_n( (change), &(__temp), (assn), false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST ); })
+#define Casm( change, comp, assn, memorder... ) ({typeof(comp) * __temp = &(comp); __atomic_compare_exchange_n( (change), &(__temp), (assn), false, memorder ); })
+#define Casv( change, comp, assn ) __atomic_compare_exchange_n( (change), (comp), (assn), false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST )
+#define Casvm( change, comp, assn, memorder... ) __atomic_compare_exchange_n( (change), (comp), (assn), false, memorder )
+#define Faa( change, assn ) __atomic_exchange_n( (change), (assn), __ATOMIC_SEQ_CST )
+#define Faam( change, assn, memorder ) __atomic_exchange_n( (change), (assn), memorder )
+#define Fai( change, Inc ) __atomic_fetch_add( (change), (Inc), __ATOMIC_SEQ_CST )
+#define Faim( change, Inc, memorder ) __atomic_fetch_add( (change), (Inc), memorder )
+
+#define await( E ) while ( ! (E) ) Pause()
 
 //------------------------------------------------------------------------------
 
@@ -317,7 +333,7 @@ static int __attribute__((noinline)) PollBarrier() {
 	// Lead threads waits inside CS for quorum
 	// Follower threads wait at entry to CS on ticket lock
 	// XXX ASSERT (Threads > 0);
-	int t = __sync_fetch_and_add (&Ticket, 1);
+	int t = Fai(&Ticket, 1);
 	while ( Grant != t ) Pause();
 
 	if ( Gate == 0 ) {
@@ -345,7 +361,7 @@ static int __attribute__((noinline)) PollBarrier() {
 
 	// Consider : shift Verbose printing to after incrementing Grant
 	if ( Verbose ) {
-		int k = __sync_fetch_and_add( &nrun, 1 );
+		int k = Fai( &nrun, 1 );
 		if ( k == (ConcurrencyLevel-1) ) printf( "; " );
 		if ( k >= ConcurrencyLevel ) printf( "?" );
 	} // if

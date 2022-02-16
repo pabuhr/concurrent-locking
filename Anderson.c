@@ -43,11 +43,11 @@ static void * Worker( void * arg ) {
 		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
-			myPlace = __sync_fetch_and_add( &queueLast, 1 );
+			myPlace = Fai( &queueLast, 1 );
 			// Restore queueLast to [0,N) on roll over, but modified Fig 2 to remove modulus in the fast path by adding
 			// an extra atomic instruction every Nth entry.
 			if ( UNLIKELY( myPlace >= N ) ) {
-				if ( myPlace == N ) __sync_fetch_and_add( &queueLast, -N );
+				if ( myPlace == N ) Fai( &queueLast, -N );
 				myPlace -= N;
 			} // if
 			while ( flags[myPlace] == MUST_WAIT ) Pause(); // busy wait
@@ -66,15 +66,15 @@ static void * Worker( void * arg ) {
 			#endif // FAST
 		} // for
 
-		__sync_fetch_and_add( &sumOfThreadChecksums, randomThreadChecksum );
+		Fai( &sumOfThreadChecksums, randomThreadChecksum );
 
 		#ifdef FAST
 		id = oid;
 		#endif // FAST
 		entries[r][id] = entry;
-		__sync_fetch_and_add( &Arrived, 1 );
+		Fai( &Arrived, 1 );
 		while ( stop != 0 ) Pause();
-		__sync_fetch_and_add( &Arrived, -1 );
+		Fai( &Arrived, -1 );
 	} // for
 
 	return NULL;

@@ -77,32 +77,34 @@ static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false shar
 
 #define await( E ) while ( ! (E) ) Pause()
 
-static void *Worker( void *arg ) {
+static void * Worker( void * arg ) {
 	TYPE id = (size_t)arg;
 	uint64_t entry;
 
+	#ifdef FAST
+	unsigned int cnt = 0, oid = id;
+	#endif // FAST
+
 	volatile typeof(arrState[0].enter) *tEnter = &arrState[id].enter;
 	volatile typeof(arrState[0].wait) *tWait = &arrState[id].wait;
-#ifdef FAST
-	unsigned int cnt = 0, oid = id;
-#endif // FAST
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
-		entry = 0;
-		while ( stop == 0 ) {
+		RTYPE randomThreadChecksum = 0;
+
+		for ( entry = 0; stop == 0; entry += 1 ) {
 			*tEnter = true;
 
 			// up hill
 			typeof(id) node = id;
-			for ( int j = 0; j < toursize; j += 1 ) {	// tree register
+			for ( typeof(toursize) j = 0; j < toursize; j += 1 ) { // tree register
 				tournament[j][node] = id;
 				node >>= 1;
 			} // for
 
-			if ( FASTPATH( ! __sync_bool_compare_and_swap( &first, FREE_LOCK, id ) ) ) {
+			if ( FASTPATH( ! Cas( &first, FREE_LOCK, id ) ) ) {
 				typeof(exits) e = exits;
 				await( exits - e >= 2 || first == id || first == FREE_LOCK );
-				if ( FASTPATH( ! __sync_bool_compare_and_swap( &first, FREE_LOCK, id ) ) ) {
+				if ( FASTPATH( ! Cas( &first, FREE_LOCK, id ) ) ) {
 					await( *tWait );
 				} // if
 			} // if
@@ -110,10 +112,11 @@ static void *Worker( void *arg ) {
 			*tEnter = false;
 			*tWait = false;
 			exits += 1 ;
-			//Fence();									// force store before more loads
+			WO( Fence(); )
 
-			CriticalSection( id );
+			randomThreadChecksum += CriticalSection( id );
 
+			WO( Fence(); );								// prevent write floating up
 			// down hill
 			TYPE thread = tournament[toursize - 1][0];
 			if ( FASTPATH( thread != FREE_NODE && thread != id && arrState[thread].enter ) )
@@ -141,20 +144,24 @@ static void *Worker( void *arg ) {
 			} else {
 				first = FREE_LOCK;
 			} // if
-#ifdef FAST
+
+			#ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
 			cnt = cycleUp( cnt, NoStartPoints );
-#endif // FAST
-			entry += 1;
-		} // while
-#ifdef FAST
+			#endif // FAST
+		} // for
+
+		Fai( &sumOfThreadChecksums, randomThreadChecksum );
+
+		#ifdef FAST
 		id = oid;
-#endif // FAST
+		#endif // FAST
 		entries[r][id] = entry;
-		__sync_fetch_and_add( &Arrived, 1 );
+		Fai( &Arrived, 1 );
 		while ( stop != 0 ) Pause();
-		__sync_fetch_and_add( &Arrived, -1 );
+		Fai( &Arrived, -1 );
 	} // for
+
 	return NULL;
 } // Worker
 
@@ -162,7 +169,7 @@ void __attribute__((noinline)) ctor() {
 	q = Qctor( N );
 
 	arrState = malloc( N * sizeof(typeof(arrState[0])) );
-	for ( int i = 0; i < N; i += 1 ) {
+	for ( typeof(N) i = 0; i < N; i += 1 ) {
 		arrState[i].enter = arrState[i].wait = false;
 	} // for
 
@@ -170,9 +177,9 @@ void __attribute__((noinline)) ctor() {
 	tournament = malloc( toursize * sizeof(typeof(tournament[0])) );
 	unsigned int levelSize = 1 << (toursize - 1);				// 2^|log N|
 
-	for ( unsigned int i = 0; i < toursize; i += 1 ) {
+	for ( typeof(toursize) i = 0; i < toursize; i += 1 ) {
 		tournament[i] = malloc( levelSize * sizeof(typeof(tournament[0][0])) );
-		for ( unsigned int j = 0; j < levelSize; j += 1 ) {
+		for ( typeof(levelSize) j = 0; j < levelSize; j += 1 ) {
 			tournament[i][j] = FREE_NODE;
 		} // for
 		levelSize /= 2;
@@ -184,7 +191,7 @@ void __attribute__((noinline)) ctor() {
 
 void __attribute__((noinline)) dtor() {
 	Qdtor( q );
-	for ( int i = 0; i < toursize; i += 1 ) {
+	for ( typeof(toursize) i = 0; i < toursize; i += 1 ) {
 		free( (void *)tournament[i] );
 	} // for
 	free( tournament );
@@ -193,5 +200,5 @@ void __attribute__((noinline)) dtor() {
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=RMRS Harness.c -lpthread -lm" //
+// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=RMRS Harness.c -lpthread -lm -D`hostname` -DCFMT -DCNT=0" //
 // End: //

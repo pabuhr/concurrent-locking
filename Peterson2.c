@@ -39,9 +39,9 @@ static void *Worker( void *arg ) {
 		other = inv( id );
 #endif // FAST
 		entries[r][id] = entry;
-		__sync_fetch_and_add( &Arrived, 1 );
+		Fai( &Arrived, 1 );
 		while ( stop != 0 ) Pause();
-		__sync_fetch_and_add( &Arrived, -1 );
+		Fai( &Arrived, -1 );
     } // for
 	return NULL;
 } // Worker
