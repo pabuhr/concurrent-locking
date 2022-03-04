@@ -1,4 +1,4 @@
-// Shared-memory mutual exclusion: major research trends since 1986, James H. Anderson, Yong-Jik Kim, Ted Herman
+// Shared-memory Mutual Exclusion: Major Research Trends Since 1986, James H. Anderson, Yong-Jik Kim, Ted Herman
 // Distrib. Comput. (2003) 16: 75-110, Fig 3.
 
 #include<stdbool.h>
