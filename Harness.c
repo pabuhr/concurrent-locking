@@ -75,12 +75,24 @@
 
 // pause to prevent excess processor bus usage
 #if defined( __i386 ) || defined( __x86_64 )
-	#define Pause() __asm__ __volatile__ ( "pause" : : : )
+#ifdef LPAUSE
+	#define Pause() __asm__ __volatile__ ( "lfence" )
+#else
+	#define Pause() __asm__ __volatile__ ( "pause" ::: )
+#endif // LPAUSE
+
 //	#define Delay() for ( int i = random() & (512 - 1); i < 1000; i += 1 ) Pause()
 //	#define Delay() { for ( uint32_t r = (ThreadLocalRandom() & ( (1<<16) - 1)) + ((1<<16) - 1); r >= 8; r -= 8 ) { Pause(); Pause(); Pause(); Pause(); Pause(); Pause(); Pause(); Pause(); } }
 //	#define Delay() { for ( uint32_t r = 1 << (((ThreadLocalRandom() & (1<<4)) - 1) + 3); r >= 8; r -= 8 ) { Pause(); Pause(); Pause(); Pause(); Pause(); Pause(); Pause(); Pause(); } }
+
 #elif defined(__ARM_ARCH)
-	#define Pause() __asm__ __volatile__ ( "YIELD" : : : )
+
+#ifdef LPAUSE
+	#define Pause() __asm__ __volatile__ ( "DMB ISH" ::: )
+#else
+	#define Pause() __asm__ __volatile__ ( "YIELD" ::: )
+#endif // LPAUSE
+
 #else
 	#error unsupported architecture
 #endif
@@ -489,6 +501,9 @@ int main( int argc, char * argv[] ) {
 	#ifdef ATOMIC
 				" ATOMIC"
 	#endif // ATOMIC
+	#ifdef LPAUSE
+				" LFENCE pause"
+	#endif // LPAUSE
 	#ifdef FAST
 				" FAST"
 	#endif // FAST
