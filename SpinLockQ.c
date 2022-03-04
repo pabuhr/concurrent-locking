@@ -48,6 +48,11 @@
 
 #include "MCS.h"
 
+typedef struct {
+	MCS_lock mcs_lock;
+	volatile TYPE flag CALIGN;
+} QSLock;
+
 inline void acquire( QSLock * lock ) {
 	MCS_node node;
 	mcs_lock( &lock->mcs_lock, &node );

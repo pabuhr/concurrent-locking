@@ -59,12 +59,6 @@ inline void mcs_unlock( MCS_lock * lock, MCS_node * node ) {
 #endif // MCS_OPT2
 } // mcs_unlock
 
-typedef struct {
-	MCS_lock mcs_lock;
-	volatile TYPE flag CALIGN;
-} QSLock;
-
-
 // Local Variables: //
 // tab-width: 4 //
 // End: //
