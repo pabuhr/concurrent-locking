@@ -38,7 +38,7 @@ inline void mcs_lock( MCS_lock * lock, MCS_node * node ) {
 
 inline void mcs_unlock( MCS_lock * lock, MCS_node * node ) {
 	WO( Fence(); ); // 6
-#ifndef MCS_OPT2										// original, default option
+#ifdef MCS_OPT2											// original, default option
 	if ( FASTPATH( node->next == NULL ) ) {				// no one waiting ?
   if ( Cas( lock, node, NULL ) ) return;				// Fence
 		while ( node->next == NULL ) Pause();			// busy wait until my node is modified
