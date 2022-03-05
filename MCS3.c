@@ -32,7 +32,7 @@ inline void mcs_lock( MCS_lock * lock, MCS_node * node ) {
 } // mcs_lock
 
 inline void mcs_unlock( MCS_lock * lock, MCS_node * node ) {
-#ifndef MCS_OPT2										// original, default option
+#ifdef MCS_OPT2											// original, default option
 	if ( FASTPATH( load( &node->next, memory_order_relaxed ) == NULL ) ) { // no one waiting ?
 		MCS_node * temp = node;							// copy because exchange overwrites expected
   if ( SLOWPATH( CAS( lock, &temp, NULL, memory_order_release, memory_order_relaxed ) ) ) return;
@@ -45,7 +45,7 @@ inline void mcs_unlock( MCS_lock * lock, MCS_node * node ) {
 	if ( FASTPATH( succ == NULL ) ) {					// no one waiting ?
 		// node is potentially at the tail of the MCS chain 
 		MCS_node * temp = node;							// copy because exchange overwrites expected
-  if ( CAS( lock, &temp, NULL, memory_order_release, memory_order_relaxed ) ) return;
+  if ( SLOWPATH( CAS( lock, &temp, NULL, memory_order_release, memory_order_relaxed ) ) ) return;
 		while ( (succ = atomic_load_explicit( &node->next, memory_order_relaxed ) ) == NULL) Pause(); // busy wait until my node is modified
 	} // if
 	store( &succ->spin, false, memory_order_release );

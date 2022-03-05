@@ -31,7 +31,7 @@ inline void mcs_lock( MCS_lock * lock, MCS_node * node ) {
 } // mcs_lock
 
 inline void mcs_unlock( MCS_lock * lock, MCS_node * node ) {
-#ifndef MCS_OPT2										// original, default option
+#ifdef MCS_OPT2											// original, default option
 	if ( FASTPATH( load( &node->next, memory_order_relaxed ) == NULL ) ) { // no one waiting ?
 		MCS_node * old_tail = exchange( lock, NULL, memory_order_seq_cst );
   if ( SLOWPATH( old_tail == node ) ) return;

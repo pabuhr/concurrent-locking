@@ -40,7 +40,7 @@ inline void mcs_unlock( MCS_lock * lock, MCS_node * node ) {
 	WO( Fence(); ); // 6
 #ifdef MCS_OPT2											// original, default option
 	if ( FASTPATH( node->next == NULL ) ) {				// no one waiting ?
-  if ( Cas( lock, node, NULL ) ) return;				// Fence
+  if ( SLOWPATH( Cas( lock, node, NULL ) ) ) return;	// Fence
 		while ( node->next == NULL ) Pause();			// busy wait until my node is modified
 	} // if
 	WO( Fence(); ); // 7
@@ -49,7 +49,7 @@ inline void mcs_unlock( MCS_lock * lock, MCS_node * node ) {
 	MCS_node * succ = node->next;
 	if ( FASTPATH( succ == NULL ) ) {					// no one waiting ?
 		// node is potentially at the tail of the MCS chain 
-  if (Cas( lock, node, NULL ) ) return;					// Fence
+  if ( SLOWPATH( Cas( lock, node, NULL ) ) ) return;	// Fence
 		// Either a new thread arrived in the LD-CAS window above or fetched a false NULL
 		// as the successor has yet to store into node->next.
 		while ( (succ = node->next) == NULL ) Pause();	// busy wait until my node is modified
