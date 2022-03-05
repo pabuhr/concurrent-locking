@@ -37,9 +37,9 @@ inline void mcs_lock( MCS_lock * lock, MCS_node * node ) {
 	WO( Fence(); ); // 5
 } // mcs_lock
 
-inline void mcs_unlock( MCS_lock * lock, MCS_node * node, TYPE * ucnt ) {
+inline void mcs_unlock( MCS_lock * lock, MCS_node * node ) {
 	WO( Fence(); ); // 6
-#ifndef MCS_OPT2										// original, default option
+#ifdef MCS_OPT2											// original, default option
 	if ( FASTPATH( node->next == NULL ) ) {				// no one waiting ?
 		MCS_node * old_tail = Faa( lock, NULL );
   if ( SLOWPATH( old_tail == node ) ) return;
@@ -47,7 +47,6 @@ inline void mcs_unlock( MCS_lock * lock, MCS_node * node, TYPE * ucnt ) {
 		while ( node->next == NULL ) Pause();			// busy wait until my node is modified
 		WO( Fence(); ); // 7
 		if ( usurper != NULL ) {
-			*ucnt += 1;
 			usurper->next = node->next;
 		} else {
 			node->next->spin = false;
@@ -65,7 +64,6 @@ inline void mcs_unlock( MCS_lock * lock, MCS_node * node, TYPE * ucnt ) {
 		while ( (succ = node->next) == NULL ) Pause();	// busy wait until my node is modified
 		WO( Fence(); ); // 6
 		if ( usurper != NULL ) {
-			*ucnt += 1;
 			usurper->next = succ;
 		} else {
 			succ->spin = false;
@@ -92,16 +90,14 @@ static void * Worker( void * arg ) {
 	MCS_node node;
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
-		TYPE ucnt = 0;
 		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
-			for ( volatile int i = 0; i < 5500; i += 1 );		// Spinlock: 200
 			mcs_lock( &lock, &node );
 
 			randomThreadChecksum += CriticalSection( id );
 
-			mcs_unlock( &lock, &node, &ucnt );
+			mcs_unlock( &lock, &node );
 
 			#ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
@@ -110,7 +106,6 @@ static void * Worker( void * arg ) {
 		} // for
 
 		Fai( &sumOfThreadChecksums, randomThreadChecksum );
-		printf( "%ju %d \n", ucnt, r );
 
 		#ifdef FAST
 		id = oid;
