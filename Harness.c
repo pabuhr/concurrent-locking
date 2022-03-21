@@ -53,50 +53,6 @@
 	#define SLOWPATH(x) __builtin_expect(!!(x), 0)
 #endif // FASTPATH
 
-// Architectural ST-LD memory fences: In theory explicit memory fences should be obviated by the C11 automated atomic
-// declarations, which is provided by specifying -DATOMIC.  Unfortunately, the current implementations of C11 atomic
-// operators is still sub-optimal compared to hand fencing. Manually annotating every load/store with atomic macros is
-// more error prone because there is more to get wrong than manually fencing.
-
-#ifdef ATOMIC
-	#define Fence()
-#else
-	#if defined(__x86_64)
-		//#define Fence() __asm__ __volatile__ ( "mfence" )
-		#define Fence() __asm__ __volatile__ ( "lock; addq $0,(%%rsp);" ::: "cc" )
-	#elif defined(__i386)
-		#define Fence() __asm__ __volatile__ ( "lock; addl $0,(%%esp);" ::: "cc" )
-	#elif defined(__ARM_ARCH)
-		#define Fence() __asm__ __volatile__ ( "DMB ISH" ::: )
-	#else
-		#error unsupported architecture
-	#endif
-#endif // ATOMIC
-
-// pause to prevent excess processor bus usage
-#if defined( __i386 ) || defined( __x86_64 )
-#ifdef LPAUSE
-	#define Pause() __asm__ __volatile__ ( "lfence" )
-#else
-	#define Pause() __asm__ __volatile__ ( "pause" ::: )
-#endif // LPAUSE
-
-//	#define Delay() for ( int i = random() & (512 - 1); i < 1000; i += 1 ) Pause()
-//	#define Delay() { for ( uint32_t r = (ThreadLocalRandom() & ( (1<<16) - 1)) + ((1<<16) - 1); r >= 8; r -= 8 ) { Pause(); Pause(); Pause(); Pause(); Pause(); Pause(); Pause(); Pause(); } }
-//	#define Delay() { for ( uint32_t r = 1 << (((ThreadLocalRandom() & (1<<4)) - 1) + 3); r >= 8; r -= 8 ) { Pause(); Pause(); Pause(); Pause(); Pause(); Pause(); Pause(); Pause(); } }
-
-#elif defined(__ARM_ARCH)
-
-#ifdef LPAUSE
-	#define Pause() __asm__ __volatile__ ( "DMB ISH" ::: )
-#else
-	#define Pause() __asm__ __volatile__ ( "YIELD" ::: )
-#endif // LPAUSE
-
-#else
-	#error unsupported architecture
-#endif
-
 //------------------------------------------------------------------------------
 
 typedef uintptr_t TYPE;									// addressable word-size
@@ -122,6 +78,85 @@ typedef volatile uint32_t VWHOLESIZE;
 
 //------------------------------------------------------------------------------
 
+// Architectural ST-LD memory fences: In theory explicit memory fences should be obviated by the C11 automated atomic
+// declarations, which is provided by specifying -DATOMIC.  Unfortunately, the current implementations of C11 atomic
+// operators is still sub-optimal compared to hand fencing. Manually annotating every load/store with atomic macros is
+// more error prone because there is more to get wrong than manually fencing.
+
+#ifdef ATOMIC
+	#if defined( LPAUSE ) || defined( MPAUSE )
+		#error Compilation options LPAUSE/MPAUSE are incompatible with ATOMIC.
+	#endif
+	#define Fence()
+#else
+	#if defined(__x86_64)
+		//#define Fence() __asm__ __volatile__ ( "mfence" )
+		#define Fence() __asm__ __volatile__ ( "lock; addq $0,(%%rsp);" ::: "cc" )
+	#elif defined(__i386)
+		#define Fence() __asm__ __volatile__ ( "lock; addl $0,(%%esp);" ::: "cc" )
+	#elif defined(__ARM_ARCH)
+		#define Fence() __asm__ __volatile__ ( "DMB ISH" ::: )
+	#else
+		#error unsupported architecture
+	#endif
+#endif // ATOMIC
+
+// pause to prevent excess processor bus usage
+#if defined( LPAUSE ) && defined( MPAUSE )
+	#error Compilation options LPAUSE and MPAUSE cannot be used together.
+#endif
+
+#if defined( __i386 ) || defined( __x86_64 )
+
+#if defined( LPAUSE )
+	#define Pause() __asm__ __volatile__ ( "lfence" )
+#elif defined( MPAUSE )
+	inline TYPE MonitorLD( VTYPE * A ) {
+		TYPE rv = 0;
+		__asm__ __volatile__ (
+			"xorq %%rcx,%%rcx; xorq %%rdx,%%rdx; monitorx; mov (%[RA]), %[RV];  "
+			: [RV] "=r" (rv)
+			: [RA] "a" (A)
+			: "rcx", "rdx", "memory") ;
+		return rv ;
+	}
+	inline void MWait( int timo __attribute__(( unused )) ) { // newer mwait takes an argument
+		__asm__ __volatile__ ( "xorq %%rcx,%%rcx; xorq %%rax,%%rax; mwaitx; " ::: "rax", "rcx" );
+	}
+	#define MPause( E, C ) { while ( (typeof(E))MonitorLD( (VTYPE *)(&(E)) ) C ) { MWait( 0 ); } }
+	#define MPauseS( S, E, C ) { while ( ( S (typeof(E))MonitorLD( (VTYPE *)(&(E)) ) ) C ) { MWait( 0 ); } }
+	#define Pause() __asm__ __volatile__ ( "pause" ::: )
+#else
+	#define Pause() __asm__ __volatile__ ( "pause" ::: )
+#endif // LPAUSE
+
+#elif defined(__ARM_ARCH)
+
+#if defined( LPAUSE )
+	#define Pause() __asm__ __volatile__ ( "DMB ISH" ::: )
+#elif defined( MPAUSE )
+	inline TYPE MonitorLD( VTYPE * A ) {
+		TYPE v = 0;
+		// Polymorphic based on size of operand => automagically selects w or x register for %0.
+		__asm__ __volatile__ ( "wfe; ldaxr %0,%1; " : "=r" (v) : "Q" (*A) );
+		return v;
+	} // MonitorLD
+
+	#define sevl() __asm__ __volatile__ ( "sevl" )
+	// Polymorphic on operand using type erasure => use uintptr_t so both values and pointers work.
+	#define MPause( E, C ) { sevl(); while ( (typeof(E))MonitorLD( (VTYPE *)(&(E)) ) C ) {} }
+	#define MPauseS( S, E, C ) { sevl(); while ( ( S (typeof(E))MonitorLD( (VTYPE *)(&(E)) ) ) C ) {} }
+	#define Pause() __asm__ __volatile__ ( "YIELD" ::: )
+#else
+	#define Pause() __asm__ __volatile__ ( "YIELD" ::: )
+#endif // LPAUSE
+
+#else
+	#error unsupported architecture
+#endif
+
+//------------------------------------------------------------------------------
+
 #define Clr( lock ) __atomic_clear( lock, __ATOMIC_RELEASE )
 #define Clrm( lock, memorder ) __atomic_clear( lock, memorder )
 #define Tas( lock ) __atomic_test_and_set( (lock), __ATOMIC_SEQ_CST )
@@ -130,8 +165,8 @@ typedef volatile uint32_t VWHOLESIZE;
 #define Casm( change, comp, assn, memorder... ) ({typeof(comp) * __temp = &(comp); __atomic_compare_exchange_n( (change), &(__temp), (assn), false, memorder ); })
 #define Casv( change, comp, assn ) __atomic_compare_exchange_n( (change), (comp), (assn), false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST )
 #define Casvm( change, comp, assn, memorder... ) __atomic_compare_exchange_n( (change), (comp), (assn), false, memorder )
-#define Faa( change, assn ) __atomic_exchange_n( (change), (assn), __ATOMIC_SEQ_CST )
-#define Faam( change, assn, memorder ) __atomic_exchange_n( (change), (assn), memorder )
+#define Fas( change, assn ) __atomic_exchange_n( (change), (assn), __ATOMIC_SEQ_CST )
+#define Fasm( change, assn, memorder ) __atomic_exchange_n( (change), (assn), memorder )
 #define Fai( change, Inc ) __atomic_fetch_add( (change), (Inc), __ATOMIC_SEQ_CST )
 #define Faim( change, Inc, memorder ) __atomic_fetch_add( (change), (Inc), memorder )
 
@@ -221,7 +256,11 @@ volatile int Run CALIGN = 0;
 
 //------------------------------------------------------------------------------
 
-enum { CSTimes = 50 };
+#ifndef CSTIMES
+#define CSTIMES 20
+#endif // CSTIMES
+
+enum { CSTimes = CSTIMES };								// time spent in CS + random number call
 
 #ifdef NONCS
 static inline void NonCriticalSection( const TYPE id ) {
@@ -243,7 +282,8 @@ static volatile TYPE CurrTid CALIGN = ULONG_MAX;		// shared, current thread id i
 static TYPE HPAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 //static int Identity(int v) { __asm__ __volatile__ (";" : "+r" (v)); return v; } 
-static inline RTYPE CriticalSection( const TYPE tid ) {
+static inline RTYPE CriticalSection( const TYPE tid __attribute__(( unused )) ) { // parameter unused for CSTIME == 0
+#if CSTIMES != 0
 	#ifdef CNT
 	if ( UNLIKELY( CurrTid == tid ) ) counters[Run][tid].cnts[0] += 1; // consecutive entries in the critical section
 	#endif // CNT
@@ -253,7 +293,7 @@ static inline RTYPE CriticalSection( const TYPE tid ) {
 	// perfect interleaving. Note, the load, delay, store to increase the chance of detecting a violation.
 	RTYPE randomNumber = ThreadLocalRandom();			// belt and
 	volatile RTYPE copy = randomChecksum;
-	for ( volatile int delay = 0; delay < CSTimes; delay += 1 ) {} // delay
+	for ( volatile int delay = 0; delay < CSTimes; delay += 1 ) {} // short delay
 	randomChecksum = copy + randomNumber;
 
 	// The assignment to CurrTid above can delay in a store buffer, that is, committed but not pushed into coherent
@@ -266,6 +306,9 @@ static inline RTYPE CriticalSection( const TYPE tid ) {
 	} // if
 
 	return randomNumber;
+#else
+	return 0;
+#endif // CSTIMES != 0
 } // CriticalSection
 
 //------------------------------------------------------------------------------
@@ -494,22 +537,34 @@ int main( int argc, char * argv[] ) {
 	if ( N == 1 ) {										// title
 		printf( "%s"
 	#ifdef __cplusplus
-				".cc"
+				".cc,"
 	#else
-				".c"
+				".c,"
 	#endif // __cplusplus
-	#ifdef ATOMIC
-				" ATOMIC"
-	#endif // ATOMIC
-	#ifdef LPAUSE
-				" LFENCE pause"
-	#endif // LPAUSE
 	#ifdef FAST
-				" FAST"
+				" FAST,"
 	#endif // FAST
-				, xstr(Algorithm) );
+	#ifdef ATOMIC
+				" ATOMIC,"
+	#endif // ATOMIC
+	#if defined( NOEXPBACK ) && ! defined( MPAUSE )
+				" NOEXPBACK,"
+	#endif // NOEXPBACK
+	#ifdef LPAUSE
+				" LFENCE pause,"
+	#endif // LPAUSE
+	#ifdef MPAUSE
+				" MONITOR pause,"
+	#endif // MPAUSE
+				" %d CS spins,"
+				" %d runs median"
+				, xstr(Algorithm), CSTimes, RUNS );
 		if ( Degree != -1 ) printf( " %jd-ary", Degree ); // Zhang only
-		printf( "\n  N   T    CS Entries           AVG           STD   RSTD   CAVG        SMALLS\n" );
+		printf( "\n  N   T    CS Entries           AVG           STD   RSTD"
+	#ifdef CNT
+				"   CAVG"
+	#endif // CNT
+				"        SMALLS\n" );
 	} // if
 #else
 	#define QUOTE ""
