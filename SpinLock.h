@@ -29,13 +29,19 @@ void spin_lock( VTYPE * lock ) {
 
 	for ( unsigned int i = 1;; i += 1 ) {
 	  if ( *lock == 0 && Tas( lock ) == 0 ) break;		// Fence
+
 		#ifndef NOEXPBACK
 		for ( TYPE s = 0; s < spin; s += 1 ) Pause();	// exponential spin
 		spin += spin;									// powers of 2
 		// if ( i % 64 == 0 ) spin += spin;				// slowly increase by powers of 2
 		if ( spin > SPIN_END ) spin = SPIN_END;			// cap spinning length
 		#else
+
+		#ifndef MPAUSE
 		Pause();
+		#else
+		MPause( lock, == 0 );							// busy wait on my spin variable
+		#endif // MPAUSE
 		#endif // ! NOEXPBACK
 	} // for
 	WO( Fence(); );

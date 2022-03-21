@@ -19,25 +19,41 @@ typedef MCS_node * MCS_lock;
 
 inline void mcs_lock( MCS_lock * lock, MCS_node * node ) {
 	store( &node->next, NULL, memory_order_relaxed );
+
 #ifndef MCS_OPT1										// default option
 	store( &node->spin, true, memory_order_relaxed );	// mark as waiting
 #endif // MCS_OPT1
+
 	MCS_node * prev = exchange( lock, node, memory_order_seq_cst );
   if ( SLOWPATH( prev == NULL ) ) return;				// no one on list ?
+
 #ifdef MCS_OPT1
 	atomic_store_explicit( &node->spin, true, memory_order_relaxed ); // mark as waiting
 #endif // MCS_OPT1
+
 	store( &prev->next, node, memory_order_release);	// add to list of waiting threads
-	while ( load( &node->spin, memory_order_acquire ) ) Pause(); // busy wait on my spin variable
+
+	#ifndef MPAUSE
+	while ( load( &node->spin, memory_order_acquire ) == true ) Pause(); // busy wait on my spin variable
+	#else
+	MPause( node->spin, == true );						// busy wait on my spin variable
+	#endif // MPAUSE
 } // mcs_lock
 
 inline void mcs_unlock( MCS_lock * lock, MCS_node * node ) {
 #ifdef MCS_OPT2											// original, default option
 	if ( FASTPATH( load( &node->next, memory_order_relaxed ) == NULL ) ) { // no one waiting ?
 		MCS_node * temp = node;							// copy because exchange overwrites expected
+
   if ( SLOWPATH( CAS( lock, &temp, NULL, memory_order_release, memory_order_relaxed ) ) ) return;
-		while ( atomic_load_explicit( &node->next, memory_order_relaxed ) == NULL) Pause(); // busy wait until my node is modified
+
+		#ifndef MPAUSE
+		while ( load( &node->next, memory_order_relaxed ) == NULL ) Pause(); // busy wait until my node is modified
+		#else
+		MPause( node->next, == NULL );					// busy wait until my node is modified
+		#endif // MPAUSE
 	} // if
+
 	// MCS_node * next = atomic_load_explicit( &node->next, memory_order_acquire );
 	store( &node->next->spin, false, memory_order_release );
 #else													// Scott book Figure 4.8
@@ -46,7 +62,12 @@ inline void mcs_unlock( MCS_lock * lock, MCS_node * node ) {
 		// node is potentially at the tail of the MCS chain 
 		MCS_node * temp = node;							// copy because exchange overwrites expected
   if ( SLOWPATH( CAS( lock, &temp, NULL, memory_order_release, memory_order_relaxed ) ) ) return;
-		while ( (succ = atomic_load_explicit( &node->next, memory_order_relaxed ) ) == NULL) Pause(); // busy wait until my node is modified
+
+		#ifndef MPAUSE
+		while ( (succ = load( &node->next, memory_order_relaxed ) ) == NULL) Pause(); // busy wait until my node is modified
+		#else
+		MPauseS( succ =, node->next, == NULL );			// busy wait until my node is modified
+		#endif // MPAUSE
 	} // if
 	store( &succ->spin, false, memory_order_release );
 #endif // MCS_OPT2
