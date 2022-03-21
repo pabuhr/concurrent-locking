@@ -25,7 +25,7 @@ inline void mcs_lock( MCS_lock * lock, MCS_node * node ) {
 	node->spin = true;									// alternative position and remove fence below
 	WO( Fence(); ); // 2
 #endif // MCS_OPT1
-	MCS_node * prev = Faa( lock, node );
+	MCS_node * prev = Fas( lock, node );
   if ( SLOWPATH( prev == NULL ) ) return;				// no one on list ?
 #ifdef MCS_OPT1
 	node->spin = true;									// mark as waiting
@@ -41,9 +41,9 @@ inline void mcs_unlock( MCS_lock * lock, MCS_node * node ) {
 	WO( Fence(); ); // 6
 #ifdef MCS_OPT2											// original, default option
 	if ( FASTPATH( node->next == NULL ) ) {				// no one waiting ?
-		MCS_node * old_tail = Faa( lock, NULL );
+		MCS_node * old_tail = Fas( lock, NULL );
   if ( SLOWPATH( old_tail == node ) ) return;
-		MCS_node * usurper = Faa( lock, old_tail );
+		MCS_node * usurper = Fas( lock, old_tail );
 		while ( node->next == NULL ) Pause();			// busy wait until my node is modified
 		WO( Fence(); ); // 7
 		if ( usurper != NULL ) {
@@ -58,9 +58,9 @@ inline void mcs_unlock( MCS_lock * lock, MCS_node * node ) {
 #else													// Scott book Figure 4.8
 	MCS_node * succ = node->next;
 	if ( FASTPATH( succ == NULL ) ) {					// no one waiting ?
-		MCS_node * old_tail = Faa( lock, NULL );
+		MCS_node * old_tail = Fas( lock, NULL );
   if ( SLOWPATH( old_tail == node ) ) return;
-		MCS_node * usurper = Faa( lock, old_tail );
+		MCS_node * usurper = Fas( lock, old_tail );
 		while ( (succ = node->next) == NULL ) Pause();	// busy wait until my node is modified
 		WO( Fence(); ); // 6
 		if ( usurper != NULL ) {

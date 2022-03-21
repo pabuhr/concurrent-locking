@@ -26,7 +26,7 @@ static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sha
 
 static inline void clh_lock( qnode_ptr p ) {
 	p->succ_must_wait = true;
-	qnode_ptr pred = p->prev = Faa( &tail, p );
+	qnode_ptr pred = p->prev = Fas( &tail, p );
 	await( ! pred->succ_must_wait );
 	WO( Fence(); );
 } // clh_lock

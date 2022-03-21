@@ -23,9 +23,9 @@ static void * Worker( void * arg ) {
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
 			Element E CALIGN = { 0 };
-			Element * const prev = Faa( &L.Tail, &E );
+			Element * const prev = Fas( &L.Tail, &E );
 			if ( prev != NULL ) { 
-				await( Faa( &(prev->Grant), 0 ) != 0 );
+				await( Fas( &(prev->Grant), 0 ) != 0 );
 			} // if
 			WO( Fence(); );
 
@@ -37,7 +37,7 @@ static void * Worker( void * arg ) {
 				#ifdef __ARM_ARCH
 				await( E.Grant == 0 );
 				#else
-				await( Faa( &(E.Grant), 1 ) == 0 );
+				await( Fas( &(E.Grant), 1 ) == 0 );
 				#endif // __ARM_ARCH
 			} // if
 

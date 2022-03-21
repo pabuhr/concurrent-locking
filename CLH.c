@@ -34,7 +34,7 @@ static void * Worker( void * arg ) {
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
 			*n = false;
-			qnode_ptr prev = Faa( &tail, n );
+			qnode_ptr prev = Fas( &tail, n );
 			await( *prev );
 			WO( Fence(); );
 
