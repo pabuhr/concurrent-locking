@@ -50,7 +50,7 @@
 
 typedef struct {
 	MCS_lock mcs_lock;
-	volatile TYPE flag CALIGN;
+	VTYPE flag CALIGN;
 } QSLock;
 
 inline void acquire( QSLock * lock ) {
@@ -62,6 +62,7 @@ inline void acquire( QSLock * lock ) {
 } // acquire
 	
 inline void release( QSLock * lock ) {
+	WO( Fence(); );
 	lock->flag = 0;
 } // release
 
@@ -116,5 +117,5 @@ void __attribute__((noinline)) dtor() {
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=SpinLockQ Harness.c -lpthread -lm -D`hostname` -DCFMT -DCNT=0" //
+// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=QSpinLock Harness.c -lpthread -lm -D`hostname` -DCFMT -DCNT=0" //
 // End: //
