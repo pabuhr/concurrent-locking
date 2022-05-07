@@ -21,19 +21,29 @@ typedef _Atomic(MCS_node *) MCS_lock;
 inline void mcs_lock( MCS_lock * lock, MCS_node * node ) {
 	WO( Fence(); ); // 1
 	node->next = NULL;
+
 #ifndef MCS_OPT1										// default option
 	node->spin = true;									// alternative position and remove fence below
 	WO( Fence(); ); // 2
 #endif // MCS_OPT1
+
 	MCS_node * prev = Fas( lock, node );
+
   if ( SLOWPATH( prev == NULL ) ) return;				// no one on list ?
+
 #ifdef MCS_OPT1
 	node->spin = true;									// mark as waiting
 	WO( Fence(); ); // 3
 #endif // MCS_OPT1
+
 	prev->next = node;									// add to list of waiting threads
 	WO( Fence(); ); // 4
+
+	#ifndef MPAUSE
 	while ( node->spin == true ) Pause();				// busy wait on my spin variable
+	#else
+	MPause( node->spin, == true );						// busy wait on my spin variable
+	#endif // MPAUSE
 	WO( Fence(); ); // 5
 } // mcs_lock
 
@@ -42,10 +52,17 @@ inline void mcs_unlock( MCS_lock * lock, MCS_node * node ) {
 #ifdef MCS_OPT2											// original, default option
 	if ( FASTPATH( node->next == NULL ) ) {				// no one waiting ?
 		MCS_node * old_tail = Fas( lock, NULL );
+
   if ( SLOWPATH( old_tail == node ) ) return;
-		MCS_node * usurper = Fas( lock, old_tail );
+
+  		MCS_node * usurper = Fas( lock, old_tail );
+		#ifndef MPAUSE
 		while ( node->next == NULL ) Pause();			// busy wait until my node is modified
+		#else
+		MPause( node->next, == NULL );					// busy wait until my node is modified
+		#endif // MPAUSE
 		WO( Fence(); ); // 7
+
 		if ( usurper != NULL ) {
 			usurper->next = node->next;
 		} else {
@@ -59,10 +76,17 @@ inline void mcs_unlock( MCS_lock * lock, MCS_node * node ) {
 	MCS_node * succ = node->next;
 	if ( FASTPATH( succ == NULL ) ) {					// no one waiting ?
 		MCS_node * old_tail = Fas( lock, NULL );
+
   if ( SLOWPATH( old_tail == node ) ) return;
+
 		MCS_node * usurper = Fas( lock, old_tail );
+		#ifndef MPAUSE
 		while ( (succ = node->next) == NULL ) Pause();	// busy wait until my node is modified
+		#else
+		MPauseS( succ =, node->next, == NULL );			// busy wait until my node is modified
+		#endif // MPAUSE
 		WO( Fence(); ); // 6
+
 		if ( usurper != NULL ) {
 			usurper->next = succ;
 		} else {
@@ -128,5 +152,5 @@ void __attribute__((noinline)) dtor() {
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=MCS2 Harness.c -lpthread -lm -D`hostname` -DCFMT -DCNT=0" //
+// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=MCSFAS Harness.c -lpthread -lm -D`hostname` -DCFMT -DCNT=0" //
 // End: //

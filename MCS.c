@@ -37,10 +37,10 @@ static void * Worker( void * arg ) {
 		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
+			NonCriticalSection();
+
 			mcs_lock( &lock, &node );
-
 			randomThreadChecksum += CriticalSection( id );
-
 			mcs_unlock( &lock, &node );
 
 			#ifdef FAST
