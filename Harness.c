@@ -53,6 +53,9 @@
 	#define SLOWPATH(x) __builtin_expect(!!(x), 0)
 #endif // FASTPATH
 
+#define xstr(s) str(s)
+#define str(s) #s
+
 //------------------------------------------------------------------------------
 
 typedef uintptr_t TYPE;									// addressable word-size
@@ -192,7 +195,7 @@ static RTYPE Mix64( uint64_t v ) {
 // Optionally, sequester R on its own cache line to avoid false sharing
 // but on linux __thread "initial-exec" TLS variables are already segregated.
 
-static __attribute__(( unused )) RTYPE ThreadLocalRandom() {
+static __attribute__(( unused, noinline )) RTYPE ThreadLocalRandom() { // must be called
 	static __thread RTYPE R = 0;
 	if ( R == 0 ) R = Mix64( (uint64_t)(uintptr_t)&R ) | 1;
 	RTYPE v = R;
@@ -256,23 +259,27 @@ volatile int Run CALIGN = 0;
 
 //------------------------------------------------------------------------------
 
+#ifndef NCSTIMES
+#define NCSTIMES 0
+#endif // NCSTIMES
 #ifndef CSTIMES
 #define CSTIMES 20
 #endif // CSTIMES
 
-enum { CSTimes = CSTIMES };								// time spent in CS + random number call
+enum {
+	NCSTimes = NCSTIMES,								// time delay before attempting entry to CS
+	CSTimes  = CSTIMES									// time spent in CS + random-number call
+};
 
-#ifdef NONCS
-static inline void NonCriticalSection( const TYPE id ) {
-	for ( volatile int i = 0; i < 550; i += 1 );		// Spinlock: 200
-	// Fence();											// optional
-	// for ( int i = 1; i <= CSTimes; i += 1 ) {		// delay
-	// 	if ( id == Threads ) {							// mutual exclusion violation ?
-	// 		printf( "Interference Id:%zu\n", id );
-	// 	} // if
-	// } // for
+#if NCSTIMES != 0
+static inline RTYPE NonCriticalSection() {
+	volatile RTYPE randomNumber = ThreadLocalRandom();	// match with CS
+	for ( volatile int delay = 0; delay < NCSTimes; delay += 1 ) {} // short delay
+	return randomNumber;
 } // NonCriticalSection
-#endif // NONCS
+#else
+	#define NonCriticalSection()
+#endif // NCSTIMES != 0
 
 static TYPE HPAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
 static volatile RTYPE randomChecksum CALIGN = 0;
@@ -282,8 +289,8 @@ static volatile TYPE CurrTid CALIGN = ULONG_MAX;		// shared, current thread id i
 static TYPE HPAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 //static int Identity(int v) { __asm__ __volatile__ (";" : "+r" (v)); return v; } 
-static inline RTYPE CriticalSection( const TYPE tid __attribute__(( unused )) ) { // parameter unused for CSTIME == 0
 #if CSTIMES != 0
+static inline RTYPE CriticalSection( const TYPE tid __attribute__(( unused )) ) { // parameter unused for CSTIME == 0
 	#ifdef CNT
 	if ( UNLIKELY( CurrTid == tid ) ) counters[Run][tid].cnts[0] += 1; // consecutive entries in the critical section
 	#endif // CNT
@@ -306,10 +313,10 @@ static inline RTYPE CriticalSection( const TYPE tid __attribute__(( unused )) ) 
 	} // if
 
 	return randomNumber;
-#else
-	return 0;
-#endif // CSTIMES != 0
 } // CriticalSection
+#else
+	#define CriticalSection( tid ) 0
+#endif // CSTIMES != 0
 
 //------------------------------------------------------------------------------
 
@@ -477,8 +484,6 @@ void affinity( pthread_t pthreadid, unsigned int tid ) {
 
 static uint64_t ** entries CALIGN;						// holds CS entry results for each threads for all runs
 
-#define xstr(s) str(s)
-#define str(s) #s
 #ifdef __cplusplus
 #include xstr(Algorithm.cc)								// include software algorithm for testing
 #else
@@ -556,9 +561,10 @@ int main( int argc, char * argv[] ) {
 	#ifdef MPAUSE
 				" MONITOR pause,"
 	#endif // MPAUSE
+				" %d NCS spins,"
 				" %d CS spins,"
 				" %d runs median"
-				, xstr(Algorithm), CSTimes, RUNS );
+				, xstr(Algorithm), NCSTimes, CSTimes, RUNS );
 		if ( Degree != -1 ) printf( " %jd-ary", Degree ); // Zhang only
 		printf( "\n  N   T    CS Entries           AVG           STD   RSTD"
 	#ifdef CNT
