@@ -1,14 +1,47 @@
 // Dave Dice and Alex Kogan, Hemlock: Compact and Scalable Mutual Exclusion, Proceedings of the 33rd ACM Symposium on
-// Parallelism in Algorithms and Architectures, July 2021, 173-183.
+// Parallelism in Algorithms and Architectures, July 2021, 173-183, Listing 1.
 
 #include <stdbool.h>
 
-typedef struct { VTYPE Grant; } Element;
-typedef struct { Element * volatile Tail; } HemLock;
+typedef VTYPE Grant;
+#ifndef ATOMIC
+typedef Grant * volatile HemLock;
+#else
+typedef _Atomic(Grant *) HemLock;
+#endif // ! ATOMIC
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
-static HemLock L CALIGN;
+static HemLock lock CALIGN;
+#ifdef THREADLOCAL
+static __thread volatile Grant grant CALIGN;
+#define GPARM
+#define GARG
+#define STAR
+#define ADDR &
+#else
+#define GPARM , Grant * grant
+#define GARG , &grant
+#define STAR *
+#define ADDR
+#endif // THREADLOCAL
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
+
+static inline void hem_lock( HemLock * lock  GPARM ) {
+	STAR grant = 0;
+	Grant * prev = Fas( lock, ADDR grant );
+	if ( prev != NULL ) { 
+		await( Fas( prev, 0 ) != 0 );
+	} // if
+	WO( Fence(); );
+} // hem_lock
+
+static inline void hem_unlock( HemLock * lock  GPARM ) {
+	WO( Fence(); );
+	STAR grant = 1;
+	if ( ! Cas( lock, ADDR grant, NULL ) ) {
+		await( STAR grant == 0 );
+	} // if
+} // hem_unlock
 
 static void * Worker( void * arg ) {
 	TYPE id = (size_t)arg;
@@ -18,28 +51,19 @@ static void * Worker( void * arg ) {
 	unsigned int cnt = 0, oid = id;
 	#endif // FAST
 
+	#ifndef THREADLOCAL
+	Grant grant CALIGN;
+	#endif // ! THREADLOCAL
+
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
-			Element E CALIGN = { 0 };
-			Element * const prev = Fas( &L.Tail, &E );
-			if ( prev != NULL ) { 
-				await( Fas( &(prev->Grant), 0 ) != 0 );
-			} // if
-			WO( Fence(); );
+			hem_lock( &lock  GARG );
 
 			randomThreadChecksum += CriticalSection( id );
 
-			WO( Fence(); );
-			E.Grant = 1;
-			if ( ! Cas( &L.Tail, &E, NULL ) ) {
-				#ifdef __ARM_ARCH
-				await( E.Grant == 0 );
-				#else
-				await( Fas( &(E.Grant), 1 ) == 0 );
-				#endif // __ARM_ARCH
-			} // if
+			hem_unlock( &lock  GARG );
 
 			#ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
@@ -62,7 +86,7 @@ static void * Worker( void * arg ) {
 } // Worker
 
 void __attribute__((noinline)) ctor() {
-	L.Tail = NULL;
+	lock = NULL;
 } // ctor
 
 void __attribute__((noinline)) dtor() {
