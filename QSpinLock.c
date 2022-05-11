@@ -1,5 +1,5 @@
 // Waiman Long <waiman.long@hp.com>, qspinlock: Introducing a 4-byte queue spinlock implementation,
-// https://lwn.net/Articles/561775/
+// https://lwn.net/Articles/561775
 //
 // This qspinlock is kernel specific. First, the MCS nodes are not actually on-stack, but reside in a static global 2D
 // array indexed by CPUID and trap level.  There are 4 trap levels : normal; device interrupt; panic and NMI.  The
