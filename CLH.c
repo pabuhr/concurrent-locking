@@ -1,23 +1,40 @@
-// Travis S. Craig, Building FIFO and priority-queueing spin locks from atomic swap. Technical Report TR 93-02-02,
-// University of Washington, Department of Computer Science and Engineering, February 1993, Appendix A.
-// 
 // Peter Magnusson, Anders Landin, Erik Hagersten, Queue Locks on Cache Coherent Multiprocessors, Proceedings of 8th
 // International Parallel Processing Symposium (IPPS), 1994, Figure 2 (LH lock).
 
 #include <stdbool.h>
 
 typedef VTYPE qnode CALIGN;
-
-#ifndef ATOMIC
-typedef qnode *
-#else
-typedef _Atomic(qnode *)
-#endif // ! ATOMIC
-	qnode_ptr;
+typedef qnode * qnode_ptr;
+typedef qnode_ptr CLH_lock;
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
-static qnode_ptr tail CALIGN;
+static CLH_lock lock CALIGN;
+#ifdef THREADLOCAL
+static __thread qnode_ptr node CALIGN;					// alternative location
+#define NPARM( addr )
+#define NARG( addr )
+#define STAR
+#define ADDR &
+#else
+#define NPARM( star ) , qnode_ptr star node
+#define NARG( addr ) , addr node
+#define STAR *
+#define ADDR
+#endif // THREADLOCAL
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
+
+static inline void clh_lock( CLH_lock * lock, qnode_ptr * prev  NPARM() ) {
+	STAR node = false;
+	*prev = Fas( lock, ADDR node );
+	await( **prev );
+	WO( Fence(); );
+} // clh_lock
+
+static inline void clh_unlock( qnode_ptr prev  NPARM(*) ) {
+	WO( Fence(); );
+	* STAR node = true;
+	STAR node = prev;
+} // clh_unlock
 
 static void * Worker( void * arg ) {
 	TYPE id = (size_t)arg;
@@ -27,22 +44,22 @@ static void * Worker( void * arg ) {
 	unsigned int cnt = 0, oid = id;
 	#endif // FAST
 
-	qnode_ptr n = Allocator( sizeof( qnode ) );			// cache alignment
+	#ifndef THREADLOCAL
+	qnode_ptr node;
+	#endif // ! THREADLOCAL
+
+	node = Allocator( sizeof( qnode ) );				// cache alignment
+	qnode_ptr prev;
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
-			*n = false;
-			qnode_ptr prev = Fas( &tail, n );
-			await( *prev );
-			WO( Fence(); );
+			clh_lock( &lock, &prev  NARG() );
 
 			randomThreadChecksum += CriticalSection( id );
 
-			WO( Fence(); );
-			*n = true;
-			n = prev;
+			clh_unlock( prev  NARG(&) );
 
 			#ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
@@ -61,18 +78,20 @@ static void * Worker( void * arg ) {
 		Fai( &Arrived, -1 );
 	} // for
 
-	free( (TYPE *)n );									// remove volatile
+	#ifndef THREADLOCAL
+	free( (TYPE *)node );									// remove volatile
+	#endif // ! THREADLOCAL
 
 	return NULL;
 } // Worker
 
 void __attribute__((noinline)) ctor() {
-	tail = Allocator( sizeof( qnode ) );				// cache alignment
-	*tail = true;
+	lock = Allocator( sizeof( qnode ) );				// cache alignment
+	*lock = true;
 } // ctor
 
 void __attribute__((noinline)) dtor() {
-	free( (TYPE *)tail );								// remove volatile
+	free( (TYPE *)lock );								// remove volatile
 } // dtor
 
 // Local Variables: //
