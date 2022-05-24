@@ -672,7 +672,7 @@ int main( int argc, char * argv[] ) {
 	uint64_t totals[RUNS], sort[RUNS], smalls[RUNS];
 
 	#ifdef DEBUG
-	printf( "\nruns: " );
+	printf( "\nruns:\n" );
 	#endif // DEBUG
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		smalls[r] = totals[r] = 0;
@@ -683,6 +683,9 @@ int main( int argc, char * argv[] ) {
 			printf( "%" QUOTE "ju ", entries[r][tid] );
 			#endif // DEBUG
 		} // for
+		#ifdef DEBUG
+		printf( "\n" );
+		#endif // DEBUG
 		sort[r] = totals[r];
 	} // for
 	qsort( sort, RUNS, sizeof(typeof(sort[0])), compare );
@@ -706,7 +709,7 @@ int main( int argc, char * argv[] ) {
 	for ( posn = 0; posn < RUNS && totals[posn] != med; posn += 1 ); // assumes RUNS is odd
 
 	#ifdef DEBUG
-	printf( "\ntotals: " );
+	printf( "totals: " );
 	for ( int i = 0; i < RUNS; i += 1 ) {				// print values
 		printf( "%" QUOTE "ju ", totals[i] );
 	} // for
