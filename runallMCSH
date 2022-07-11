@@ -7,7 +7,7 @@
 # https://community.arm.com/developer/tools-software/tools/b/tools-software-ides-blog/posts/making-the-most-of-the-arm-architecture-in-gcc-10
 
 algorithms="MCS MCSFAS MCSK42 MCSH CLH HemLock QSpinLock PthreadLock SpinLock"
-time=10
+time=60
 outdir=`hostname`
 Exec=`hostname`.out
 mkdir -p ${outdir}
@@ -22,7 +22,8 @@ if [ ${outdir} = "algol" ] ; then
 fi
 
 runalgorithm() {
-    for atomic in "" "ATOMIC" ; do
+#    for atomic in "" "ATOMIC" ; do
+    for atomic in "" ; do
 	outfile=${outdir}/${1}${2}${atomic}${contention}
 	echo "${outfile}"
 	gcc-10 ${cflag} ${atomic:+-D${atomic}} ${contention:+-D${contention}} -D${outdir} -DAlgorithm=${1} Harness.c -lpthread -lm -o ${outdir}.out
