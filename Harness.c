@@ -259,27 +259,63 @@ volatile int Run CALIGN = 0;
 
 //------------------------------------------------------------------------------
 
-#ifndef NCSTIMES
-#define NCSTIMES 0
-#endif // NCSTIMES
+#ifdef FAST
+enum { MaxStartPoints = 64 };
+static unsigned int NoStartPoints CALIGN;
+static uint64_t * Startpoints CALIGN;
+
+// To ensure the single thread exercises all aspects of an algorithm, it is assigned different start-points on each
+// access to the critical section by randomly changing its thread id.  The randomness is accomplished using
+// approximately 64 pseudo-random thread-ids, where 64 is divided by N to get R repetitions, e.g., for N = 5, R = 64 / 5
+// = 12.  Each of the 12 repetition is filled with 5 random value in the range, 0..N-1, without replacement, e.g., 0 3 4
+// 1 2.  There are no consecutive thread-ids within a repetition but there may be between repetition.  The thread cycles
+// through this array of ids during an experiment.
+
+static inline unsigned int startpoint( unsigned int pos ) {
+	assert( pos < NoStartPoints );
+	return Startpoints[pos];
+//	return rand() % N;
+} // startpoint
+#endif // FAST
+
+//------------------------------------------------------------------------------
+
+#ifndef NCS_DELAY
+#define NCS_DELAY 0
+#endif // NCS_DELAY
+
 #ifndef CSTIMES
 #define CSTIMES 20
 #endif // CSTIMES
 
 enum {
-	NCSTimes = NCSTIMES,								// time delay before attempting entry to CS
+	NCSTimes = NCS_DELAY,								// time delay before attempting entry to CS
 	CSTimes  = CSTIMES									// time spent in CS + random-number call
 };
 
-#if NCSTIMES != 0
-static inline RTYPE NonCriticalSection() {
-	volatile RTYPE randomNumber = ThreadLocalRandom();	// match with CS
-	for ( volatile int delay = 0; delay < NCSTimes; delay += 1 ) {} // short delay
-	return randomNumber;
-} // NonCriticalSection
+#if NCS_DELAY != 0
+static unsigned int NoNCSPoints CALIGN;
+static uint64_t * NCSpoints CALIGN;
+
+static inline unsigned int ncspoint( unsigned int pos ) {
+	assert( pos < NoNCSPoints );
+	return NCSpoints[pos];
+//	return rand() % N;
+} // ncspoint
+
+static void NCS_delay( unsigned int times ) {
+	for ( volatile unsigned int delay = 0; delay < times; delay += 1 ) {} // short delay
+} // NCS_delay
+
+#define NCS_DECL unsigned int ncscnt = id, ncsdelay
+#define NCS { \
+	ncsdelay = ncspoint( ncscnt ); \
+	ncscnt = cycleUp( ncscnt, NoNCSPoints ); \
+	NCS_delay( ncsdelay ); }
 #else
-	#define NonCriticalSection()
-#endif // NCSTIMES != 0
+#define NCS_DECL
+#define NCS
+#endif // NCS_DELAY != 0
 
 static TYPE HPAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
 static volatile RTYPE randomChecksum CALIGN = 0;
@@ -290,7 +326,7 @@ static TYPE HPAD2 CALIGN __attribute__(( unused ));		// protect further false sh
 
 //static int Identity(int v) { __asm__ __volatile__ (";" : "+r" (v)); return v; } 
 #if CSTIMES != 0
-static inline RTYPE CriticalSection( const TYPE tid __attribute__(( unused )) ) { // parameter unused for CSTIME == 0
+static inline RTYPE CS( const TYPE tid __attribute__(( unused )) ) { // parameter unused for CSTIME == 0
 	#ifdef CNT
 	if ( UNLIKELY( CurrTid == tid ) ) counters[Run][tid].cnts[0] += 1; // consecutive entries in the critical section
 	#endif // CNT
@@ -313,54 +349,39 @@ static inline RTYPE CriticalSection( const TYPE tid __attribute__(( unused )) ) 
 	} // if
 
 	return randomNumber;
-} // CriticalSection
+} // CS
 #else
-	#define CriticalSection( tid ) 0
+	#define CS( tid ) 0
 #endif // CSTIMES != 0
 
 //------------------------------------------------------------------------------
 
-#ifdef FAST
-enum { MaxStartPoints = 64 };
-static unsigned int NoStartPoints CALIGN;
-static uint64_t * Startpoints CALIGN;
-
-// To ensure the single thread exercises all aspects of an algorithm, it is assigned different start-points on each
-// access to the critical section by randomly changing its thread id.  The randomness is accomplished using
-// approximately 64 pseudo-random thread-ids, where 64 is divided by N to get R repetitions, e.g., for N = 5, R = 64 / 5
-// = 12.  Each of the 12 repetition is filled with 5 random value in the range, 0..N-1, without replacement, e.g., 0 3 4
-// 1 2.  There are no consecutive thread-ids within a repetition but there may be between repetition.  The thread cycles
-// through this array of ids during an experiment.
-
-void startpoints() {
-	Startpoints[0] = N;
- 	for ( unsigned int i = 0; i < NoStartPoints; i += N ) {
+#if defined( FAST ) || defined( NCS_DELAY )
+void randPoints( uint64_t points[], unsigned int numPoints, unsigned int N ) {
+	//printf( "randPoints points %p, numPoints %d, N %d\n", points, numPoints, N );
+	points[0] = N;
+ 	for ( unsigned int i = 0; i < numPoints; i += N ) {
 		for ( unsigned int j = i; j < i + N; j += 1 ) {
 			unsigned int v;
 		  L: v = rand() % N;
 			unsigned int k;
 			for ( k = i; k < j; k += 1 ) {
-				if ( Startpoints[k] == v ) goto L;
+				if ( points[k] == v ) goto L;
 			} // for
-// Unknown performance drop caused by following assert, use -DNDEBUG for experiments
-			assert( k < NoStartPoints );
-			Startpoints[k] = v;
+			// Unknown performance drop caused by following assert, use -DNDEBUG for experiments
+			assert( k < numPoints );
+			points[k] = v;
 		} // for
 	} // for
 #if 0
-	printf( "N %jd NoStartPoints %d ", N, NoStartPoints );
-	for ( unsigned int i = 0; i < NoStartPoints; i += 1 ) {
-		printf( "%d ", Startpoints[i] );
+	printf( "N %d numPoints %d ", N, numPoints );
+	for ( unsigned int i = 0; i < numPoints; i += 1 ) {
+		printf( "%jd ", points[i] );
 	} // for
 	printf( "\n" );
 #endif // 0
-} // startpoints
-
-static inline unsigned int startpoint( unsigned int pos ) {
-	return Startpoints[pos];
-//	return rand() % N;
-} // startpoint
-#endif // FAST
+} // randPoints
+#endif // FAST || NCS_DELAY
 
 //------------------------------------------------------------------------------
 
@@ -446,20 +467,28 @@ void affinity( pthread_t pthreadid, unsigned int tid ) {
 // Below are alternative approaches.
 #if defined( __linux ) && defined( PIN )
 #if 1
+#if defined( nasus )
+	// enum { OFFSETSOCK = 1 /* 0 origin */, SOCKETS = 2, CORES = 64, HYPER = 1 };
+	int cpu = (tid / 2) + ((tid % 2 == 0) ? 0 : 128);
+#elif defined( pyke )
+	// enum { OFFSETSOCK = 1 /* 0 origin */, SOCKETS = 2, CORES = 24, HYPER = 2 /* wrap on socket */ };
+	int cpu = (tid / 2) + ((tid % 2 == 0) ? 0 : 48);
+#else
 #if defined( algol )
 	enum { OFFSETSOCK = 1 /* 0 origin */, SOCKETS = 2, CORES = 48, HYPER = 1 };
-#elif defined( nasus )
-	enum { OFFSETSOCK = 1 /* 0 origin */, SOCKETS = 2, CORES = 64, HYPER = 1 };
+// #elif defined( nasus )
+//	enum { OFFSETSOCK = 1 /* 0 origin */, SOCKETS = 2, CORES = 64, HYPER = 1 };
 #elif defined( jax )
 	enum { OFFSETSOCK = 1 /* 0 origin */, SOCKETS = 4, CORES = 24, HYPER = 2 /* wrap on socket */ };
-#elif defined( pyke )
-	enum { OFFSETSOCK = 1 /* 0 origin */, SOCKETS = 2, CORES = 24, HYPER = 2 /* wrap on socket */ };
+// #elif defined( pyke )
+//	enum { OFFSETSOCK = 1 /* 0 origin */, SOCKETS = 2, CORES = 24, HYPER = 2 /* wrap on socket */ };
 #elif defined( cfapi1 )
 	enum { OFFSETSOCK = 0 /* 0 origin */, SOCKETS = 1, CORES = 4, HYPER = 1 };
 #else // default
 	enum { OFFSETSOCK = 2 /* 0 origin */, SOCKETS = 4, CORES = 16, HYPER = 1 };
 #endif // HOSTS
 	int cpu = tid + ((tid < CORES) ? OFFSETSOCK * CORES : HYPER < 2 ? OFFSETSOCK * CORES : CORES * SOCKETS);
+#endif // computer
 #endif // 0
 
 #if 0
@@ -578,12 +607,18 @@ int main( int argc, char * argv[] ) {
 
 	printf( "%3ju %3jd ", N, Time );
 
+#if NCS_DELAY != 0
+	NoNCSPoints = NCS_DELAY * 5;							// repeat random pattern N times
+	NCSpoints = Allocator( sizeof(typeof(NCSpoints[0])) * NoNCSPoints );
+	randPoints( NCSpoints, NoNCSPoints, NCS_DELAY );
+#endif // NCS_DELAY != 0
+
 #ifdef FAST
 	assert( N <= MaxStartPoints );
 	Threads = 1;										// fast test, Threads=1, N=1..32
 	NoStartPoints = MaxStartPoints / N * N;				// floor( MaxStartPoints / N )
 	Startpoints = Allocator( sizeof(typeof(Startpoints[0])) * NoStartPoints );
-	startpoints( N );
+	randPoints( Startpoints, NoStartPoints, N );
 #else
 	Threads = N;										// allow testing of T < N
 #endif // FAST

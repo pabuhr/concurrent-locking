@@ -15,12 +15,16 @@ static void * Worker( void * arg ) {
 	unsigned int cnt = 0, oid = id;
 	#endif // FAST
 
+	NCS_DECL;
+
 	typeof(N) j;
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
+			NCS;
+
 		  L0: flag[id] = true;							// entry protocol
 			turn = id;									// RACE
 			Fence();									// force store before more loads
@@ -38,7 +42,7 @@ static void * Worker( void * arg ) {
 					if ( FASTPATH( j != id && flag[j] ) ) goto L2;
 			} // if
 
-			randomThreadChecksum += CriticalSection( id );
+			randomThreadChecksum += CS( id );
 
 			flag[id] = false;							// exit protocol
 

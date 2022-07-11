@@ -31,16 +31,20 @@ static void * Worker( void * arg ) {
 	unsigned int cnt = 0, oid = id;
 	#endif // FAST
 
+	NCS_DECL;
+
 	MCS_node node;
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
-			NonCriticalSection();
+			NCS;
 
 			mcs_lock( &lock, &node );
-			randomThreadChecksum += CriticalSection( id );
+
+			randomThreadChecksum += CS( id );
+
 			mcs_unlock( &lock, &node );
 
 			#ifdef FAST

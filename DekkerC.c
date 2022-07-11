@@ -22,12 +22,16 @@ static void * Worker( void * arg ) {
 	unsigned int cnt = 0, oid = id;
 	#endif // FAST
 
+	NCS_DECL;
+
 	int other = inv( id );								// int is better than TYPE
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
+			NCS;
+
 			#ifdef FLICKER
 			for ( int i = 0; i < 100; i += 1 ) intents[id] = i % 2; // flicker
 			#endif // FLICKER
@@ -58,7 +62,7 @@ static void * Worker( void * arg ) {
 				} // if
 			} // while
 
-			randomThreadChecksum += CriticalSection( id );
+			randomThreadChecksum += CS( id );
 
 			#ifdef FLICKER
 			for ( int i = id; i < 100; i += 1 ) last = i % 2; // flicker

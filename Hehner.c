@@ -15,12 +15,16 @@ static void * Worker( void * arg ) {
 	unsigned int cnt = 0, oid = id;
 	#endif // FAST
 
+	NCS_DECL;
+
 	VTYPE * myticket = &ticket[id];						// optimization
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
+			NCS;
+
 			// step 1, select a ticket
 			*myticket = 0;								// set highest priority
 			Fence();									// force store before more loads
@@ -42,7 +46,7 @@ static void * Worker( void * arg ) {
 			} // for
 			WO( Fence(); );
 
-			randomThreadChecksum += CriticalSection( id );
+			randomThreadChecksum += CS( id );
 
 			WO( Fence(); );
 			*myticket = MAX_TICKET;						// exit protocol

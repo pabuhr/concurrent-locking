@@ -18,16 +18,16 @@ typedef _Atomic(qnode *)
 	qnode_ptr;
 
 typedef struct {
-	qnode_ptr tail CALIGN;
-	qnode_ptr mess CALIGN;
-	VTYPE flag CALIGN;
-} NMCS_lock;
+	qnode_ptr tail;
+	qnode_ptr msg;
+	VTYPE flag;
+} NMCS_lock CALIGN;
 
 static inline void mcs_lock( NMCS_lock * lock ) {
 	qnode mm = { NULL, false };
 	qnode_ptr prev = Fas( &lock->tail, &mm );
 
-	if ( SLOWPATH( prev == NULL ) ) {
+	if ( FASTPATH( prev == NULL ) ) {
 		await( lock->flag );
 	} else {
 		prev->next = &mm;
@@ -44,16 +44,19 @@ static inline void mcs_lock( NMCS_lock * lock ) {
 		} // if
 	} // if
 	WO( Fence(); );
-	lock->mess = succ;
+	lock->msg = succ;
 } // mcs_lock
 
+//The first two lines of release must not be swapped (see handware Fence), because, if flag holds before
+//msg is read, a new thread may be able to modify msg.
+
 static inline void mcs_unlock( NMCS_lock * lock ) {
-	qnode_ptr temp = lock->mess;
-	WO( Fence(); );
+	qnode_ptr succ = lock->msg;
+	Fence();
 	lock->flag = true;
-	if ( FASTPATH( temp != NULL ) ) {
+	if ( FASTPATH( succ != NULL ) ) {
 		WO( Fence(); );
-		temp->go = true;
+		succ->go = true;
 	} // if
 } // mcs_unlock
 
@@ -69,13 +72,17 @@ static void * Worker( void * arg ) {
 	unsigned int cnt = 0, oid = id;
 	#endif // FAST
 
+	NCS_DECL;
+
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
+			NCS;
+
 			mcs_lock( &lock );
 
-			randomThreadChecksum += CriticalSection( id );
+			randomThreadChecksum += CS( id );
 
 			mcs_unlock( &lock );
 

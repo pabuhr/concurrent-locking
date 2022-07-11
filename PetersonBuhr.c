@@ -19,34 +19,41 @@ static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false shar
 static void *Worker( void *arg ) {
 	TYPE id = (size_t)arg;
 	uint64_t entry;
-#ifdef FAST
+
+	#ifdef FAST
 	unsigned int cnt = 0, oid = id;
-#endif // FAST
+	#endif // FAST
+
+	NCS_DECL;
 
 	int level = levels[id];
 	Tuple *state = states[id];
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
-		entry = 0;
-		while ( stop == 0 ) {
+		RTYPE randomThreadChecksum = 0;
+
+		for ( entry = 0; stop == 0; entry += 1 ) {
 			for ( int lv = 0; lv <= level; lv += 1 ) {		// entry protocol
 				binary_prologue( state[lv].es, state[lv].ns );
 			} // for
 
-			CriticalSection( id );
+			randomThreadChecksum += CS( id );
 
 			for ( int lv = level; lv >= 0; lv -= 1 ) {	// exit protocol, retract reverse order
 				binary_epilogue( state[lv].es, state[lv].ns );
 			} // for
-#ifdef FAST
+
+			#ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
 			cnt = cycleUp( cnt, NoStartPoints );
-#endif // FAST
-			entry += 1;
-		} // while
-#ifdef FAST
+			#endif // FAST
+		} // for
+
+		Fai( &sumOfThreadChecksums, randomThreadChecksum );
+
+		#ifdef FAST
 		id = oid;
-#endif // FAST
+		#endif // FAST
 		entries[r][id] = entry;
 		Fai( &Arrived, 1 );
 		while ( stop != 0 ) Pause();

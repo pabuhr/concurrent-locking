@@ -16,12 +16,16 @@ static void * Worker( void * arg ) {
 	unsigned int cnt = 0, oid = id;
 	#endif // FAST
 
+	NCS_DECL;
+
 	int other = inv( id );								// int is better than TYPE
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
+			NCS;
+
 		  A1: cc[id] = WantIn;
 			Fence();
 		  L1: if ( FASTPATH( cc[other] == WantIn ) ) {
@@ -31,7 +35,7 @@ static void * Worker( void * arg ) {
 				goto A1;
 			}
 
-			randomThreadChecksum += CriticalSection( id );
+			randomThreadChecksum += CS( id );
 
 			turn = id;
 			cc[id] = DontWantIn;

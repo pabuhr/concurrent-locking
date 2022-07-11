@@ -33,9 +33,12 @@ static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sha
 static void * Worker( void * arg ) {
 	TYPE id = (size_t)arg;
 	uint64_t entry;
+
 	#ifdef FAST
 	unsigned int cnt = 0, oid = id;
 	#endif // FAST
+
+	NCS_DECL;
 
 	TYPE myPlace;
 
@@ -43,6 +46,8 @@ static void * Worker( void * arg ) {
 		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
+			NCS;
+
 			myPlace = Fai( &queueLast, 1 );
 			// Restore queueLast to [0,N) on roll over, but modified Fig 2 to remove modulus in the fast path by adding
 			// an extra atomic instruction every Nth entry.
@@ -53,7 +58,7 @@ static void * Worker( void * arg ) {
 			while ( flags[myPlace] == MUST_WAIT ) Pause(); // busy wait
 			WO( Fence(); );
 
-			randomThreadChecksum += CriticalSection( id );
+			randomThreadChecksum += CS( id );
 
 			WO( Fence(); );
 			flags[myPlace] = MUST_WAIT;					// exit protocol, myPlace must be <= N

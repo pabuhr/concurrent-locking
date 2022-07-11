@@ -12,12 +12,16 @@ static void * Worker( void * arg ) {
 	unsigned int cnt = 0, oid = id;
 	#endif // FAST
 
+	NCS_DECL;
+
 	unsigned int ridi, ridt;
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
+			NCS;
+
 			ridi = id;									// this version fastest on SPARC
 			for ( unsigned int lv = 0; lv < depth; lv += 1 ) { // entry protocol
 //				ridi = id >> lv;						// round id for intent
@@ -29,7 +33,7 @@ static void * Worker( void * arg ) {
 				ridi >>= 1;
 			} // for
 
-			randomThreadChecksum += CriticalSection( id );
+			randomThreadChecksum += CS( id );
 
 			for ( int lv = depth - 1; lv >= 0; lv -= 1 ) { // exit protocol
 				intents[lv][id >> lv] = 0;				// retract all intents in reverse order

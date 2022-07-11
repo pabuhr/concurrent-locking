@@ -16,12 +16,16 @@ static void * Worker( void * arg ) {
 	unsigned int cnt = 0, oid = id;
 	#endif // FAST
 
+	NCS_DECL;
+
 	unsigned int n, e[N];
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
+			NCS;
+
 			n = N + id;
 			while ( n > 1 ) {							// entry protocol
 #if 1
@@ -38,7 +42,7 @@ static void * Worker( void * arg ) {
 #endif
 			} // while
 
-			randomThreadChecksum += CriticalSection( id );
+			randomThreadChecksum += CS( id );
 
 			for ( n = 1; n < N; n = n + n + e[n] ) {	// exit protocol
 //				n = n + n + e[n];

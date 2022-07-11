@@ -85,6 +85,8 @@ static void * Worker( void * arg ) {
 	unsigned int cnt = 0, oid = id;
 	#endif // FAST
 
+	NCS_DECL;
+
 	volatile typeof(arrState[0].enter) *tEnter = &arrState[id].enter;
 	volatile typeof(arrState[0].wait) *tWait = &arrState[id].wait;
 
@@ -92,6 +94,8 @@ static void * Worker( void * arg ) {
 		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
+			NCS;
+
 			*tEnter = true;
 
 			// up hill
@@ -114,7 +118,7 @@ static void * Worker( void * arg ) {
 			exits += 1 ;
 			WO( Fence(); )
 
-			randomThreadChecksum += CriticalSection( id );
+			randomThreadChecksum += CS( id );
 
 			WO( Fence(); );								// prevent write floating up
 			// down hill

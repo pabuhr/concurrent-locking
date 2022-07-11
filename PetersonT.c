@@ -45,10 +45,14 @@ static void * Worker( void * arg ) {
 	unsigned int cnt = 0, oid = id;
 	#endif // FAST
 
+	NCS_DECL;
+
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
+			NCS;
+
 			for ( unsigned int k = 1; k <= (HALFSIZE)depth; k += 1 ) { // entry protocol, round
 				opp.atom = QMAX( id, k );
 				Fence();								// force store before more loads
@@ -73,7 +77,7 @@ static void * Worker( void * arg ) {
 			} // for
 			WO( Fence(); );
 
-			randomThreadChecksum += CriticalSection( id );
+			randomThreadChecksum += CS( id );
 
 			WO( Fence(); );
 			Q[id].vatom = (Tuple){ { 0, 0 } }.atom;		// exit protocol

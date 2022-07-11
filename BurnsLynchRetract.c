@@ -15,12 +15,16 @@ static void * Worker( void * arg ) {
 	unsigned int cnt = 0, oid = id;
 	#endif // FAST
 
+	NCS_DECL;
+
 	typeof(N) j;
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
+			NCS;
+
 		  L0: intents[id] = DontWantIn;					// entry protocol
 			Fence();									// force store before more loads
 			for ( j = 0; j < id; j += 1 )
@@ -33,7 +37,7 @@ static void * Worker( void * arg ) {
 				if ( intents[j] == WantIn ) { Pause(); goto L1; }
 			Fence();									// force store before more loads
 
-			randomThreadChecksum += CriticalSection( id );
+			randomThreadChecksum += CS( id );
 
 			Fence();									// force store before more loads
 			intents[id] = DontWantIn;					// exit protocol

@@ -14,6 +14,8 @@ static void * Worker( void * arg ) {
 	unsigned int cnt = 0, oid = id;
 	#endif // FAST
 
+	NCS_DECL;
+
 	typeof(&choosing[0]) mychoosing = &choosing[id];	// optimization
 	typeof(&ticket[0]) myticket = &ticket[id];
 
@@ -21,6 +23,8 @@ static void * Worker( void * arg ) {
 		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
+			NCS;
+
 			// step 1, select a ticket
 			*mychoosing = true;							// entry protocol
 			Fence();									// force store before more loads
@@ -48,7 +52,7 @@ static void * Worker( void * arg ) {
 			} // for
 			WO( Fence(); );
 
-			randomThreadChecksum += CriticalSection( id );
+			randomThreadChecksum += CS( id );
 
 			WO( Fence(); );
 			*myticket = 0;								// exit protocol

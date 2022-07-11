@@ -14,12 +14,16 @@ static void * Worker( void * arg ) {
 	unsigned int cnt = 0, oid = id;
 	#endif // FAST
 
+	NCS_DECL;
+
 	uint64_t entry;
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
+			NCS;
+
 		  L0: control[id] = WantIn;						// entry protocol
 			Fence();									// force store before more loads
 		  L1: for ( typeof(id) j = turn; j != id; j = cycleDown( j, N ) )
@@ -29,7 +33,7 @@ static void * Worker( void * arg ) {
 			for ( int j = N - 1; j >= 0; j -= 1 )
 				if ( (typeof(id))j != id && control[j] == EnterCS ) goto L0;
 
-			randomThreadChecksum += CriticalSection( id );
+			randomThreadChecksum += CS( id );
 
 			// cycle through threads
 			if ( control[turn] == DontWantIn || turn == id ) // exit protocol

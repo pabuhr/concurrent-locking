@@ -15,6 +15,8 @@ static void * Worker( void * arg ) {
 	unsigned int cnt = 0, oid = id;
 	#endif // FAST
 
+	NCS_DECL;
+
 	int rival, j, ridi, ridt, high;
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
@@ -23,6 +25,8 @@ static void * Worker( void * arg ) {
 		high = Clog2( N );								// maximal depth of binary tree
 		//printf( "id:%d high:%d\n", id, high );
 		for ( entry = 0; stop == 0; entry += 1 ) {
+			NCS;
+
 			for ( j = 0; j < high; j += 1 ) {
 				ridi = id >> j;							// round id for intent
 				ridt = ridi >> 1;						// round id for turn
@@ -46,7 +50,7 @@ static void * Worker( void * arg ) {
 				} // if
 			} // for
 
-			randomThreadChecksum += CriticalSection( id );
+			randomThreadChecksum += CS( id );
 
 			for ( j = high - 1; j >= 0; j -= 1 ) {
 				c[j][id / (1 << j)] = -1;

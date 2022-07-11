@@ -12,10 +12,14 @@ static void * Worker( void * arg ) {
 	unsigned int cnt = 0, oid = id;
 	#endif // FAST
 
+	NCS_DECL;
+
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
+			NCS;
+
 			b[id] = 0;									// entry protocol
 		  L: c[id] = 1;
 			Fence();									// force store before more loads
@@ -30,7 +34,7 @@ static void * Worker( void * arg ) {
 				if ( j != (typeof(N))id && c[j] == 0 ) goto L;
 			Fence();									// force store before more loads
 
-			randomThreadChecksum += CriticalSection( id );
+			randomThreadChecksum += CS( id );
 
 			Fence();									// force store before more loads
 			b[id] = c[id] = 1;							// exit protocol

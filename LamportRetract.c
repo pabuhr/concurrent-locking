@@ -15,10 +15,14 @@ static void * Worker( void * arg ) {
 	unsigned int cnt = 0, oid = id;
 	#endif // FAST
 
+	NCS_DECL;
+
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
+			NCS;
+
 		  L: intents[id] = WantIn;
 			Fence();									// force store before more loads
 			for ( typeof(id) j = 0; j < id; j += 1 ) {	// check if thread with higher id wants in
@@ -34,7 +38,7 @@ static void * Worker( void * arg ) {
 				while ( intents[j] == WantIn ) Pause();
 			Fence();									// force store before more loads
 
-			randomThreadChecksum += CriticalSection( id );
+			randomThreadChecksum += CS( id );
 
 			Fence();									// force store before more loads
 			intents[id] = DontWantIn;					// exit protocol

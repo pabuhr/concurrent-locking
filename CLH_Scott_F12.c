@@ -46,6 +46,8 @@ static void * Worker( void * arg ) {
 	unsigned int cnt = 0, oid = id;
 	#endif // FAST
 
+	NCS_DECL;
+
 	qnode_ptr node_ptr = Allocator( sizeof( qnode ) );	// cache alignment
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
@@ -54,9 +56,11 @@ static void * Worker( void * arg ) {
 		*node_ptr = (qnode){ NULL, false };
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
+			NCS;
+
 			clh_lock( node_ptr );
 
-			randomThreadChecksum += CriticalSection( id );
+			randomThreadChecksum += CS( id );
 
 			clh_unlock( &node_ptr );
 

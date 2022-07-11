@@ -17,6 +17,8 @@ static void * Worker( void * arg ) {
 	unsigned int cnt = 0, oid = id;
 	#endif // FAST
 
+	NCS_DECL;
+
 	int high, k, i, j, l, len;
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
@@ -26,6 +28,8 @@ static void * Worker( void * arg ) {
 		j = 0;
 		l = id;
 		for ( entry = 0; stop == 0; entry += 1 ) {
+			NCS;
+
 			k = id / Degree;
 			len = N;
 			while ( j < high ) {
@@ -47,7 +51,7 @@ static void * Worker( void * arg ) {
 				len = (len % Degree == 0) ? len / Degree : len / Degree + 1;
 			} // for
 
-			randomThreadChecksum += CriticalSection( id );
+			randomThreadChecksum += CS( id );
 
 			//j = high;
 			int pow2 = pow( Degree, high );

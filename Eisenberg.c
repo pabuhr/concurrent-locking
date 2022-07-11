@@ -15,10 +15,14 @@ static void * Worker( void * arg ) {
 	unsigned int cnt = 0, oid = id;
 	#endif // FAST
 
+	NCS_DECL;
+
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
+			NCS;
+
 		  L0: control[id] = WantIn;						// entry protocol
 			Fence();									// force store before more loads
 			// step 1, wait for threads with higher priority
@@ -32,7 +36,7 @@ static void * Worker( void * arg ) {
 			if ( control[HIGH] != DontWantIn && HIGH != id ) goto L0;
 			HIGH = id;									// its now ok to enter
 
-			randomThreadChecksum += CriticalSection( id );
+			randomThreadChecksum += CS( id );
 
 			// look for any thread that wants in other than this thread
 //			for ( typeof(N) j = cycleUp( id + 1, N );; j = cycleUp( j, N ) ) // exit protocol

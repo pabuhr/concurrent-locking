@@ -6,6 +6,8 @@ static void * Worker( void * arg ) {
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		for ( entry = 0; stop == 0; entry += 1 ) {
+			NCS;
+
 			turn = id;									// perturb cache
 			Fence();									// force store before more loads
 		} // for

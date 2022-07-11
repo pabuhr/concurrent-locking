@@ -51,6 +51,8 @@ static void * Worker( void * arg ) {
 	unsigned int cnt = 0, oid = id;
 	#endif // FAST
 
+	NCS_DECL;
+
 	#ifndef THREADLOCAL
 	Grant grant CALIGN;
 	#endif // ! THREADLOCAL
@@ -59,9 +61,11 @@ static void * Worker( void * arg ) {
 		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
+			NCS;
+
 			hem_lock( &lock  GARG );
 
-			randomThreadChecksum += CriticalSection( id );
+			randomThreadChecksum += CS( id );
 
 			hem_unlock( &lock  GARG );
 

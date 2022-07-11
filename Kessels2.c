@@ -17,6 +17,8 @@ static void * Worker( void * arg ) {
 		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
+			NCS;
+
 			#ifdef FLICKER
 			for ( int i = 0; i < 100; i += 1 ) Q[id] = i % 2; // flicker
 			#endif // FLICKER
@@ -38,7 +40,7 @@ static void * Worker( void * arg ) {
 			while ( Q[other] == 1 && R[id] == (R[other] ^ id) ) Pause() ;
 #endif
 
-			randomThreadChecksum += CriticalSection( id );
+			randomThreadChecksum += CS( id );
 
 			#ifdef FLICKER
 			for ( int i = 0; i < 100; i += 1 ) Q[id] = i % 2; // flicker

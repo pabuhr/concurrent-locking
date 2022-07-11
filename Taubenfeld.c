@@ -14,10 +14,14 @@ static void * Worker( void * arg ) {
 	unsigned int cnt = 0, oid = id;
 	#endif // FAST
 
+	NCS_DECL;
+
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
+			NCS;
+
 			unsigned int node = id;
 			for ( typeof(depth) lv = 0; lv < depth; lv += 1 ) {	// entry protocol
 				unsigned int lr = node & 1;				// round id for intent
@@ -28,7 +32,7 @@ static void * Worker( void * arg ) {
 				while ( intents[lv][2 * node + (1 - lr)] == 1 && turns[lv][node] == lr ) Pause();
 			} // for
 
-			randomThreadChecksum += CriticalSection( id );
+			randomThreadChecksum += CS( id );
 
 			for ( int lv = depth - 1; lv >= 0; lv -= 1 ) { // exit protocol
 				intents[lv][id / (1 << lv)] = 0;		// retract all intents in reverse order

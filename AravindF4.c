@@ -13,6 +13,8 @@ static void * Worker( void * arg ) {
 	unsigned int cnt = 0, oid = id;
 	#endif // FAST
 
+	NCS_DECL;
+
 	TYPE S[N][2];
 	typeof(N) j, bit;
 
@@ -21,6 +23,8 @@ static void * Worker( void * arg ) {
 		bit = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
+			NCS;
+
 			D[id] = 1;
 			Fence();									// force store before more loads
 			for ( j = 0; j < N; j += 1 ) {
@@ -51,7 +55,7 @@ static void * Worker( void * arg ) {
 			for ( j = 0; j < N; j += 1 )
 				while ( D[j] != 0 ) Pause();
 
-			randomThreadChecksum += CriticalSection( id );
+			randomThreadChecksum += CS( id );
 
 			X[id] = 0;
 			bit = ! bit;

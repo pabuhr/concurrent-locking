@@ -101,6 +101,8 @@ static void * Worker( void * arg ) {
 	unsigned int cnt = 0, oid = id;
 	#endif // FAST
 
+	NCS_DECL;
+
 	#ifndef TB
 	int level = levels[id];
 	Tuple * state = states[id];
@@ -112,6 +114,8 @@ static void * Worker( void * arg ) {
 		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
+			NCS;
+
 			x = id;
 			Fence();									// force store before more loads
 			if ( FASTPATH( y != -1 ) ) goto Slow;
@@ -125,7 +129,7 @@ static void * Worker( void * arg ) {
 
 			binary_prologue( 1, &B );
 
-			randomThreadChecksum += CriticalSection( id );
+			randomThreadChecksum += CS( id );
 
 			binary_epilogue( 1, &B );
 
@@ -143,7 +147,7 @@ static void * Worker( void * arg ) {
 				);
 			binary_prologue( 0, &B );
 
-			randomThreadChecksum += CriticalSection( id );
+			randomThreadChecksum += CS( id );
 
 			b[id] = false;
 			Fence();									// force store before more loads

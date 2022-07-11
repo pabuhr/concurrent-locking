@@ -15,19 +15,23 @@ static void * Worker( void * arg ) {
 	unsigned int cnt = 0, oid = id;
 	#endif // FAST
 
+	NCS_DECL;
+
 	unsigned int lid;									// local id at each tree level
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
+			NCS;
+
 			lid = id;									// entry protocol
 			for ( typeof(depth) lv = 0; lv < depth; lv += 1 ) {
 				binary_prologue( lid & 1, &t[lv][lid >> 1] );
 				lid >>= 1;								// advance local id for next tree level
 			} // for
 
-			randomThreadChecksum += CriticalSection( id );
+			randomThreadChecksum += CS( id );
 
 			for ( int lv = depth - 1; lv >= 0; lv -= 1 ) { // exit protocol, retract reverse order
 				lid = id >> lv;

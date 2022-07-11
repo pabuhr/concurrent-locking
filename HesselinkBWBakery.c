@@ -24,6 +24,8 @@ static void * Worker( void * arg ) {
 	unsigned int cnt = 0, oid = id;
 	#endif // FAST
 
+	NCS_DECL;
+
 	typeof(&cho[0]) mycho = &cho[id];					// optimization
 	typeof(&pair[0]) mypair = &pair[id];
 
@@ -31,6 +33,8 @@ static void * Worker( void * arg ) {
 		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
+			NCS;
+
 			*mycho = true;
 			Fence();
 			mcol = color;
@@ -64,7 +68,7 @@ static void * Worker( void * arg ) {
 			} // for
 			WO( Fence(); );
 
-			randomThreadChecksum += CriticalSection( id );
+			randomThreadChecksum += CS( id );
 
 			WO( Fence(); );
 			color = 1 - mcol;

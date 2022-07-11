@@ -124,6 +124,8 @@ static void * Worker( void * arg ) {
 	unsigned int cnt = 0, oid = id;
 	#endif // FAST
 
+	NCS_DECL;
+
 	#ifndef TB
 	int level = levels[id];
 	Tuple * state = states[id];
@@ -142,6 +144,8 @@ static void * Worker( void * arg ) {
 		#endif // CNT
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
+			NCS;
+
 #if 0
 			for ( fa = 0; fa < K; fa += 1 ) {
 				fp = &fastpaths[fa];					// optimization
@@ -214,7 +218,7 @@ static void * Worker( void * arg ) {
 				binary_prologue( i < fa, &fastpaths[i].B );
 			} // for
 
-			randomThreadChecksum += CriticalSection( id );
+			randomThreadChecksum += CS( id );
 
 			for ( unsigned int i = 0; i <= fa; i += 1 ) {
 				binary_epilogue( i < fa, &fastpaths[i].B );
@@ -244,7 +248,7 @@ static void * Worker( void * arg ) {
 				binary_prologue( 1, &fastpaths[i].B );
 			} // for
 
-			randomThreadChecksum += CriticalSection( id );
+			randomThreadChecksum += CS( id );
 
 			for ( unsigned int i = 0; i <= fa; i += 1 ) {
 				binary_epilogue( 1, &fastpaths[i].B );

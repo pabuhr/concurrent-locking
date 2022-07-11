@@ -14,12 +14,16 @@ static void * Worker( void * arg ) {
 	unsigned int cnt = 0, oid = id;
 	#endif // FAST
 
+	NCS_DECL;
+
 	typeof(N) j;
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
+			NCS;
+
 			flag[id] = 1;
 			Fence();									// force store before more loads
 			for ( j = 0; j < N; j += 1 )				// wait until doors open
@@ -42,7 +46,7 @@ static void * Worker( void * arg ) {
 			for ( j = 0; j < id; j += 1 )				// service threads in priority order
 				await( flag[j] < 2 );
 
-			randomThreadChecksum += CriticalSection( id );
+			randomThreadChecksum += CS( id );
 
 			for ( j = id + 1; j < N; j += 1 )			// wait for all threads in waiting room
 				await( flag[j] < 2 || flag[j] > 3 );	//    to pass through door 2

@@ -36,12 +36,16 @@ static void * Worker( void * arg ) {
 	unsigned int cnt = 0, oid = id;
 	#endif // FAST
 
+	NCS_DECL;
+
 	int j;
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
+			NCS;
+
 			W[id] = Fast;
 			Turn = id;
 			if ( ! Lock ) {
@@ -57,7 +61,7 @@ static void * Worker( void * arg ) {
 			CheckVars( l - 1, 0 );
 		  CS: ;
 
-			randomThreadChecksum += CriticalSection( id );
+			randomThreadChecksum += CS( id );
 
 			Lock = false;
 			if ( W[id] ) {

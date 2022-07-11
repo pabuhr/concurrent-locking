@@ -16,19 +16,23 @@ static void * Worker( void * arg ) {
 	unsigned int cnt = 0, oid = id;
 	#endif // FAST
 
+	NCS_DECL;
+
 	int other = inv( id );								// int is better than TYPE
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
+			NCS;
+
 			intents[id] = WantIn;						// entry protocol
 			last = id;									// RACE
 			Fence();									// force store before more loads
 			if ( FASTPATH( intents[other] != DontWantIn ) )	// local spin
 				while ( last == id ) Pause();			// busy wait
 
-			randomThreadChecksum += CriticalSection( id );
+			randomThreadChecksum += CS( id );
 
 			intents[id] = DontWantIn;					// exit protocol
 			last = id;

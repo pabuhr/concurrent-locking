@@ -112,7 +112,7 @@ static inline void SLOW1( TYPE id, uint32_t * randomThreadChecksum
 		);
 	binary_prologue( 0, &B );
 
-	*randomThreadChecksum += CriticalSection( id );
+	*randomThreadChecksum += CS( id );
 
 	binary_epilogue( 0, &B );
 	exitSlow(
@@ -139,7 +139,7 @@ static inline void SLOW2( TYPE id, Atomic y, uint32_t * randomThreadChecksum
 		);
 	binary_prologue( 0, &B );
 
-	*randomThreadChecksum += CriticalSection( id );
+	*randomThreadChecksum += CS( id );
 
 	y.vatom = 0;
 	x = id;
@@ -172,6 +172,8 @@ static void * Worker( void * arg ) {
 	unsigned int cnt = 0, oid = id;
 	#endif // FAST
 
+	NCS_DECL;
+
 	#ifndef TB
 	int level = levels[id];
 	Tuple * state = states[id];
@@ -183,6 +185,8 @@ static void * Worker( void * arg ) {
 		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
+			NCS;
+
 			x = id;
 			Fence();									// force store before more loads
 			ly.atom = y.vatom;
@@ -216,7 +220,7 @@ static void * Worker( void * arg ) {
 						Infast = true;
 						binary_prologue( 1, &B );
 
-						randomThreadChecksum += CriticalSection( id );
+						randomThreadChecksum += CS( id );
 
 						Obstacle[id] = false;
 						Reset.vatom = (Atomic){ { false, ly.indx } }.atom;

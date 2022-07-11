@@ -132,10 +132,14 @@ static void * Worker( void * arg ) {
 	typeof(id) cnt = 0, oid = id;
 	#endif // FAST
 
+	NCS_DECL;
+
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
+			NCS;
+
 			// loop goes from leaf to child of root
 			for ( unsigned int j = n; j > 1; j >>= 1 )	// entry protocol
 				vals[j] = id;
@@ -165,7 +169,7 @@ static void * Worker( void * arg ) {
 			*flagId = false;
 			#endif // FLAG
 
-			randomThreadChecksum += CriticalSection( id );
+			randomThreadChecksum += CS( id );
 
 			// loop goes from child of root to leaf and inspects siblings
 			for ( int j = dep - 1; j >= 0; j -= 1 ) {	// must be "signed"

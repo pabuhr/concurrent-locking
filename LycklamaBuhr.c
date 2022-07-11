@@ -14,6 +14,8 @@ static void * Worker( void * arg ) {
 	unsigned int cnt = 0, oid = id;
 	#endif // FAST
 
+	NCS_DECL;
+
 	TYPE copy[N];
 	typeof(N) j;
 
@@ -28,6 +30,8 @@ static void * Worker( void * arg ) {
 		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
+			NCS;
+
 			*myc = 1;									// stage 1, establish FCFS
 			Fence();									// force store before more loads
 			for ( j = 0; j < N; j += 1 )				// copy turn values
@@ -58,7 +62,7 @@ static void * Worker( void * arg ) {
 			} // for
 			WO( Fence(); );
 
-			randomThreadChecksum += CriticalSection( id );
+			randomThreadChecksum += CS( id );
 
 			WO( Fence(); );
 			*myv = *myintent = 0;						// exit protocol

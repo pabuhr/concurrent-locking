@@ -4,15 +4,19 @@ int lN;
 static void *Worker( void *arg ) {
 	TYPE id = (size_t)arg;
 	uint64_t entry;
-#ifdef FAST
+
+	#ifdef FAST
 	unsigned int cnt = 0, oid = id;
-#endif // FAST
+	#endif // FAST
+
+	NCS_DECL;
 
 	int high, j, l, rival;
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
-		entry = 0;
-		while ( stop == 0 ) {
+		RTYPE randomThreadChecksum = 0;
+
+		for ( entry = 0; stop == 0; entry += 1 ) {
 			j = 0;
 			l = id;
 			high = Clog2( N );							// maximal depth of binary tree
@@ -44,7 +48,9 @@ static void *Worker( void *arg ) {
 				l /= 2;
 				j += 1;
 			}
-			CriticalSection( id );
+
+			randomThreadChecksum += CS( id );
+
 			j = high;
 			//int pow2 = pow( Degree, high );
 			int pow2 = 1 << high;
@@ -60,15 +66,18 @@ static void *Worker( void *arg ) {
 					c[j][rival] = 0;
 				}
 			} // while
-#ifdef FAST
+
+			#ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
 			cnt = cycleUp( cnt, NoStartPoints );
-#endif // FAST
-			entry += 1;
-		} // while
-#ifdef FAST
+			#endif // FAST
+		} // for
+
+		Fai( &sumOfThreadChecksums, randomThreadChecksum );
+
+		#ifdef FAST
 		id = oid;
-#endif // FAST
+		#endif // FAST
 		entries[r][id] = entry;
 		Fai( &Arrived, 1 );
 		while ( stop != 0 ) Pause();

@@ -16,12 +16,16 @@ static void * Worker( void * arg ) {
 	unsigned int cnt = 0, oid = id;
 	#endif // FAST
 
+	NCS_DECL;
+
 	TYPE lid, comp, role, low, high;
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
+			NCS;
+
 			for ( TYPE km1 = 0, k = 1; k <= depth; km1 += 1, k += 1 ) { // entry protocol
 				lid = id >> km1;						// local id
 				comp = (lid >> 1) + (width >> k);		// unique position in the tree
@@ -36,7 +40,7 @@ static void * Worker( void * arg ) {
 			} // for
 			WO( Fence(); );
 
-			randomThreadChecksum += CriticalSection( id );
+			randomThreadChecksum += CS( id );
 
 			WO( Fence(); );
 			intents[id] = 0;							// exit protocol

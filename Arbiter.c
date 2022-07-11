@@ -11,18 +11,23 @@ static pthread_t arbiter;
 static void * Worker( void * arg ) {
 	TYPE id = (size_t)arg;
 	uint64_t entry;
+
 	#ifdef FAST
 	unsigned int cnt = 0, oid = id;
 	#endif // FAST
+
+	NCS_DECL;
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
+			NCS;
+
 			intents[id] = 1;							// entry protocol
 			while ( serving[id] == 0 ) Pause();			// busy wait
 
-			randomThreadChecksum += CriticalSection( id );
+			randomThreadChecksum += CS( id );
 
 			serving[id] = 0;							// exit protocol
 

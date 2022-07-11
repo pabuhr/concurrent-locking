@@ -97,12 +97,17 @@ static void * Worker( void * arg ) {
 	#ifdef FAST
 	typeof(id) cnt = 0, oid = id;
 	#endif // FAST
+
+	NCS_DECL;
+
 	typeof(id) thr;
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
+			NCS;
+
 			*applyId = true;							// entry protocol
 			if ( FASTPATH( trylock( id ) ) ) {			// true => leader
 				#ifndef CAS
@@ -128,7 +133,7 @@ static void * Worker( void * arg ) {
 			*flagId = false;
 			#endif // FLAG
 
-			randomThreadChecksum += CriticalSection( id );
+			randomThreadChecksum += CS( id );
 
 			#ifdef CYCLEUP
 			for ( thr = cycleUp( id, N ); ! flags[thr].apply; thr = cycleUp( thr, N ) );

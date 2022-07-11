@@ -84,18 +84,22 @@ static void * Worker( void * arg ) {
 	uint64_t entry;
 	WO(Not yet properly fenced for weak memory models);
 
-#ifdef FAST
+	#ifdef FAST
 	unsigned int cnt = 0, oid = id;
-#endif // FAST
+	#endif // FAST
+
+	NCS_DECL;
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
+			NCS;
+
 			Acquire(L);
 			WO( Fence(); );
 
-			randomThreadChecksum += CriticalSection( id );
+			randomThreadChecksum += CS( id );
 
 			Release(L);
 
