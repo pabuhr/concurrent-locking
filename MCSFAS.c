@@ -19,12 +19,11 @@ typedef _Atomic(MCS_node *) MCS_lock;
 #endif // ! ATOMIC
 
 inline void mcs_lock( MCS_lock * lock, MCS_node * node ) {
-	WO( Fence(); ); // 1
 	node->next = NULL;
 
 #ifndef MCS_OPT1										// default option
 	node->spin = true;									// alternative position and remove fence below
-	WO( Fence(); ); // 2
+	WO( Fence(); ); // 1
 #endif // MCS_OPT1
 
 	MCS_node * prev = Fas( lock, node );
@@ -33,22 +32,22 @@ inline void mcs_lock( MCS_lock * lock, MCS_node * node ) {
 
 #ifdef MCS_OPT1
 	node->spin = true;									// mark as waiting
-	WO( Fence(); ); // 3
+	WO( Fence(); ); // 2
 #endif // MCS_OPT1
 
 	prev->next = node;									// add to list of waiting threads
-	WO( Fence(); ); // 4
+	WO( Fence(); ); // 3
 
 	#ifndef MPAUSE
 	while ( node->spin == true ) Pause();				// busy wait on my spin variable
 	#else
 	MPause( node->spin, == true );						// busy wait on my spin variable
 	#endif // MPAUSE
-	WO( Fence(); ); // 5
+	WO( Fence(); ); // 4
 } // mcs_lock
 
 inline void mcs_unlock( MCS_lock * lock, MCS_node * node ) {
-	WO( Fence(); ); // 6
+	WO( Fence(); ); // 5
 #ifdef MCS_OPT2											// original, default option
 	if ( FASTPATH( node->next == NULL ) ) {				// no one waiting ?
 		MCS_node * old_tail = Fas( lock, NULL );
@@ -61,7 +60,7 @@ inline void mcs_unlock( MCS_lock * lock, MCS_node * node ) {
 		#else
 		MPause( node->next, == NULL );					// busy wait until my node is modified
 		#endif // MPAUSE
-		WO( Fence(); ); // 7
+		WO( Fence(); ); // 6
 
 		if ( usurper != NULL ) {
 			usurper->next = node->next;
@@ -69,7 +68,7 @@ inline void mcs_unlock( MCS_lock * lock, MCS_node * node ) {
 			node->next->spin = false;
 		} // if
 	} else {
-		WO( Fence(); ); // 8
+		WO( Fence(); ); // 7
 		node->next->spin = false;
 	} // if
 #else													// Scott book Figure 4.8
