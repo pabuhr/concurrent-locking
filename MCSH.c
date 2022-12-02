@@ -1,3 +1,6 @@
+// The MCSH paper uses the name "locked" for this variable to match with the original MCS paper, where "locked == ! go."
+// The name "go" matches better with our usage of "await" rather than "repeat" in the MCS paper.
+
 #include <stdbool.h>
 
 typedef struct qnode_t {
@@ -52,7 +55,7 @@ static inline void mcs_lock( NMCS_lock * lock ) {
 
 static inline void mcs_unlock( NMCS_lock * lock ) {
 	qnode_ptr succ = lock->msg;
-	Fence();
+//	Fence();
 	lock->flag = true;
 	if ( FASTPATH( succ != NULL ) ) {
 		WO( Fence(); );
