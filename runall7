@@ -17,8 +17,7 @@ runalgorithm() {
 	outfile=${outdir}/${1}${2}${contention}
 	echo "${outfile}"
 	gcc-9 ${cflag} ${contention:+-D${contention}} ${2:+-DNEST=${2}} -DAlgorithm=${1} Harness.c -lpthread -lm
-#	gcc-9 ${cflag} ${contention:+-D${contention}} ${2:+-DNEST=${2}} -DAlgorithm=${1} Harness.c -lpthread -lm
-#	./run1 > "${outfile}"
+	./run1 > "${outfile}"
 	if [ -f core ] ; then
 	    echo core generated for ${1}
 	    break

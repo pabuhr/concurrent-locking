@@ -6,7 +6,7 @@
 # ARM -march=armv8.2-a+lse => generate Arm LSE extension instructions SWAP and CAS
 # https://community.arm.com/developer/tools-software/tools/b/tools-software-ides-blog/posts/making-the-most-of-the-arm-architecture-in-gcc-10
 
-algorithms="CLH CLH2 CLH_Scott_F12 CLH_Scott_F14 MCS"
+algorithms="CLH CLH2 CLH_Scott_F12 CLH_Scott_F14 MCS HemLock"
 time=10
 outdir=`hostname`
 Exec=`hostname`.out
