@@ -53,6 +53,9 @@
 	#define SLOWPATH(x) __builtin_expect(!!(x), 0)
 #endif // FASTPATH
 
+#define max( x, y ) (x > y ? x : y)
+#define min( x, y ) (x < y ? x : y)
+
 #define xstr(s) str(s)
 #define str(s) #s
 
@@ -297,21 +300,23 @@ enum {
 static unsigned int NoNCSPoints CALIGN;
 static uint64_t * NCSpoints CALIGN;
 
-static inline unsigned int ncspoint( unsigned int pos ) {
-	assert( pos < NoNCSPoints );
-	return NCSpoints[pos];
-//	return rand() % N;
-} // ncspoint
-
 static void NCS_delay( unsigned int times ) {
 	for ( volatile unsigned int delay = 0; delay < times; delay += 1 ) {} // short delay
 } // NCS_delay
 
-#define NCS_DECL unsigned int ncscnt = id, ncsdelay
-#define NCS { \
-	ncsdelay = ncspoint( ncscnt ); \
-	ncscnt = cycleUp( ncscnt, NoNCSPoints ); \
-	NCS_delay( ncsdelay ); }
+#define NCS_DECL \
+	unsigned int myncscnt = id, myncsdelay, myNCSpoints[NoNCSPoints]; \
+	for ( size_t i = 0; i < NoNCSPoints; i += 1 ) myNCSpoints[i] = NCSpoints[i];
+
+#define NCS {						  \
+	assert( myncscnt < NoNCSPoints ); \
+	myncsdelay = myNCSpoints[ myncscnt ]; \
+	myncscnt = cycleUp( myncscnt, NoNCSPoints ); \
+	NCS_delay( myncsdelay ); \
+	if ( entry % 128 == 0 ) { \
+		typeof( myNCSpoints[0] ) swap = myNCSpoints[0], r = ThreadLocalRandom() % NoNCSPoints; \
+		myNCSpoints[0] = myNCSpoints[r]; myNCSpoints[r] = swap; } \
+	}
 #else
 #define NCS_DECL
 #define NCS
@@ -321,16 +326,21 @@ static TYPE HPAD1 CALIGN __attribute__(( unused ));		// protect further false sh
 static volatile RTYPE randomChecksum CALIGN = 0;
 static volatile RTYPE sumOfThreadChecksums CALIGN = 0;
 // Do not use VTYPE because -DATOMIC changes it.
-static volatile TYPE CurrTid CALIGN = ULONG_MAX;		// shared, current thread id in critical section
+static volatile TYPE CurrTid CALIGN = 0;				// shared, current thread id in critical section
 static TYPE HPAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
+
+#ifdef CONVOY
+static TYPE convoy[16][128][128];						// [RUNS][THREADS][THREADS]
+#endif // CONVOY
 
 //static int Identity(int v) { __asm__ __volatile__ (";" : "+r" (v)); return v; } 
 #if CSTIMES != 0
 static inline RTYPE CS( const TYPE tid __attribute__(( unused )) ) { // parameter unused for CSTIME == 0
-	#ifdef CNT
-	if ( UNLIKELY( CurrTid == tid ) ) counters[Run][tid].cnts[0] += 1; // consecutive entries in the critical section
-	#endif // CNT
-	CurrTid = tid;
+	#ifdef CONVOY
+	convoy[Run][tid][CurrTid] += 1;						// can be off by 1 for thread 0
+	#endif // CONVOY
+
+	CurrTid = tid;										// CurrTid is global
 
 	// If the critical section is violated, the additions are corrupted because of the load/store race unless there is
 	// perfect interleaving. Note, the load, delay, store to increase the chance of detecting a violation.
@@ -364,7 +374,7 @@ void randPoints( uint64_t points[], unsigned int numPoints, unsigned int N ) {
 		for ( unsigned int j = i; j < i + N; j += 1 ) {
 			unsigned int v;
 		  L: v = rand() % N;
-			unsigned int k;
+			size_t k;
 			for ( k = i; k < j; k += 1 ) {
 				if ( points[k] == v ) goto L;
 			} // for
@@ -374,9 +384,10 @@ void randPoints( uint64_t points[], unsigned int numPoints, unsigned int N ) {
 		} // for
 	} // for
 #if 0
-	printf( "N %d numPoints %d ", N, numPoints );
-	for ( unsigned int i = 0; i < numPoints; i += 1 ) {
-		printf( "%jd ", points[i] );
+	printf( "\nN %d numPoints %d\n", N, numPoints );
+	for ( size_t i = 0; i < numPoints; i += 1 ) {
+		printf( "%2jd ", points[i] );
+		if ( (i+1) % N == 0 ) printf( "\n" );
 	} // for
 	printf( "\n" );
 #endif // 0
@@ -503,7 +514,9 @@ void affinity( pthread_t pthreadid, unsigned int tid ) {
 	int rc = pthread_setaffinity_np( pthreadid, sizeof(cpu_set_t), &mask );
 	if ( rc != 0 ) {
 		errno = rc;
-		perror( "***ERROR*** setaffinity failure" );
+		char buf[64];
+		snprintf( buf, 64, "***ERROR*** setaffinity failure for CPU %d", cpu );
+		perror( buf );
 		abort();
 	} // if
 #endif // linux && PIN
@@ -524,7 +537,7 @@ static uint64_t ** entries CALIGN;						// holds CS entry results for each threa
 static __attribute__(( unused )) void shuffle( unsigned int set[], const int size ) {
 	unsigned int p1, p2, temp;
 
-	for ( int i = 0; i < 200; i +=1 ) {					// shuffle array S times
+	for ( unsigned int i = 0; i < 200; i +=1 ) {		// shuffle array S times
 		p1 = rand() % size;
 		p2 = rand() % size;
 		temp = set[p1];
@@ -607,27 +620,27 @@ int main( int argc, char * argv[] ) {
 
 	printf( "%3ju %3jd ", N, Time );
 
-#if NCS_DELAY != 0
-	NoNCSPoints = NCS_DELAY * 5;							// repeat random pattern N times
+	#if NCS_DELAY != 0
+	NoNCSPoints = max( NCS_DELAY, N ) * 5;				// repeat random pattern N times
 	NCSpoints = Allocator( sizeof(typeof(NCSpoints[0])) * NoNCSPoints );
-	randPoints( NCSpoints, NoNCSPoints, NCS_DELAY );
-#endif // NCS_DELAY != 0
+	randPoints( NCSpoints, NoNCSPoints, (N <= 3) ? (N - 1) : max( max( NCS_DELAY, 5 ), N ) );
+	#endif // NCS_DELAY != 0
 
-#ifdef FAST
+	#ifdef FAST
 	assert( N <= MaxStartPoints );
 	Threads = 1;										// fast test, Threads=1, N=1..32
 	NoStartPoints = MaxStartPoints / N * N;				// floor( MaxStartPoints / N )
 	Startpoints = Allocator( sizeof(typeof(Startpoints[0])) * NoStartPoints );
 	randPoints( Startpoints, NoStartPoints, N );
-#else
+	#else
 	Threads = N;										// allow testing of T < N
-#endif // FAST
+	#endif // FAST
 
 	entries = (typeof(entries[0]) *)malloc( sizeof(typeof(entries[0])) * RUNS );
-#ifdef CNT
+	#ifdef CNT
 	counters = (typeof(counters[0]) *)malloc( sizeof(typeof(counters[0])) * RUNS );
-#endif // CNT
-	for ( int r = 0; r < RUNS; r += 1 ) {
+	#endif // CNT
+	for ( size_t r = 0; r < RUNS; r += 1 ) {
 		entries[r] = (typeof(entries[0][0]) *)Allocator( sizeof(typeof(entries[0][0])) * Threads );
 #ifdef CNT
 #ifdef FAST
@@ -642,9 +655,9 @@ int main( int argc, char * argv[] ) {
 //#ifdef FAST
 	// For FAST experiments, there is only thread but it changes its thread id to visit all the start points. Therefore,
 	// all the counters for each id must be initialized and summed at the end.
-	for ( int r = 0; r < RUNS; r += 1 ) {
-		for ( uintptr_t id = 0; id < N; id += 1 ) {
-			for ( unsigned int i = 0; i < CNT + 1; i += 1 ) { // reset for each run
+	for ( size_t r = 0; r < RUNS; r += 1 ) {
+		for ( size_t id = 0; id < N; id += 1 ) {
+			for ( size_t i = 0; i < CNT + 1; i += 1 ) { // reset for each run
 				counters[r][id].cnts[i] = 0;
 			} // for
 		} // for
@@ -652,20 +665,32 @@ int main( int argc, char * argv[] ) {
 //#endif // FAST
 #endif // CNT
 
+	#if defined( CONVOY )
+	assert( RUNS <= 16 && N <= 128 );
+	for ( size_t r = 0; r < RUNS; r += 1 ) {
+		for ( size_t tid1 = 0; tid1 < N; tid1 += 1 ) {
+			for ( size_t tid2 = 0; tid2 < N; tid2 += 1 ) {
+				convoy[r][tid1][tid2] = 0;
+			} // for
+		} // for
+	} // for
+	#endif // CONVOY
+
 	unsigned int set[Threads];
-	for ( typeof(Threads) i = 0; i < Threads; i += 1 ) set[ i ] = i;
+	for ( size_t i = 0; i < Threads; i += 1 ) set[ i ] = i;
 	// srand( getpid() );
 	// shuffle( set, Threads );							// randomize thread ids
 	#ifdef DEBUG
 	printf( "\nthread set: " );
-	for ( uintptr_t i = 0; i < Threads; i += 1 ) printf( "%u ", set[ i ] );
+	for ( size_t i = 0; i < Threads; i += 1 ) printf( "%u ", set[ i ] );
+	printf( "\n" );
 	#endif // DEBUG
 
 	ctor();												// global algorithm constructor
 
 	pthread_t workers[Threads];
 
-	for ( typeof(Threads) tid = 0; tid < Threads; tid += 1 ) { // start workers
+	for ( size_t tid = 0; tid < Threads; tid += 1 ) {	// start workers
 		int rc = pthread_create( &workers[tid], NULL, Worker, (void *)(size_t)set[tid] );
 		if ( rc != 0 ) {
 			errno = rc;
@@ -693,7 +718,7 @@ int main( int argc, char * argv[] ) {
 		while ( Arrived != 0 ) Pause();					// all threads started ?
 	} // for
 
-	for ( typeof(Threads) tid = 0; tid < Threads; tid += 1 ) { // terminate workers
+	for ( size_t tid = 0; tid < Threads; tid += 1 ) { // terminate workers
 		int rc = pthread_join( workers[tid], NULL );
 		if ( rc != 0 ) {
 			errno = rc;
@@ -709,9 +734,9 @@ int main( int argc, char * argv[] ) {
 	#ifdef DEBUG
 	printf( "\nruns:\n" );
 	#endif // DEBUG
-	for ( int r = 0; r < RUNS; r += 1 ) {
+	for ( size_t r = 0; r < RUNS; r += 1 ) {
 		smalls[r] = totals[r] = 0;
-		for ( typeof(Threads) tid = 0; tid < Threads; tid += 1 ) {
+		for ( size_t tid = 0; tid < Threads; tid += 1 ) {
 			if ( entries[r][tid] <= 5 ) smalls[r] += 1;	// only 5 entries in CS => small
 			totals[r] += entries[r][tid];
 			#ifdef DEBUG
@@ -727,12 +752,12 @@ int main( int argc, char * argv[] ) {
 	uint64_t med = median( sort );
 
 	double sum = 0.0;
-	for ( int r = 0; r < RUNS; r += 1 ) {
+	for ( size_t r = 0; r < RUNS; r += 1 ) {
 		sum += totals[r];
 	} // for
 	double avg = sum / RUNS;							// average
 	sum = 0.0;
-	for ( int r = 0; r < RUNS; r += 1 ) {				// sum squared differences from average
+	for ( size_t r = 0; r < RUNS; r += 1 ) {			// sum squared differences from average
 		double diff = totals[r] - avg;
 		sum += diff * diff;
 	} // for
@@ -740,16 +765,16 @@ int main( int argc, char * argv[] ) {
 	avg = avg == 0 ? 0.0 : std / avg * 100;
 	if ( avg > percent ) printf( "\nWarning relative standard deviation %.1f%% greater than %.0f%% over %d runs.\n", avg, percent, RUNS );
 
-	unsigned int posn;									// run with median result
+	size_t posn;										// run with median result
 	for ( posn = 0; posn < RUNS && totals[posn] != med; posn += 1 ); // assumes RUNS is odd
 
 	#ifdef DEBUG
 	printf( "totals: " );
-	for ( int i = 0; i < RUNS; i += 1 ) {				// print values
+	for ( size_t i = 0; i < RUNS; i += 1 ) {			// print values
 		printf( "%" QUOTE "ju ", totals[i] );
 	} // for
 	printf( "\nsorted: " );
-	for ( int i = 0; i < RUNS; i += 1 ) {				// print values
+	for ( size_t i = 0; i < RUNS; i += 1 ) {			// print values
 		printf( "%" QUOTE "ju ", sort[i] );
 	} // for
 	printf( "\nmedian posn:%d\n", posn );
@@ -757,7 +782,7 @@ int main( int argc, char * argv[] ) {
 
 	avg = (double)totals[posn] / Threads;				// average
 	sum = 0.0;
-	for ( typeof(Threads) tid = 0; tid < Threads; tid += 1 ) { // sum squared differences from average
+	for ( size_t tid = 0; tid < Threads; tid += 1 ) { // sum squared differences from average
 		double diff = entries[posn][tid] - avg;
 		sum += diff * diff;
 	} // for
@@ -766,61 +791,56 @@ int main( int argc, char * argv[] ) {
 	printf( "%" QUOTE "ju", med );						// median round
 	printf( " %" QUOTE ".1f %" QUOTE ".1f %5.1f%%", avg, std, avg == 0 ? 0.0 : std / avg * 100 );
 
-
-#if 0
-#ifdef CNT
-	printf( "\n\n" );
-	uint64_t cntsum2;
-	for ( unsigned int r = 0; r < RUNS; r += 1 ) {
-		cntsum2 = 0;
-#ifdef FAST
-		for ( uintptr_t tid = 0; tid < N; tid += 1 ) {
-#else
-		for ( uintptr_t tid = 0; tid < Threads; tid += 1 ) {
-			cntsum2 += counters[r][tid].cnts[0];
-#endif // FAST
-			printf( "%" QUOTE "ju ", counters[r][tid].cnts[0] );
-		} // for
-		printf( "= %lu\n", cntsum2 );
-	} // for
-	printf( "\n" );
-#endif // CNT
-#endif // 0
-
-
-#ifdef CNT
+	#ifdef CNT
 	// posn is the run containing the median result. Other runs are ignored.
 	uint64_t cntsum;
-	for ( unsigned int i = 0; i < CNT + 1; i += 1 ) {
+	for ( size_t i = 0; i < CNT + 1; i += 1 ) {
 		cntsum = 0;
-#ifdef FAST
-		for ( uintptr_t tid = 0; tid < N; tid += 1 ) {
-#else
-		for ( uintptr_t tid = 0; tid < Threads; tid += 1 ) {
-#endif // FAST
+		#ifdef FAST
+		for ( size_t tid = 0; tid < N; tid += 1 ) {
+		#else
+		for ( size_t tid = 0; tid < Threads; tid += 1 ) {
+		#endif // FAST
 			cntsum += counters[posn][tid].cnts[i];
 		} // for
 		printf( " %5.1f%%", (double)cntsum / (double)totals[posn] * 100.0 );
 	} // for
-#endif // CNT
+	#endif // CNT
 
 	printf( " %" QUOTE "ju", smalls[posn] );
 
+	#ifdef CONVOY
+	printf( "\n\n" );
+	for ( size_t r = 0; r < RUNS; r += 1 ) {
+		for ( size_t tid1 = 0; tid1 < N; tid1 += 1 ) {
+			for ( size_t tid2 = 0; tid2 < N; tid2 += 1 ) {
+				#ifdef CFMT
+				printf( "%" QUOTE "ju ", convoy[r][tid1][tid2] ); // posn for median
+				#else
+				printf( "%13ju ", convoy[r][tid1][tid2] ); // posn for median
+				#endif // CFMT
+			} // for
+			printf( "\n" );
+		} // for
+		printf( "\n" );
+	} // for
+	#endif // CONVOY
+
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		free( entries[r] );
-#ifdef CNT
+		#ifdef CNT
 		free( counters[r] );
-#endif // CNT
+		#endif // CNT
 	} // for
-#ifdef CNT
+	#ifdef CNT
 	free( counters );
-#endif // CNT
+	#endif // CNT
 
 	free( entries );
 
-#ifdef FAST
+	#ifdef FAST
 	free( Startpoints );
-#endif // FAST
+	#endif // FAST
 
 	printf( "\n" );
 } // main
