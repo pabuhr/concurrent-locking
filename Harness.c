@@ -297,29 +297,16 @@ enum {
 };
 
 #if NCS_DELAY != 0
-static unsigned int NoNCSPoints CALIGN;
-static uint64_t * NCSpoints CALIGN;
-
-static void NCS_delay( unsigned int times ) {
-	for ( volatile unsigned int delay = 0; delay < times; delay += 1 ) {} // short delay
-} // NCS_delay
-
-#define NCS_DECL \
-	unsigned int myncscnt = id, myncsdelay, myNCSpoints[NoNCSPoints]; \
-	for ( size_t i = 0; i < NoNCSPoints; i += 1 ) myNCSpoints[i] = NCSpoints[i];
-
-#define NCS {						  \
-	assert( myncscnt < NoNCSPoints ); \
-	myncsdelay = myNCSpoints[ myncscnt ]; \
-	myncscnt = cycleUp( myncscnt, NoNCSPoints ); \
-	NCS_delay( myncsdelay ); \
-	if ( entry % 128 == 0 ) { \
-		typeof( myNCSpoints[0] ) swap = myNCSpoints[0], r = ThreadLocalRandom() % NoNCSPoints; \
-		myNCSpoints[0] = myNCSpoints[r]; myNCSpoints[r] = swap; } \
-	}
+	#define NCS_DECL
+	#define NCS if ( UNLIKELY( id == 0 && N > 1 ) ) NonCriticalSection()
+	static inline RTYPE NonCriticalSection() {
+		volatile RTYPE randomNumber = ThreadLocalRandom();	// match with CS
+		for ( volatile int delay = 0; delay < NCSTimes; delay += 1 ) {} // short delay
+		return randomNumber;
+	} // NonCriticalSection
 #else
-#define NCS_DECL
-#define NCS
+	#define NCS_DECL
+	#define NCS
 #endif // NCS_DELAY != 0
 
 static TYPE HPAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
@@ -487,20 +474,16 @@ void affinity( pthread_t pthreadid, unsigned int tid ) {
 #else
 #if defined( algol )
 	enum { OFFSETSOCK = 1 /* 0 origin */, SOCKETS = 2, CORES = 48, HYPER = 1 };
-// #elif defined( nasus )
-//	enum { OFFSETSOCK = 1 /* 0 origin */, SOCKETS = 2, CORES = 64, HYPER = 1 };
 #elif defined( jax )
 	enum { OFFSETSOCK = 1 /* 0 origin */, SOCKETS = 4, CORES = 24, HYPER = 2 /* wrap on socket */ };
-// #elif defined( pyke )
-//	enum { OFFSETSOCK = 1 /* 0 origin */, SOCKETS = 2, CORES = 24, HYPER = 2 /* wrap on socket */ };
 #elif defined( cfapi1 )
 	enum { OFFSETSOCK = 0 /* 0 origin */, SOCKETS = 1, CORES = 4, HYPER = 1 };
 #else // default
 	enum { OFFSETSOCK = 2 /* 0 origin */, SOCKETS = 4, CORES = 16, HYPER = 1 };
 #endif // HOSTS
 	int cpu = tid + ((tid < CORES) ? OFFSETSOCK * CORES : HYPER < 2 ? OFFSETSOCK * CORES : CORES * SOCKETS);
-#endif // computer
 #endif // 0
+#endif // computer
 
 #if 0
 	// 4x8x2 : 4 sockets, 8 cores per socket, 2 hyperthreads per core
@@ -537,7 +520,7 @@ static uint64_t ** entries CALIGN;						// holds CS entry results for each threa
 static __attribute__(( unused )) void shuffle( unsigned int set[], const int size ) {
 	unsigned int p1, p2, temp;
 
-	for ( unsigned int i = 0; i < 200; i +=1 ) {		// shuffle array S times
+	for ( size_t i = 0; i < 200; i += 1 ) {				// shuffle array S times
 		p1 = rand() % size;
 		p2 = rand() % size;
 		temp = set[p1];
@@ -619,12 +602,6 @@ int main( int argc, char * argv[] ) {
 #endif // CFMT
 
 	printf( "%3ju %3jd ", N, Time );
-
-	#if NCS_DELAY != 0
-	NoNCSPoints = max( NCS_DELAY, N ) * 5;				// repeat random pattern N times
-	NCSpoints = Allocator( sizeof(typeof(NCSpoints[0])) * NoNCSPoints );
-	randPoints( NCSpoints, NoNCSPoints, (N <= 3) ? (N - 1) : max( max( NCS_DELAY, 5 ), N ) );
-	#endif // NCS_DELAY != 0
 
 	#ifdef FAST
 	assert( N <= MaxStartPoints );
