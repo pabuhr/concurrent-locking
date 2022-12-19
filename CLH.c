@@ -7,6 +7,8 @@ typedef VTYPE qnode CALIGN;
 typedef qnode * qnode_ptr;
 typedef qnode_ptr CLH_lock;
 
+//#define THREADLOCAL /* fastest version */
+
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
 static CLH_lock lock CALIGN;
 #ifdef THREADLOCAL
@@ -14,18 +16,16 @@ static __thread qnode_ptr node CALIGN;					// alternative location
 #define NPARM( addr )
 #define NARG( addr )
 #define STAR
-#define ADDR &
 #else
 #define NPARM( star ) , qnode_ptr star node
 #define NARG( addr ) , addr node
 #define STAR *
-#define ADDR
 #endif // THREADLOCAL
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 static inline void clh_lock( CLH_lock * lock, qnode_ptr * prev  NPARM() ) {
-	STAR node = false;
-	*prev = Fas( lock, ADDR node );
+	*node = false;
+	*prev = Fas( lock, node );
 	await( **prev );
 	WO( Fence(); );
 } // clh_lock
