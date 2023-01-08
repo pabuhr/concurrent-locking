@@ -23,18 +23,19 @@ static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sha
 
 void spin_lock( VTYPE * lock ) {
 	#ifndef NOEXPBACK
-	enum { SPIN_START = 4, SPIN_END = 64 * 1024, };
+	enum { SPIN_START = 16, SPIN_END = 4 * 1024, };
 	unsigned int spin = SPIN_START;
 	#endif // ! NOEXPBACK
 
-	for ( unsigned int i = 1;; i += 1 ) {
+	for ( ;; ) {
 	  if ( *lock == 0 && Tas( lock ) == 0 ) break;		// Fence
 
 		#ifndef NOEXPBACK
-		for ( TYPE s = 0; s < spin; s += 1 ) Pause();	// exponential spin
+		for ( VTYPE s = 0; s < spin; s += 1 ) Pause();	// exponential spin
 		spin += spin;									// powers of 2
 		// if ( i % 64 == 0 ) spin += spin;				// slowly increase by powers of 2
-		if ( spin > SPIN_END ) spin = SPIN_END;			// cap spinning length
+		// if ( spin > SPIN_END ) spin = SPIN_END;			// cap spinning length
+		if ( spin > SPIN_END ) spin = SPIN_START;		// restart (randomize) spinning length
 		#else
 
 		#ifndef MPAUSE
