@@ -10,6 +10,8 @@ typedef Grant * volatile HemLock;
 typedef _Atomic(Grant *) HemLock;
 #endif // ! ATOMIC
 
+#define THREADLOCAL /* fastest version */
+
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
 static HemLock lock CALIGN;
 #ifdef THREADLOCAL
@@ -27,19 +29,19 @@ static __thread volatile Grant grant CALIGN;
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 static inline void hem_lock( HemLock * lock  GPARM ) {
-	STAR grant = 0;
+	STAR grant = false;
 	Grant * prev = Fas( lock, ADDR grant );
 	if ( prev != NULL ) { 
-		await( Fas( prev, 0 ) != 0 );
+		await( Fas( prev, false ) );
 	} // if
 	WO( Fence(); );
 } // hem_lock
 
 static inline void hem_unlock( HemLock * lock  GPARM ) {
 	WO( Fence(); );
-	STAR grant = 1;
+	STAR grant = true;
 	if ( ! Cas( lock, ADDR grant, NULL ) ) {
-		await( STAR grant == 0 );
+		await( ! STAR grant );
 	} // if
 } // hem_unlock
 

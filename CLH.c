@@ -7,7 +7,7 @@ typedef VTYPE qnode CALIGN;
 typedef qnode * qnode_ptr;
 typedef qnode_ptr CLH_lock;
 
-//#define THREADLOCAL /* fastest version */
+#define THREADLOCAL /* fastest version */
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
 static CLH_lock lock CALIGN;
