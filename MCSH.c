@@ -50,8 +50,8 @@ static inline void mcs_lock( NMCS_lock * lock ) {
 	lock->msg = succ;
 } // mcs_lock
 
-//The first two lines of release must not be swapped (see handware Fence), because, if flag holds before
-//msg is read, a new thread may be able to modify msg.
+// The first two lines of release must not be swapped (see handware Fence), because, if flag holds before msg is read, a
+// new thread may be able to modify msg.
 
 static inline void mcs_unlock( NMCS_lock * lock ) {
 	qnode_ptr succ = lock->msg;
