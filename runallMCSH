@@ -24,9 +24,9 @@ fi
 runalgorithm() {
 #    for atomic in "" "ATOMIC" ; do
     for atomic in "" ; do
-	outfile=${outdir}/${1}${2}${atomic}${contention}
+	outfile=${outdir}/${1}${atomic}
 	echo "${outfile}"
-	gcc-10 ${cflag} ${atomic:+-D${atomic}} ${contention:+-D${contention}} -D${outdir} -DAlgorithm=${1} -DNCS_DELAY=1 Harness.c -lpthread -lm -o ${outdir}.out
+	gcc-10 ${cflag} ${atomic:+-D${atomic}} -D${outdir} -DAlgorithm=${1} -DNCS_DELAY=20 Harness.c -lpthread -lm -o ${outdir}.out
 	./run1 Time=${time} Exec="${Exec}" > "${outfile}"
 	if [ -f core ] ; then
 	    echo core generated for ${1}
