@@ -165,7 +165,7 @@ typedef volatile uint32_t VWHOLESIZE;
 
 #define Clr( lock ) __atomic_clear( lock, __ATOMIC_RELEASE )
 #define Clrm( lock, memorder ) __atomic_clear( lock, memorder )
-#define Tas( lock ) __atomic_test_and_set( (lock), __ATOMIC_SEQ_CST )
+#define Tas( lock ) __atomic_test_and_set( (lock), __ATOMIC_ACQUIRE )
 #define Tasm( lock, memorder ) __atomic_test_and_set( (lock), memorder )
 #define Cas( change, comp, assn ) ({typeof(comp) __temp = (comp); __atomic_compare_exchange_n( (change), &(__temp), (assn), false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST ); })
 #define Casm( change, comp, assn, memorder... ) ({typeof(comp) * __temp = &(comp); __atomic_compare_exchange_n( (change), &(__temp), (assn), false, memorder ); })
@@ -180,12 +180,21 @@ typedef volatile uint32_t VWHOLESIZE;
 
 //------------------------------------------------------------------------------
 
-static RTYPE Mix64( uint64_t v ) {
-	static const int64_t Mix64K = 0xdaba0b6eb09322e3LL;
-	v = (v ^ (v >> 32)) * Mix64K;
-	v = (v ^ (v >> 32)) * Mix64K;
-	return v ^ (v >> 32);
-} // Mix64
+static inline long long int rdtscl( void ) {
+	#if defined( __i386 ) || defined( __x86_64 )
+	unsigned int lo, hi;
+	__asm__ __volatile__ ("rdtsc" : "=a"(lo), "=d"(hi));
+	return ( (unsigned long long)lo)|( ((unsigned long long)hi)<<32 );
+
+	#elif defined( __aarch64__ ) || defined( __arm__ )
+	// https://github.com/google/benchmark/blob/v1.1.0/src/cycleclock.h#L116
+	long long int virtual_timer_value;
+	asm volatile("mrs %0, cntvct_el0" : "=r"(virtual_timer_value));
+	return virtual_timer_value;
+	#else
+		#error unsupported hardware architecture
+	#endif
+}
 
 // Marsaglia shift-XOR PRNG with thread-local state
 // Period is 4G-1
@@ -198,17 +207,14 @@ static RTYPE Mix64( uint64_t v ) {
 // Optionally, sequester R on its own cache line to avoid false sharing
 // but on linux __thread "initial-exec" TLS variables are already segregated.
 
-static __attribute__(( unused, noinline )) RTYPE ThreadLocalRandom() { // must be called
-	static __thread RTYPE R = 0;
-	if ( R == 0 ) R = Mix64( (uint64_t)(uintptr_t)&R ) | 1;
-	RTYPE v = R;
-	RTYPE n = v;
-	n ^= n << 6;
-	n ^= n >> 21;
-	n ^= n << 7;
-	R = n;
-	return v;
-} // ThreadLocalRandom
+static __thread RTYPE R;
+static __attribute__(( unused, noinline )) RTYPE PRNG() { // must be called
+	uint32_t ret = R;
+	R ^= R << 6;
+	R ^= R >> 21;
+	R ^= R << 7;
+	return ret;
+} // PRNG
 
 //------------------------------------------------------------------------------
 
@@ -296,25 +302,26 @@ enum {
 	CSTimes  = CSTIMES									// time spent in CS + random-number call
 };
 
-#if NCS_DELAY != 0
-	#define NCS_DECL
-	#define NCS if ( UNLIKELY( id == 0 && N > 1 ) ) NonCriticalSection()
-	static inline RTYPE NonCriticalSection() {
-		volatile RTYPE randomNumber = ThreadLocalRandom();	// match with CS
-		for ( volatile int delay = 0; delay < NCSTimes; delay += 1 ) {} // short delay
-		return randomNumber;
-	} // NonCriticalSection
-#else
-	#define NCS_DECL
-	#define NCS
-#endif // NCS_DELAY != 0
-
 static TYPE HPAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
 static volatile RTYPE randomChecksum CALIGN = 0;
 static volatile RTYPE sumOfThreadChecksums CALIGN = 0;
 // Do not use VTYPE because -DATOMIC changes it.
 static volatile TYPE CurrTid CALIGN = 0;				// shared, current thread id in critical section
 static TYPE HPAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
+
+#if NCS_DELAY != 0
+	#define NCS_DECL
+//	#define NCS if ( UNLIKELY( id == 0 && N > 1 ) ) NonCriticalSection( id )
+	#define NCS if ( UNLIKELY( N > 1 ) ) NonCriticalSection( id )
+	static inline void NonCriticalSection() {
+//		volatile RTYPE randomNumber = PRNG() % NCSTimes; // match with CS
+//		for ( VTYPE delay = 0; delay < randomNumber; delay += 1 ) {} // short random delay
+		for ( VTYPE delay = 0; delay < NCSTimes; delay += 1 ) {} // short fixed delay
+	} // NonCriticalSection
+#else
+	#define NCS_DECL
+	#define NCS
+#endif // NCS_DELAY != 0
 
 #ifdef CONVOY
 static TYPE convoy[16][128][128];						// [RUNS][THREADS][THREADS]
@@ -331,7 +338,7 @@ static inline RTYPE CS( const TYPE tid __attribute__(( unused )) ) { // paramete
 
 	// If the critical section is violated, the additions are corrupted because of the load/store race unless there is
 	// perfect interleaving. Note, the load, delay, store to increase the chance of detecting a violation.
-	RTYPE randomNumber = ThreadLocalRandom();			// belt and
+	RTYPE randomNumber = PRNG();						// belt and
 	volatile RTYPE copy = randomChecksum;
 	for ( volatile int delay = 0; delay < CSTimes; delay += 1 ) {} // short delay
 	randomChecksum = copy + randomNumber;
@@ -348,7 +355,14 @@ static inline RTYPE CS( const TYPE tid __attribute__(( unused )) ) { // paramete
 	return randomNumber;
 } // CS
 #else
-	#define CS( tid ) 0
+static inline RTYPE CS( const TYPE tid __attribute__(( unused )) ) { // parameter unused for CSTIME == 0
+	#ifdef CONVOY
+	convoy[Run][tid][CurrTid] += 1;						// can be off by 1 for thread 0
+	#endif // CONVOY
+
+	CurrTid = tid;										// CurrTid is global
+	return 0;
+} // CS
 #endif // CSTIMES != 0
 
 //------------------------------------------------------------------------------
@@ -560,6 +574,8 @@ int main( int argc, char * argv[] ) {
 		exit( EXIT_FAILURE );
 	} // switch
 
+	R = rdtscl();										// seed PRNG
+
 #ifdef CFMT
 	#define QUOTE "'13"
 	setlocale( LC_NUMERIC, "en_US.UTF-8" );
@@ -577,6 +593,9 @@ int main( int argc, char * argv[] ) {
 	#ifdef ATOMIC
 				" ATOMIC,"
 	#endif // ATOMIC
+	#ifdef THREADLOCAL
+				" THREADLOCAL,"
+	#endif // THREADLOCAL
 	#if defined( NOEXPBACK ) && ! defined( MPAUSE )
 				" NOEXPBACK,"
 	#endif // NOEXPBACK
@@ -738,7 +757,7 @@ int main( int argc, char * argv[] ) {
 		double diff = totals[r] - avg;
 		sum += diff * diff;
 	} // for
-	double std = sqrt( sum / Threads ), percent = 15.0;
+	double std = sqrt( sum / RUNS ), percent = 15.0;
 	avg = avg == 0 ? 0.0 : std / avg * 100;
 	if ( avg > percent ) printf( "\nWarning relative standard deviation %.1f%% greater than %.0f%% over %d runs.\n", avg, percent, RUNS );
 
@@ -759,7 +778,7 @@ int main( int argc, char * argv[] ) {
 
 	avg = (double)totals[posn] / Threads;				// average
 	sum = 0.0;
-	for ( size_t tid = 0; tid < Threads; tid += 1 ) { // sum squared differences from average
+	for ( size_t tid = 0; tid < Threads; tid += 1 ) {	// sum squared differences from average
 		double diff = entries[posn][tid] - avg;
 		sum += diff * diff;
 	} // for
