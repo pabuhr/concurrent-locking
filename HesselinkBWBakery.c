@@ -12,8 +12,6 @@ static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sha
 #define guardA( n, mcol, lev, p, thr ) (n / 2 == 0 || n % 2 != mcol || lev < n / 2 || (p <= thr && lev <= n / 2))
 #define guardB( n, mcol ) ((n / 2 == 0 || n % 2 == mcol))
 
-#define max( x, y ) ((x) < (y) ? (y) : (x))
-
 static void * Worker( void * arg ) {
 	TYPE id = (size_t)arg;
 	uint64_t entry;
