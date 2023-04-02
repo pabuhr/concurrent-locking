@@ -554,6 +554,23 @@ static int compare( const void * p1, const void * p2 ) {
 
 //------------------------------------------------------------------------------
 
+static void statistics( size_t N, uint64_t values[N], double * avg, double * std, double * rstd ) {
+	double sum = 0.;
+	for ( size_t r = 0; r < N; r += 1 ) {
+		sum += values[r];
+	} // for
+	*avg = sum / N;										// average
+	sum = 0.;
+	for ( size_t r = 0; r < N; r += 1 ) {				// sum squared differences from average
+		double diff = values[r] - *avg;
+		sum += diff * diff;
+	} // for
+	*std = sqrt( sum / N );
+	*rstd = *avg == 0.0 ? 0.0 : *std / *avg * 100;
+} // statisitics
+
+//------------------------------------------------------------------------------
+
 int main( int argc, char * argv[] ) {
 	N = 8;												// defaults
 	Time = 10;											// seconds
@@ -605,6 +622,12 @@ int main( int argc, char * argv[] ) {
 	#ifdef MPAUSE
 				" MONITOR pause,"
 	#endif // MPAUSE
+	#ifdef FCFS
+				" FCFS,"
+	#endif // FCFS
+	#ifdef FCFSTest
+				" FCFSTest,"
+	#endif // FCFSTest
 				" %d NCS spins,"
 				" %d CS spins,"
 				" %d runs median"
@@ -614,7 +637,7 @@ int main( int argc, char * argv[] ) {
 	#ifdef CNT
 				"   CAVG"
 	#endif // CNT
-				"        SMALLS\n" );
+			"\n");
 	} // if
 #else
 	#define QUOTE ""
@@ -725,67 +748,70 @@ int main( int argc, char * argv[] ) {
 
 	dtor();												// global algorithm destructor
 
-	uint64_t totals[RUNS], sort[RUNS], smalls[RUNS];
+	double avg = 0.0, std = 0.0, rstd;
+
+	#ifdef DEBUG
+	printf( "\nthreads:\n" );
+	#endif // DEBUG
+	for ( size_t r = 0; r < RUNS; r += 1 ) {
+		#ifdef DEBUG
+		for ( size_t tid = 0; tid < Threads; tid += 1 ) {
+			printf( "%" QUOTE "ju ", entries[r][tid] );
+		} // for
+		#endif // DEBUG
+		statistics( Threads, entries[r], &avg, &std, &rstd );
+		#ifdef DEBUG
+		printf( ": avg %'1.f  std %'1.f  rstd %'2.f%%\n", avg, std, rstd );
+		#endif // DEBUG
+	} // for
+
+	uint64_t totalCols[RUNS];
 
 	#ifdef DEBUG
 	printf( "\nruns:\n" );
-	#endif // DEBUG
-	for ( size_t r = 0; r < RUNS; r += 1 ) {
-		smalls[r] = totals[r] = 0;
-		for ( size_t tid = 0; tid < Threads; tid += 1 ) {
-			if ( entries[r][tid] <= 5 ) smalls[r] += 1;	// only 5 entries in CS => small
-			totals[r] += entries[r][tid];
-			#ifdef DEBUG
+	for ( size_t tid = 0; tid < Threads; tid += 1 ) {
+		for ( size_t r = 0; r < RUNS; r += 1 ) {
+			totalCols[r] = entries[r][tid];				// must copy, row major order
 			printf( "%" QUOTE "ju ", entries[r][tid] );
-			#endif // DEBUG
 		} // for
-		#ifdef DEBUG
-		printf( "\n" );
-		#endif // DEBUG
-		sort[r] = totals[r];
+		statistics( RUNS, totalCols, &avg, &std, &rstd );
+		printf( ": avg %'1.f  std %'1.f  rstd %'2.f%%\n", avg, std, rstd );
 	} // for
+	#endif // DEBUG
+
+	uint64_t sort[RUNS];
+
+	for ( size_t r = 0; r < RUNS; r += 1 ) {
+		totalCols[r] = 0;
+		for ( size_t tid = 0; tid < Threads; tid += 1 ) {
+			totalCols[r] += entries[r][tid];
+		} // for
+		sort[r] = totalCols[r];
+	} // for
+	statistics( RUNS, totalCols, &avg, &std, &rstd );
+	const double percent = 15.0;
+	if ( rstd > percent ) printf( "Warning relative standard deviation %.1f%% greater than %.0f%% over %d runs.\n", rstd, percent, RUNS );
+
 	qsort( sort, RUNS, sizeof(typeof(sort[0])), compare );
 	uint64_t med = median( sort );
-
-	double sum = 0.0;
-	for ( size_t r = 0; r < RUNS; r += 1 ) {
-		sum += totals[r];
-	} // for
-	double avg = sum / RUNS;							// average
-	sum = 0.0;
-	for ( size_t r = 0; r < RUNS; r += 1 ) {			// sum squared differences from average
-		double diff = totals[r] - avg;
-		sum += diff * diff;
-	} // for
-	double std = sqrt( sum / RUNS ), percent = 15.0;
-	avg = avg == 0 ? 0.0 : std / avg * 100;
-	if ( avg > percent ) printf( "\nWarning relative standard deviation %.1f%% greater than %.0f%% over %d runs.\n", avg, percent, RUNS );
-
 	size_t posn;										// run with median result
-	for ( posn = 0; posn < RUNS && totals[posn] != med; posn += 1 ); // assumes RUNS is odd
+	for ( posn = 0; posn < RUNS && totalCols[posn] != med; posn += 1 ); // assumes RUNS is odd
 
 	#ifdef DEBUG
-	printf( "totals: " );
+	printf( "\ntotals: " );
 	for ( size_t i = 0; i < RUNS; i += 1 ) {			// print values
-		printf( "%" QUOTE "ju ", totals[i] );
+		printf( "%" QUOTE "ju ", totalCols[i] );
 	} // for
 	printf( "\nsorted: " );
 	for ( size_t i = 0; i < RUNS; i += 1 ) {			// print values
 		printf( "%" QUOTE "ju ", sort[i] );
 	} // for
-	printf( "\nmedian posn:%d\n", posn );
+	printf( "\nmedian posn:%jd\n\n", posn );
 	#endif // DEBUG
 
-	avg = (double)totals[posn] / Threads;				// average
-	sum = 0.0;
-	for ( size_t tid = 0; tid < Threads; tid += 1 ) {	// sum squared differences from average
-		double diff = entries[posn][tid] - avg;
-		sum += diff * diff;
-	} // for
-	std = sqrt( sum / Threads );
-
 	printf( "%" QUOTE "ju", med );						// median round
-	printf( " %" QUOTE ".1f %" QUOTE ".1f %5.1f%%", avg, std, avg == 0 ? 0.0 : std / avg * 100 );
+	statistics( Threads, entries[posn], &avg, &std, &rstd ); // median thread
+	printf( " %" QUOTE ".1f %" QUOTE ".1f %5.1f%%", avg, std, rstd );
 
 	#ifdef CNT
 	// posn is the run containing the median result. Other runs are ignored.
@@ -799,11 +825,9 @@ int main( int argc, char * argv[] ) {
 		#endif // FAST
 			cntsum += counters[posn][tid].cnts[i];
 		} // for
-		printf( " %5.1f%%", (double)cntsum / (double)totals[posn] * 100.0 );
+		printf( " %5.1f%%", (double)cntsum / (double)totalCols[posn] * 100.0 );
 	} // for
 	#endif // CNT
-
-	printf( " %" QUOTE "ju", smalls[posn] );
 
 	#ifdef CONVOY
 	printf( "\n\n" );
