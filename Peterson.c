@@ -1,13 +1,18 @@
 // G. L. Peterson, Myths About the Mutual Exclusion Problem, Information Processing Letters, 1981, 12(3), Fig. 3, p. 116
 // cnt is used to prove threads do not move evenly through levels.
 
+#include "FCFS.h"
+
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
 static VTYPE * Q CALIGN, * turns CALIGN;
+FCFSGlobal();
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 static void * Worker( void * arg ) {
 	TYPE id = (size_t)arg + 1;							// id 0 => don't-want-in
 	uint64_t entry;
+
+	FCFSLocal();
 
 	#ifdef FAST
 	unsigned int cnt = 0, oid = id;
@@ -21,17 +26,22 @@ static void * Worker( void * arg ) {
 		for ( entry = 0; stop == 0; entry += 1 ) {
 			NCS;
 
+			FCFSIntro();
 			for ( TYPE rd = 1; rd < N; rd += 1 ) {		// entry protocol, round
 				Q[id] = rd;								// current round
+				WO( Fence(); )							// write order matters
 				turns[rd] = id;							// RACE
 				Fence();								// force store before more loads
-			  L: for ( int k = 1; k <= N; k += 1 ) {		// find loser
+			  L: for ( typeof(N) k = 1; k <= N; k += 1 ) { // find loser
 					if ( k != id && Q[k] >= rd && turns[rd] == id ) { Pause(); goto L; }
 				} // for
 			} // for
+			WO( Fence(); )
+			FCFSExit();
 
 			randomThreadChecksum += CS( id );
 
+			WO( Fence(); );								// prevent write floating up
 			Q[id] = 0;									// exit protocol
 
 			#ifdef FAST
@@ -57,17 +67,19 @@ static void * Worker( void * arg ) {
 void __attribute__((noinline)) ctor() {
 	Q = Allocator( sizeof(typeof(Q[0])) * (N + 1) );
 	turns = Allocator( sizeof(typeof(turns[0])) * (N - 1 + 1) );
-	for ( int i = 1; i <= N; i += 1 ) {					// initialize shared data
+	for ( typeof(N) i = 1; i <= N; i += 1 ) {			// initialize shared data
 		Q[i] = 0;
 	} // for
+	FCFSCtor();
 } // ctor
 
 void __attribute__((noinline)) dtor() {
+	FCFSDtor();
 	free( (void *)turns );
 	free( (void *)Q );
 } // dtor
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=Peterson Harness.c -lpthread -lm -D`hostname` -DCFMT -DCNT=0" //
+// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=Peterson Harness.c -lpthread -lm -D`hostname` -DCFMT" //
 // End: //

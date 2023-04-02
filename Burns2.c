@@ -1,15 +1,20 @@
 // James E. Burns, Symmetry in Systems of Asynchronous Processes. 22nd Annual
 // Symposium on Foundations of Computer Science, 1981, Figure 2, p 170.
 
+#include "FCFS.h"
+
 #include <stdbool.h>
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
 static VTYPE turn CALIGN, * flag CALIGN;
+FCFSGlobal();
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 static void * Worker( void * arg ) {
 	TYPE id = (size_t)arg;
 	uint64_t entry;
+
+	FCFSLocal();
 
 	#ifdef FAST
 	unsigned int cnt = 0, oid = id;
@@ -25,7 +30,9 @@ static void * Worker( void * arg ) {
 		for ( entry = 0; stop == 0; entry += 1 ) {
 			NCS;
 
+			FCFSIntro();
 		  L0: flag[id] = true;							// entry protocol
+			WO( Fence(); )								// write order matters
 			turn = id;									// RACE
 			Fence();									// force store before more loads
 		  L1: if ( FASTPATH( turn != id ) ) {
@@ -37,13 +44,17 @@ static void * Worker( void * arg ) {
 			} else {
 //				flag[id] = true;
 //				Fence();								// force store before more loads
+				WO( Fence(); )							// read recent turn
 			  L2: if ( FASTPATH( turn != id ) ) goto L1;
 				for ( j = 0; j < N; j += 1 )
 					if ( FASTPATH( j != id && flag[j] ) ) goto L2;
 			} // if
+			WO( Fence(); )
+			FCFSExit();
 
 			randomThreadChecksum += CS( id );
 
+			WO( Fence(); );								// prevent write floating up
 			flag[id] = false;							// exit protocol
 
 			#ifdef FAST
@@ -70,14 +81,15 @@ void __attribute__((noinline)) ctor() {
 	for ( typeof(N) i = 0; i < N; i += 1 ) {			// initialize shared data
 		flag[i] = false;
 	} // for
-	//turn = 0;
+	FCFSCtor();
 } // ctor
 
 void __attribute__((noinline)) dtor() {
+	FCFSDtor();
 	free( (void *)flag );
 } // dtor
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=Burns2 Harness.c -lpthread -lm -D`hostname` -DCFMT -DCNT=0" //
+// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=Burns2 Harness.c -lpthread -lm -D`hostname` -DCFMT" //
 // End: //

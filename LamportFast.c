@@ -1,11 +1,14 @@
 // Leslie Lamport, A Fast Mutual Exclusion Algorithm, ACM Transactions on Computer Systems, 5(1), 1987, Fig. 2, p. 5
 // N => do not want in, versus 0 in original paper, so "b" is dimensioned 0..N-1 rather than 1..N.
 
+#include "FCFS.h"
+
 #include <stdbool.h>
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
 static VTYPE * b CALIGN;
 static VTYPE x CALIGN, y CALIGN;
+FCFSGlobal();
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 static TYPE Bottom = UINTPTR_MAX;
@@ -13,6 +16,8 @@ static TYPE Bottom = UINTPTR_MAX;
 static void * Worker( void * arg ) {
 	TYPE id = (size_t)arg;
 	uint64_t entry;
+
+	FCFSLocal();
 
 	#ifdef FAST
 	unsigned int cnt = 0, oid = id;
@@ -26,6 +31,7 @@ static void * Worker( void * arg ) {
 		for ( entry = 0; stop == 0; entry += 1 ) {
 			NCS;
 
+			FCFSIntro();
 		  START: ;
 			b[id] = true;								// entry protocol
 			WO( Fence(); )								// write order matters
@@ -54,6 +60,7 @@ static void * Worker( void * arg ) {
 				} // if
 			} // if
 			WO( Fence(); )
+			FCFSExit();
 
 			randomThreadChecksum += CS( id );
 
@@ -89,13 +96,15 @@ void __attribute__((noinline)) ctor() {
 		b[i] = false;
 	} // for
 	y = Bottom;
+	FCFSCtor();
 } // ctor
 
 void __attribute__((noinline)) dtor() {
+	FCFSDtor();
 	free( (void *)b );
 } // dtor
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=LamportFast Harness.c -lpthread -lm -D`hostname` -DCFMT -DCNT=0" //
+// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=LamportFast Harness.c -lpthread -lm -D`hostname` -DCFMT" //
 // End: //
