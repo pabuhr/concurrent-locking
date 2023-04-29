@@ -36,14 +36,17 @@ static void * Worker( void * arg ) {
 			FCFSIntro();
 		  L0: intents[id] = DontWantIn;					// entry protocol
 			Fence();									// force store before more loads
-			for ( j = 0; j < id; j += 1 )
-				if ( intents[j] == WantIn ) { Pause(); goto L0; }
+			for ( j = 0; j < id; j += 1 ) {
+				if ( FASTPATH( intents[j] == WantIn ) ) { goto L0; }
+			} // for
 			intents[id] = WantIn;
-			Fence();									// force store before more loads
-			for ( j = 0; j < id; j += 1 )
-				if ( intents[j] == WantIn ) goto L0;
-		  L1: for ( j = id + 1; j < N; j += 1 )
-				if ( intents[j] == WantIn ) { Pause(); goto L1; }
+			WO( Fence(); )								// TSO: allow read intents[0] to float above intents[id]
+			for ( j = 0; j < id; j += 1 ) {
+				if ( FASTPATH( intents[j] == WantIn ) ) { goto L0; }
+			} // for
+		  L1: for ( j = id + 1; j < N; j += 1 ) {
+				if ( FASTPATH( intents[j] == WantIn ) ) { Pause(); goto L1; }
+			} // for
 			Fence();									// force store before more loads
 			FCFSExit();
 
