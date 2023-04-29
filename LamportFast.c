@@ -37,7 +37,7 @@ static void * Worker( void * arg ) {
 			WO( Fence(); )								// write order matters
 			x = id;
 			Fence();									// write/read order matters
-			if ( SLOWPATH( y != Bottom ) ) {
+			if ( FASTPATH( y != Bottom ) ) {
 				b[id] = false;
 				Fence();								// write/read order matters
 				await( y == Bottom );
@@ -45,16 +45,17 @@ static void * Worker( void * arg ) {
 			} // if
 			y = id;
 			Fence();									// write/read order matters
-			if ( SLOWPATH( x != id ) ) {
+			if ( FASTPATH( x != id ) ) {
 				b[id] = false;
 				Fence();								// write/read order matters
-				for ( typeof(N) k = 0; k < N; k += 1 )
+				for ( typeof(N) k = 0; k < N; k += 1 ) {
 					await( ! b[k] );
+				} // for
 				// If the loop consistently reads an outdated value of y (== id from assignment above), there is only
 				// the danger of starvation, and that is unlikely. Correctness only requires the value read after the
 				// loop is recent.
 				WO( Fence(); )							// read recent y
-				if ( SLOWPATH( y != id ) ) {
+				if ( FASTPATH( y != id ) ) {
 					await( y == Bottom );				// optional
 					goto START;
 				} // if
