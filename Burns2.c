@@ -1,5 +1,5 @@
-// James E. Burns, Symmetry in Systems of Asynchronous Processes. 22nd Annual
-// Symposium on Foundations of Computer Science, 1981, Figure 2, p 170.
+// James E. Burns, Symmetry in Systems of Asynchronous Processes. 22nd Annual Symposium on Foundations of Computer
+// Science, 1981, Figure 2, p 170. Some improvements have been made.
 
 #include "FCFS.h"
 
@@ -31,23 +31,28 @@ static void * Worker( void * arg ) {
 			NCS;
 
 			FCFSIntro();
-		  L0: flag[id] = true;							// entry protocol
+		  L0: ;
+			flag[id] = true;							// entry protocol
 			WO( Fence(); )								// write order matters
 			turn = id;									// RACE
-			Fence();									// force store before more loads
-		  L1: if ( FASTPATH( turn != id ) ) {
-				flag[id] = false;
-				Fence();								// force store before more loads
-			  L11: for ( j = 0; j < N; j += 1 )
-					if ( j != id && flag[j] ) { Pause(); goto L11; }
-				goto L0;
+			Fence();									// prevent reading turn below before intent is set above
+			if ( FASTPATH( turn != id ) ) {
+			  L1: ;
+				flag[id] = false;						// retract intent
+				WO( Fence(); )							// TSO: allow read flag[0] to float above flag[id]
+			  L11: ;
+				for ( j = 0; j < N; j += 1 ) {
+					if ( FASTPATH( flag[j] ) ) { Pause(); goto L11; }
+				} // for
+				goto L0;								// rare path
 			} else {
 //				flag[id] = true;
 //				Fence();								// force store before more loads
-				WO( Fence(); )							// read recent turn
-			  L2: if ( FASTPATH( turn != id ) ) goto L1;
-				for ( j = 0; j < N; j += 1 )
-					if ( FASTPATH( j != id && flag[j] ) ) goto L2;
+			  L2: ;
+				if ( SLOWPATH( turn != id ) ) { goto L1; }
+				for ( j = 0; j < N; j += 1 ) {
+					if ( SLOWPATH( j != id && flag[j] ) ) { goto L2; }
+				} // for
 			} // if
 			WO( Fence(); )
 			FCFSExit();
