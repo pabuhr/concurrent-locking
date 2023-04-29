@@ -11,6 +11,7 @@
 #ifndef __cplusplus
 #define _GNU_SOURCE										// See feature_test_macros(7)
 #endif // __cplusplus
+
 #include <stdio.h>
 #include <stdlib.h>										// abort, exit, atoi, rand, qsort
 #include <math.h>										// sqrt
@@ -477,17 +478,34 @@ void affinity( pthread_t pthreadid, unsigned int tid ) {
 // There are many ways to assign threads to processors: cores, chips, etc.
 // On the AMD, we find starting at core 32 and sequential assignment is sufficient.
 // Below are alternative approaches.
+
+#ifndef HYPERAFF										// default affinity
+#define HYPERAFF
+#endif // HYPERAFF
+
 #if defined( __linux ) && defined( PIN )
 #if 1
 #if defined( nasus )
-	// enum { OFFSETSOCK = 1 /* 0 origin */, SOCKETS = 2, CORES = 64, HYPER = 1 };
-	int cpu = (tid / 2) + ((tid % 2 == 0) ? 0 : 128);
+	enum { OFFSETSOCK = 1 /* 0 origin */, SOCKETS = 2, CORES = 64, HYPER = 1 };
+	#if defined( LINEARAFF )
+	int cpu = tid + ((tid < CORES) ? OFFSETSOCK * CORES : HYPER < 2 ? OFFSETSOCK * CORES : CORES * SOCKETS);
+	#endif // LINEARAFF
+	#if defined( HYPERAFF )
+	int cpu = OFFSETSOCK * CORES + (tid / 2) + ((tid % 2 == 0) ? 0 : CORES * SOCKETS);
+	#endif // HYPERAFF
 #elif defined( pyke )
-	// enum { OFFSETSOCK = 1 /* 0 origin */, SOCKETS = 2, CORES = 24, HYPER = 2 /* wrap on socket */ };
-	int cpu = (tid / 2) + ((tid % 2 == 0) ? 0 : 48);
+	enum { OFFSETSOCK = 0 /* 0 origin */, SOCKETS = 2, CORES = 24, HYPER = 1 /* wrap on socket */ };
+	#if defined( LINEARAFF )
+	int cpu = tid + ((tid < CORES) ? OFFSETSOCK * CORES : HYPER < 2 ? OFFSETSOCK * CORES : CORES * SOCKETS);
+	#endif // LINEARAFF
+	#if defined( HYPERAFF )
+	int cpu = OFFSETSOCK * CORES + (tid / 2) + ((tid % 2 == 0) ? 0 : CORES * SOCKETS );
+	#endif // HYPERAFF
 #else
 #if defined( algol )
 	enum { OFFSETSOCK = 1 /* 0 origin */, SOCKETS = 2, CORES = 48, HYPER = 1 };
+#elif defined( prolog )
+	enum { OFFSETSOCK = 1 /* 0 origin */, SOCKETS = 2, CORES = 64, HYPER = 1 }; // pretend 2 sockets
 #elif defined( jax )
 	enum { OFFSETSOCK = 1 /* 0 origin */, SOCKETS = 4, CORES = 24, HYPER = 2 /* wrap on socket */ };
 #elif defined( cfapi1 )
@@ -604,6 +622,12 @@ int main( int argc, char * argv[] ) {
 	#else
 				".c,"
 	#endif // __cplusplus
+	#if defined( LINEARAFF )
+				" LINEAR AFFINITY,"
+	#endif // LINEARAFF
+	#if defined( HYPERAFF )
+				" HYPER AFFINITY,"
+	#endif // HYPERAFF
 	#ifdef FAST
 				" FAST,"
 	#endif // FAST
