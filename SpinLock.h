@@ -45,12 +45,9 @@ void spin_lock( VTYPE * lock ) {
 		#endif // MPAUSE
 		#endif // ! NOEXPBACK
 	} // for
-
-	WO( Fence(); );
 } // spin_lock
 
 void spin_unlock( VTYPE * lock ) {
-	WO( Fence(); );
 	Clr( lock );										// Fence
 } // spin_unlock
 
