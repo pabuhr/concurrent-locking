@@ -40,7 +40,7 @@ static void * Worker( void * arg ) {
 				if ( FASTPATH( intents[j] == WantIn ) ) { goto L0; }
 			} // for
 			intents[id] = WantIn;
-			WO( Fence(); )								// TSO: allow read intents[0] to float above intents[id]
+			Fence();
 			for ( j = 0; j < id; j += 1 ) {
 				if ( FASTPATH( intents[j] == WantIn ) ) { goto L0; }
 			} // for

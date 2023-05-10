@@ -39,7 +39,7 @@ static void * Worker( void * arg ) {
 			if ( FASTPATH( turn != id ) ) {
 			  L1: ;
 				flag[id] = false;						// retract intent
-				WO( Fence(); )							// TSO: allow read flag[0] to float above flag[id]
+				Fence();
 			  L11: ;
 				for ( j = 0; j < N; j += 1 ) {
 					if ( FASTPATH( flag[j] ) ) { Pause(); goto L11; }
