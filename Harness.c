@@ -39,7 +39,7 @@
 #endif // __GNUC__ >= 7
 
 #define CACHE_ALIGN 128									// Intel recommendation
-#define CALIGN __attribute__(( aligned (CACHE_ALIGN) ))
+#define CALIGN __attribute__(( aligned(CACHE_ALIGN) ))
 
 #define LIKELY(x)   __builtin_expect(!!(x), 1)
 #define UNLIKELY(x) __builtin_expect(!!(x), 0)
@@ -479,13 +479,13 @@ void affinity( pthread_t pthreadid, unsigned int tid ) {
 // On the AMD, we find starting at core 32 and sequential assignment is sufficient.
 // Below are alternative approaches.
 
-#ifndef HYPERAFF										// default affinity
-#define HYPERAFF
-#endif // HYPERAFF
-
 #if defined( __linux ) && defined( PIN )
 #if 1
 #if defined( nasus )
+	#if ! defined( HYPERAFF ) && ! defined( LINEARAFF )		// default affinity
+	#define HYPERAFF
+	#endif // HYPERAFF
+
 	enum { OFFSETSOCK = 1 /* 0 origin */, SOCKETS = 2, CORES = 64, HYPER = 1 };
 	#if defined( LINEARAFF )
 	int cpu = tid + ((tid < CORES) ? OFFSETSOCK * CORES : HYPER < 2 ? OFFSETSOCK * CORES : CORES * SOCKETS);
@@ -494,6 +494,10 @@ void affinity( pthread_t pthreadid, unsigned int tid ) {
 	int cpu = OFFSETSOCK * CORES + (tid / 2) + ((tid % 2 == 0) ? 0 : CORES * SOCKETS);
 	#endif // HYPERAFF
 #elif defined( pyke )
+	#if ! defined( HYPERAFF ) && ! defined( LINEARAFF )		// default affinity
+	#define HYPERAFF
+	#endif // HYPERAFF
+
 	enum { OFFSETSOCK = 0 /* 0 origin */, SOCKETS = 2, CORES = 24, HYPER = 1 /* wrap on socket */ };
 	#if defined( LINEARAFF )
 	int cpu = tid + ((tid < CORES) ? OFFSETSOCK * CORES : HYPER < 2 ? OFFSETSOCK * CORES : CORES * SOCKETS);
@@ -502,6 +506,7 @@ void affinity( pthread_t pthreadid, unsigned int tid ) {
 	int cpu = OFFSETSOCK * CORES + (tid / 2) + ((tid % 2 == 0) ? 0 : CORES * SOCKETS );
 	#endif // HYPERAFF
 #else
+#define LINEARAFF
 #if defined( algol )
 	enum { OFFSETSOCK = 1 /* 0 origin */, SOCKETS = 2, CORES = 48, HYPER = 1 };
 #elif defined( prolog )
