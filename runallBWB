@@ -18,7 +18,7 @@ fi
 
 cflag="-Wall -Wextra -Werror -Wno-implicit-fallthrough -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN" #
 if [ ${outdir} = "algol" ] ; then
-    cflag=${cflag}" -mno-outline-atomics"	# use ARM LL/SC instructions for attomics
+    cflag=${cflag}" -mno-outline-atomics"	# use ARM LL/SC instructions for atomics
 fi
 
 runalgorithm() {
