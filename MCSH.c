@@ -55,10 +55,9 @@ static inline void mcs_lock( NMCS_lock * lock ) {
 
 static inline void mcs_unlock( NMCS_lock * lock ) {
 	qnode_ptr succ = lock->msg;
-//	Fence();
+	WO( Fence(); );
 	lock->flag = true;
 	if ( FASTPATH( succ != NULL ) ) {
-		WO( Fence(); );
 		succ->go = true;
 	} // if
 } // mcs_unlock
