@@ -31,7 +31,7 @@ static void * Worker( void * arg ) {
 		for ( entry = 0; stop == 0; entry += 1 ) {
 			NCS;
 
-			FCFSIntro();
+			FCFSEnter();
 		  START: ;
 			b[id] = true;								// entry protocol
 			WO( Fence(); )								// write order matters

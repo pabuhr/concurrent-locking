@@ -30,7 +30,7 @@ static void * Worker( void * arg ) {
 		for ( entry = 0; stop == 0; entry += 1 ) {
 			NCS;
 
-			FCFSIntro();
+			FCFSEnter();
 			lid = id;									// entry protocol
 			for ( typeof(depth) lv = 0; lv < depth; lv += 1 ) {
 				binary_prologue( lid & 1, &t[lv][lid >> 1] );

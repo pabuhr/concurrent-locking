@@ -33,7 +33,7 @@ static void * Worker( void * arg ) {
 		for ( entry = 0; stop == 0; entry += 1 ) {
 			NCS;
 
-			FCFSIntro();
+			FCFSEnter();
 		  L0: intents[id] = DontWantIn;					// entry protocol
 			Fence();									// force store before more loads
 			for ( j = 0; j < id; j += 1 ) {

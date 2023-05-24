@@ -26,7 +26,7 @@ static void * Worker( void * arg ) {
 		for ( entry = 0; stop == 0; entry += 1 ) {
 			NCS;
 
-			FCFSIntro();
+			FCFSEnter();
 			for ( TYPE rd = 1; rd < N; rd += 1 ) {		// entry protocol, round
 				Q[id] = rd;								// current round
 				WO( Fence(); )							// write order matters
