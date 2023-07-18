@@ -1,46 +1,43 @@
-// The MCSH paper uses the name "locked" for this variable to match with the original MCS paper, where "locked == ! go."
-// The name "go" matches better with our usage of "await" rather than "repeat" in the MCS paper.
-
 #include <stdbool.h>
 
-typedef struct qnode_t {
+typedef struct mcsh_node {
 	#ifndef ATOMIC
-	struct qnode_t * volatile
+	struct mcsh_node * volatile
 	#else
-	_Atomic(struct qnode_t *)
+	_Atomic(struct mcsh_node *)
 	#endif // ! ATOMIC
 		next;
-	VTYPE go;
-} qnode CALIGN;
+	VTYPE locked;
+} MCSH_node CALIGN;
 
 #ifndef ATOMIC
-typedef qnode *
+typedef MCSH_node *
 #else
-typedef _Atomic(qnode *)
+typedef _Atomic(MCSH_node *)
 #endif // ! ATOMIC
-	qnode_ptr;
+	MCSH_node_ptr;
 
 typedef struct {
-	qnode_ptr tail;
-	qnode_ptr msg;
+	MCSH_node_ptr tail;
+	MCSH_node_ptr msg;
 	VTYPE flag;
 } NMCS_lock CALIGN;
 
 static inline void mcs_lock( NMCS_lock * lock ) {
-	qnode mm = { NULL, false };
-	qnode_ptr prev = Fas( &lock->tail, &mm );
+	MCSH_node mm = { .next = NULL, .locked = true };
+	MCSH_node_ptr prev = Fas( &lock->tail, &mm );
 
 	if ( FASTPATH( prev == NULL ) ) {
 		await( lock->flag );
 	} else {
 		prev->next = &mm;
-		await( mm.go );
+		await( ! mm.locked );
 	} // if
 
 	WO( Fence(); );
 	lock->flag = false;
 	WO( Fence(); );
-	qnode_ptr succ = mm.next;
+	MCSH_node_ptr succ = mm.next;
 	if ( FASTPATH( succ == NULL ) ) {
 		if ( FASTPATH( ! Cas( &lock->tail, &mm, NULL ) ) ) {
 			await( (succ = mm.next) != NULL );
@@ -54,11 +51,11 @@ static inline void mcs_lock( NMCS_lock * lock ) {
 // new thread may be able to modify msg.
 
 static inline void mcs_unlock( NMCS_lock * lock ) {
-	qnode_ptr succ = lock->msg;
+	MCSH_node_ptr succ = lock->msg;
 	WO( Fence(); );
 	lock->flag = true;
 	if ( FASTPATH( succ != NULL ) ) {
-		succ->go = true;
+		succ->locked = false;
 	} // if
 } // mcs_unlock
 
