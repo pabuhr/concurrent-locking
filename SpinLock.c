@@ -53,8 +53,18 @@ static void * Worker( void * arg ) {
 } // Worker
 
 void __attribute__((noinline)) ctor() {
-	lock = 0;
+	Clr( &lock );										// Fence
 	FCFSCtor();
+
+	if ( N == 1 ) {										// title
+		#ifdef CFMT
+		#ifndef NOEXPBACK
+		printf( " EXPBACK(%d,%d)", SPIN_START, SPIN_END );
+		#else
+		printf( " NOEXPBACK" );
+		#endif // ! NOEXPBACK
+		#endif // CFMT
+	} // if
 } // ctor
 
 void __attribute__((noinline)) dtor() {
