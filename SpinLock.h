@@ -14,24 +14,25 @@
 #pragma once
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
-#ifndef ATOMIC
-static VTYPE lock CALIGN;
-#else
-_Atomic(TYPE) lock CALIGN;
-#endif // ! ATOMIC
+static volatile TYPE lock CALIGN;						// no reason to make ATOMIC(TYPE)
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
-void spin_lock( VTYPE * lock ) {
+#ifndef NOEXPBACK
+enum { SPIN_START = 64, SPIN_END = 64 * 1024, };		// performance better with large SPIN_END
+#endif // ! NOEXPBACK
+
+void spin_lock( volatile TYPE * lock ) {				// no reason to make ATOMIC(TYPE)
 	#ifndef NOEXPBACK
-	enum { SPIN_START = 16, SPIN_END = 4 * 1024, };
-	unsigned int spin = SPIN_START;
+	TYPE spin = SPIN_START;
 	#endif // ! NOEXPBACK
 
 	for ( ;; ) {
-	  if ( *lock == 0 && Tas( lock ) == 0 ) break;		// Fence
+		// For whatever reason, Casw often out performances Tas
+	  // if ( *lock == 0 && Tas( lock ) == 0 ) break;		// Fence
+	  if ( *lock == 0 && Casw( lock, (typeof(lock))0, (typeof(lock))1 ) ) break; // Fence
 
 		#ifndef NOEXPBACK
-		for ( VTYPE s = 0; s < spin; s += 1 ) Pause();	// exponential spin
+		for ( TYPE s = 0; s < spin; s += 1 ) Pause();	// exponential spin
 		spin += spin;									// powers of 2
 		// if ( i % 64 == 0 ) spin += spin;				// slowly increase by powers of 2
 		// if ( spin > SPIN_END ) spin = SPIN_END;			// cap spinning length
