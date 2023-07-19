@@ -1,5 +1,5 @@
 // Shared-memory Mutual Exclusion: Major Research Trends Since 1986, James H. Anderson, Yong-Jik Kim, Ted Herman
-// Distrib. Comput. (2003) 16: 75-110, Fig 3.
+// Distrib. Comput. (2003) 16: 75-110, Fig 3. FCFS lock
 
 #include<stdbool.h>
 
