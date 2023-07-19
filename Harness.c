@@ -14,6 +14,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>										// abort, exit, atoi, rand, qsort
+#include <stdbool.h>									// true, false
 #include <math.h>										// sqrt
 #include <assert.h>
 #include <pthread.h>
@@ -79,8 +80,8 @@ typedef volatile uint32_t VWHOLESIZE;
 #endif // __WORDSIZE == 64
 
 #ifdef ATOMIC
-#define VTYPE _Atomic TYPE
-#define VWHOLESIZE _Atomic WHOLESIZE
+#define VTYPE _Atomic(TYPE)
+#define VWHOLESIZE _Atomic(WHOLESIZE)
 #endif // ATOMIC
 
 //------------------------------------------------------------------------------
@@ -118,7 +119,8 @@ typedef volatile uint32_t VWHOLESIZE;
 #if defined( LPAUSE )
 	#define Pause() __asm__ __volatile__ ( "lfence" )
 #elif defined( MPAUSE )
-	inline TYPE MonitorLD( VTYPE * A ) {
+	// Do not use VTYPE because -DATOMIC changes it.
+	inline TYPE MonitorLD( volatile TYPE * A ) {
 		TYPE rv = 0;
 		__asm__ __volatile__ (
 			"xorq %%rcx,%%rcx; xorq %%rdx,%%rdx; monitorx; mov (%[RA]), %[RV];  "
@@ -130,8 +132,8 @@ typedef volatile uint32_t VWHOLESIZE;
 	inline void MWait( int timo __attribute__(( unused )) ) { // newer mwait takes an argument
 		__asm__ __volatile__ ( "xorq %%rcx,%%rcx; xorq %%rax,%%rax; mwaitx; " ::: "rax", "rcx" );
 	}
-	#define MPause( E, C ) { while ( (typeof(E))MonitorLD( (VTYPE *)(&(E)) ) C ) { MWait( 0 ); } }
-	#define MPauseS( S, E, C ) { while ( ( S (typeof(E))MonitorLD( (VTYPE *)(&(E)) ) ) C ) { MWait( 0 ); } }
+	#define MPause( E, C ) { while ( (typeof(E))MonitorLD( (volatile TYPE *)(&(E)) ) C ) { MWait( 0 ); } }
+	#define MPauseS( S, E, C ) { while ( ( S (typeof(E))MonitorLD( (volatile TYPE *)(&(E)) ) ) C ) { MWait( 0 ); } }
 	#define Pause() __asm__ __volatile__ ( "pause" ::: )
 #else
 	#define Pause() __asm__ __volatile__ ( "pause" ::: )
@@ -142,7 +144,7 @@ typedef volatile uint32_t VWHOLESIZE;
 #if defined( LPAUSE )
 	#define Pause() __asm__ __volatile__ ( "DMB ISH" ::: )
 #elif defined( MPAUSE )
-	inline TYPE MonitorLD( VTYPE * A ) {
+	inline TYPE MonitorLD( volatile TYPE * A ) {
 		TYPE v = 0;
 		// Polymorphic based on size of operand => automagically selects w or x register for %0.
 		__asm__ __volatile__ ( "wfe; ldaxr %0,%1; " : "=r" (v) : "Q" (*A) );
@@ -151,8 +153,8 @@ typedef volatile uint32_t VWHOLESIZE;
 
 	#define sevl() __asm__ __volatile__ ( "sevl" )
 	// Polymorphic on operand using type erasure => use uintptr_t so both values and pointers work.
-	#define MPause( E, C ) { sevl(); while ( (typeof(E))MonitorLD( (VTYPE *)(&(E)) ) C ) {} }
-	#define MPauseS( S, E, C ) { sevl(); while ( ( S (typeof(E))MonitorLD( (VTYPE *)(&(E)) ) ) C ) {} }
+	#define MPause( E, C ) { sevl(); while ( (typeof(E))MonitorLD( (volatile TYPE *)(&(E)) ) C ) {} }
+	#define MPauseS( S, E, C ) { sevl(); while ( ( S (typeof(E))MonitorLD( (volatile TYPE *)(&(E)) ) ) C ) {} }
 	#define Pause() __asm__ __volatile__ ( "YIELD" ::: )
 #else
 	#define Pause() __asm__ __volatile__ ( "YIELD" ::: )
@@ -169,9 +171,13 @@ typedef volatile uint32_t VWHOLESIZE;
 #define Tas( lock ) __atomic_test_and_set( (lock), __ATOMIC_ACQUIRE )
 #define Tasm( lock, memorder ) __atomic_test_and_set( (lock), memorder )
 #define Cas( change, comp, assn ) ({typeof(comp) __temp = (comp); __atomic_compare_exchange_n( (change), &(__temp), (assn), false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST ); })
-#define Casm( change, comp, assn, memorder... ) ({typeof(comp) * __temp = &(comp); __atomic_compare_exchange_n( (change), &(__temp), (assn), false, memorder, memorder ); })
+#define Casm( change, comp, assn, smemorder, fmemorder ) ({typeof(comp) * __temp = &(comp); __atomic_compare_exchange_n( (change), &(__temp), (assn), false, smemorder, fmemorder ); })
+#define Casw( change, comp, assn ) ({typeof(comp) __temp = (comp); __atomic_compare_exchange_n( (change), &(__temp), (assn), true, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST ); })
+#define Caswm( change, comp, assn, smemorder, fmemorder ) ({typeof(comp) __temp = (comp); __atomic_compare_exchange_n( (change), &(__temp), (assn), true, smemorder, smemorder ); })
 #define Casv( change, comp, assn ) __atomic_compare_exchange_n( (change), (comp), (assn), false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST )
-#define Casvm( change, comp, assn, memorder... ) __atomic_compare_exchange_n( (change), (comp), (assn), false, memorder, memorder )
+#define Casvm( change, comp, assn, smemorder, fmemorder ) __atomic_compare_exchange_n( (change), (comp), (assn), false, smemorder, fmemorder )
+#define Casvw( change, comp, assn ) __atomic_compare_exchange_n( (change), (comp), (assn), true, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST )
+#define Casvwm( change, comp, assn, smemorder, fmemorder ) __atomic_compare_exchange_n( (change), (comp), (assn), true, smemorder, fmemorder )
 #define Fas( change, assn ) __atomic_exchange_n( (change), (assn), __ATOMIC_SEQ_CST )
 #define Fasm( change, assn, memorder ) __atomic_exchange_n( (change), (assn), memorder )
 #define Fai( change, Inc ) __atomic_fetch_add( (change), (Inc), __ATOMIC_SEQ_CST )
@@ -181,15 +187,15 @@ typedef volatile uint32_t VWHOLESIZE;
 
 //------------------------------------------------------------------------------
 
-static inline long long int rdtscl( void ) {
+static inline TYPE rdtscl( void ) {
 	#if defined( __i386 ) || defined( __x86_64 )
-	unsigned int lo, hi;
+	TYPE lo, hi;
 	__asm__ __volatile__ ("rdtsc" : "=a"(lo), "=d"(hi));
-	return ( (unsigned long long)lo)|( ((unsigned long long)hi)<<32 );
+	return ( (TYPE)lo)|( ((TYPE)hi)<<32 );
 
 	#elif defined( __aarch64__ ) || defined( __arm__ )
 	// https://github.com/google/benchmark/blob/v1.1.0/src/cycleclock.h#L116
-	long long int virtual_timer_value;
+	TYPE virtual_timer_value;
 	asm volatile("mrs %0, cntvct_el0" : "=r"(virtual_timer_value));
 	return virtual_timer_value;
 	#else
@@ -294,13 +300,13 @@ static inline unsigned int startpoint( unsigned int pos ) {
 #define NCS_DELAY 0
 #endif // NCS_DELAY
 
-#ifndef CSTIMES
-#define CSTIMES 20
-#endif // CSTIMES
+#ifndef CS_DELAY
+#define CS_DELAY 20
+#endif // CS_DELAY
 
 enum {
 	NCSTimes = NCS_DELAY,								// time delay before attempting entry to CS
-	CSTimes  = CSTIMES									// time spent in CS + random-number call
+	CSTimes  = CS_DELAY,								// time spent in CS + random-number call
 };
 
 static TYPE HPAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
@@ -312,12 +318,19 @@ static TYPE HPAD2 CALIGN __attribute__(( unused ));		// protect further false sh
 
 #if NCS_DELAY != 0
 	#define NCS_DECL
-//	#define NCS if ( UNLIKELY( id == 0 && N > 1 ) ) NonCriticalSection( id )
-	#define NCS if ( UNLIKELY( N > 1 ) ) NonCriticalSection( id )
+	// #define NCS if ( UNLIKELY( id == 0 && N > 1 ) ) NonCriticalSection( id )
+	#define NCS if ( UNLIKELY( N > 1 ) ) NonCriticalSection()
 	static inline void NonCriticalSection() {
-//		volatile RTYPE randomNumber = PRNG() % NCSTimes; // match with CS
-//		for ( VTYPE delay = 0; delay < randomNumber; delay += 1 ) {} // short random delay
-		for ( VTYPE delay = 0; delay < NCSTimes; delay += 1 ) {} // short fixed delay
+		// volatile RTYPE randomNumber = PRNG() % NCSTimes; // match with CS
+		// for ( volatile TYPE delay = 0; delay < randomNumber; delay += 1 ) {} // short random delay
+		#ifdef RANDOM
+		// TYPE times = PRNG() % NCSTimes;
+		TYPE times = rdtscl() % NCSTimes;
+		#else
+		TYPE times = NCSTimes;
+		#endif // RANDOM
+		// Do not use VTYPE because -DATOMIC changes it.
+		for ( volatile TYPE delay = 0; delay < times; delay += 1 ) {} // short fixed delay
 	} // NonCriticalSection
 #else
 	#define NCS_DECL
@@ -328,8 +341,7 @@ static TYPE HPAD2 CALIGN __attribute__(( unused ));		// protect further false sh
 static TYPE convoy[16][128][128];						// [RUNS][THREADS][THREADS]
 #endif // CONVOY
 
-//static int Identity(int v) { __asm__ __volatile__ (";" : "+r" (v)); return v; } 
-#if CSTIMES != 0
+#if CS_DELAY != 0
 static inline RTYPE CS( const TYPE tid __attribute__(( unused )) ) { // parameter unused for CSTIME == 0
 	#ifdef CONVOY
 	convoy[Run][tid][CurrTid] += 1;						// can be off by 1 for thread 0
@@ -341,7 +353,14 @@ static inline RTYPE CS( const TYPE tid __attribute__(( unused )) ) { // paramete
 	// perfect interleaving. Note, the load, delay, store to increase the chance of detecting a violation.
 	RTYPE randomNumber = PRNG();						// belt and
 	volatile RTYPE copy = randomChecksum;
-	for ( volatile int delay = 0; delay < CSTimes; delay += 1 ) {} // short delay
+	#ifdef RANDOM
+	// TYPE times = PRNG() % NCSTimes;
+	TYPE times = rdtscl() % NCSTimes;
+	#else
+	TYPE times = CSTimes;
+	#endif // RANDOM
+	// Do not use VTYPE because -DATOMIC changes it.
+	for ( volatile TYPE delay = 0; delay < times; delay += 1 ) {} // short delay
 	randomChecksum = copy + randomNumber;
 
 	// The assignment to CurrTid above can delay in a store buffer, that is, committed but not pushed into coherent
@@ -364,7 +383,7 @@ static inline RTYPE CS( const TYPE tid __attribute__(( unused )) ) { // paramete
 	CurrTid = tid;										// CurrTid is global
 	return 0;
 } // CS
-#endif // CSTIMES != 0
+#endif // CS_DELAY != 0
 
 //------------------------------------------------------------------------------
 
@@ -506,6 +525,9 @@ void affinity( pthread_t pthreadid, unsigned int tid ) {
 	int cpu = OFFSETSOCK * CORES + (tid / 2) + ((tid % 2 == 0) ? 0 : CORES * SOCKETS );
 	#endif // HYPERAFF
 #else
+#if defined( HYPERAFF )
+	#error HYPERAFF unsupported for this architecture.
+#endif // HYPERAFF
 #define LINEARAFF
 #if defined( algol )
 	enum { OFFSETSOCK = 1 /* 0 origin */, SOCKETS = 2, CORES = 48, HYPER = 1 };
@@ -616,61 +638,79 @@ int main( int argc, char * argv[] ) {
 
 	R = rdtscl();										// seed PRNG
 
-#ifdef CFMT
+	#ifdef CFMT
+	if ( N == 1 ) {										// title
+		printf(
+			"%s"
+		#ifdef __cplusplus
+			".cc"
+		#else
+			".c"
+		#endif // __cplusplus
+			, xstr(Algorithm)
+		);
+	} // if
+	#endif // CFMT
+
+	ctor();												// global algorithm constructor (may print)
+
+	#ifdef CFMT
 	#define QUOTE "'13"
 	setlocale( LC_NUMERIC, "en_US.UTF-8" );
 
 	if ( N == 1 ) {										// title
-		printf( "%s"
-	#ifdef __cplusplus
-				".cc,"
-	#else
-				".c,"
-	#endif // __cplusplus
-	#if defined( LINEARAFF )
-				" LINEAR AFFINITY,"
-	#endif // LINEARAFF
-	#if defined( HYPERAFF )
-				" HYPER AFFINITY,"
-	#endif // HYPERAFF
-	#ifdef FAST
-				" FAST,"
-	#endif // FAST
-	#ifdef ATOMIC
-				" ATOMIC,"
-	#endif // ATOMIC
-	#ifdef THREADLOCAL
-				" THREADLOCAL,"
-	#endif // THREADLOCAL
-	#if defined( NOEXPBACK ) && ! defined( MPAUSE )
-				" NOEXPBACK,"
-	#endif // NOEXPBACK
-	#ifdef LPAUSE
-				" LFENCE pause,"
-	#endif // LPAUSE
-	#ifdef MPAUSE
-				" MONITOR pause,"
-	#endif // MPAUSE
-	#ifdef FCFS
-				" FCFS,"
-	#endif // FCFS
-	#ifdef FCFSTest
-				" FCFSTest,"
-	#endif // FCFSTest
-				" %d NCS spins,"
-				" %d CS spins,"
-				" %d runs median"
-				, xstr(Algorithm), NCSTimes, CSTimes, RUNS );
+		printf(
+			","
+			#if defined( LINEARAFF )
+			" LINEAR AFFINITY,"
+			#endif // LINEARAFF
+			#if defined( HYPERAFF )
+			" HYPER AFFINITY,"
+			#endif // HYPERAFF
+			#ifdef FAST
+			" FAST,"
+			#endif // FAST
+			#ifdef ATOMIC
+			" ATOMIC,"
+			#endif // ATOMIC
+			#ifdef ATOMICINST
+			" " xstr(ATOMICINST) ","
+			#endif // ATOMICINST
+			#ifdef THREADLOCAL
+			" THREADLOCAL,"
+			#endif // THREADLOCAL
+			#if defined( NOEXPBACK ) && ! defined( MPAUSE )
+			" NOEXPBACK,"
+			#endif // NOEXPBACK
+			#ifdef LPAUSE
+			" LFENCE pause,"
+			#endif // LPAUSE
+			#ifdef MPAUSE
+			" MONITOR pause,"
+			#endif // MPAUSE
+			#ifdef FCFS
+			" FCFS,"
+			#endif // FCFS
+			#ifdef FCFSTest
+			" FCFSTest,"
+			#endif // FCFSTest
+			" %d NCS spins,"
+			" %d CS spins,"
+			" %d runs median"
+			, NCSTimes, CSTimes, RUNS
+		);
 		if ( Degree != -1 ) printf( " %jd-ary", Degree ); // Zhang only
-		printf( "\n  N   T    CS Entries           AVG           STD   RSTD"
-	#ifdef CNT
-				"   CAVG"
-	#endif // CNT
-			"\n");
+		printf(
+			"\n  N   T    CS Entries           AVG           STD   RSTD"
+			#ifdef CNT
+			"   CAVG"
+			#endif // CNT
+			"\n"
+		);
 	} // if
-#else
+	#else
 	#define QUOTE ""
-#endif // CFMT
+	#endif // CFMT
 
 	printf( "%3ju %3jd ", N, Time );
 
@@ -734,8 +774,6 @@ int main( int argc, char * argv[] ) {
 	printf( "\n" );
 	#endif // DEBUG
 
-	ctor();												// global algorithm constructor
-
 	pthread_t workers[Threads];
 
 	for ( size_t tid = 0; tid < Threads; tid += 1 ) {	// start workers
@@ -751,7 +789,7 @@ int main( int argc, char * argv[] ) {
 	for ( ; Run < RUNS;  ) {							// global variable
 		// threads start first experiment immediately
 		sleep( Time );									// delay for experiment duration
-		stop = 1;										// stop threads
+		stop = 1;										// stop threads (atomic)
 		while ( Arrived != Threads ) Pause();			// all threads stopped ?
 
 		if ( randomChecksum != sumOfThreadChecksums ) {
@@ -762,7 +800,7 @@ int main( int argc, char * argv[] ) {
 		CurrTid = ULONG_MAX;							// reset for next run
 
 		Run += 1;
-		stop = 0;										// start threads
+		stop = 0;										// start threads (atomic)
 		while ( Arrived != 0 ) Pause();					// all threads started ?
 	} // for
 
