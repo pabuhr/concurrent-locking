@@ -5,8 +5,8 @@
 #include "Binary.c"
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
-static volatile Token ** t CALIGN;
-unsigned int depth CALIGN;
+static volatile Token ** t;								// triangular matrix, Token already CALIGN
+TYPE depth CALIGN;
 FCFSGlobal();
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
@@ -22,7 +22,8 @@ static void * Worker( void * arg ) {
 
 	NCS_DECL;
 
-	unsigned int lid;									// local id at each tree level
+	TYPE lid;											// local id at each tree level
+	TYPE mydepth = depth;								// local copy of depth
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		RTYPE randomThreadChecksum = 0;
@@ -32,7 +33,7 @@ static void * Worker( void * arg ) {
 
 			FCFSEnter();
 			lid = id;									// entry protocol
-			for ( typeof(depth) lv = 0; lv < depth; lv += 1 ) {
+			for ( typeof(mydepth) lv = 0; lv < mydepth; lv += 1 ) {
 				binary_prologue( lid & 1, &t[lv][lid >> 1] );
 				lid >>= 1;								// advance local id for next tree level
 			} // for
@@ -42,7 +43,7 @@ static void * Worker( void * arg ) {
 			randomThreadChecksum += CS( id );
 
 			WO( Fence(); );								// prevent write floating up
-			for ( int lv = depth - 1; lv >= 0; lv -= 1 ) { // exit protocol, retract reverse order
+			for ( int lv = mydepth - 1; lv >= 0; lv -= 1 ) { // exit protocol, retract reverse order
 				lid = id >> lv;
 				binary_epilogue( lid & 1, &t[lv][lid >> 1] );
 			} // for
@@ -63,6 +64,7 @@ static void * Worker( void * arg ) {
 		while ( stop != 0 ) Pause();
 		Fai( &Arrived, -1 );
 	} // for
+
 	return NULL;
 } // Worker
 
@@ -75,11 +77,11 @@ void __attribute__((noinline)) ctor() {
 		t[r] = Allocator( sizeof(typeof(t[0][0])) * size );
 		for ( int c = 0; c < size; c += 1 ) {			// initial all intents to dont-want-in
 			t[r][c].Q[0] = t[r][c].Q[1] = 0;
-#if defined( KESSELS2 )
+			#if defined( KESSELS2 )
 			t[r][c].R[0] = t[r][c].R[1] = 0;
-#else
+			#else
 			t[r][c].R = 0;
-#endif // KESSELS2
+			#endif // KESSELS2
 		} // for
 	} // for
 	FCFSCtor();
