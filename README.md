@@ -56,3 +56,5 @@ Peter A. Buhr and David Dice and Wim H. Hesselink, High-Contention Mutual
 Exclusion by Elevator Algorithms, Concurrency and Computation: Practice and
 Experience, 30(18), September, 2018, https://doi.org/10.1002/cpe.4475
 
+Wim H. Hesselink and Peter A. Buhr, MCSH, a Lock with the Standard Interface.
+ACM TOPC, 10(2), June 2023, https://doi.org/10.1145/3584696

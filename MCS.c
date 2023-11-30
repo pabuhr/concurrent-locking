@@ -1,5 +1,5 @@
-// John M. Mellor-Crummey and Michael L. Scott, Algorithm for Scalable Synchronization on Shared-Memory Multiprocessors,
-// ACM Transactions on Computer Systems, 9(1), 1991, Fig. 5, p. 30
+// John M. Mellor-Crummey and Michael L. Scott, Algorithms for Scalable Synchronization on Shared-Memory Multiprocessors,
+// ACM Transactions on Computer Systems, 9(1), February 1991, Fig. 5, p. 30
 
 // Architectural fences are unnecssary on TSO for MCS and CLH. An atomic instruction is a hardware fence, hence the only
 // reordering is store-load: stores in program order followed by loads being inverted in memory order by the CPU because

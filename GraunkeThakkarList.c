@@ -1,6 +1,6 @@
-// Scalable version of Graunke and Thakkar without need for N static storage locations, as in Figure 4 of
-// Algorithms for Scalable Synchronization Shared-Memory Multiprocessors, John M. Mellor-Crummey and Michael L. Scott
-// ACM Transactions on Computer Systems, 9(1), February, 1991, Pages 21-65.
+// Scalable version of Graunke and Thakkar without need for N static storage locations.
+// John M. Mellor-Crummey and Michael L. Scott, Algorithms for Scalable Synchronization on Shared-Memory Multiprocessors,
+// ACM Transactions on Computer Systems, 9(1), February 1991, Fig. 4, 29.
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
 static VTYPE * last CALIGN;

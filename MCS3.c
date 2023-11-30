@@ -1,5 +1,5 @@
-// John M. Mellor-Crummey and Michael L. Scott, Algorithm for Scalable Synchronization on Shared-Memory Multiprocessors,
-// ACM Transactions on Computer Systems, 9(1), 1991, Fig. 5, p. 30
+// John M. Mellor-Crummey and Michael L. Scott, Algorithms for Scalable Synchronization on Shared-Memory Multiprocessors,
+// ACM Transactions on Computer Systems, 9(1), February 1991, Fig. 5, p. 30
 
 #include <stdbool.h>
 #include <stdatomic.h>
