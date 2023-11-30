@@ -243,7 +243,7 @@ static __attribute__(( unused )) int Log2( int n ) {	// fallback integer log2( n
 #endif // __GNUC__
 
 static __attribute__(( unused )) inline int Clog2( int n ) { // integer ceil( log2( n ) )
-	if ( n <= 0 ) return -1;
+	if ( n <= 0 ) { fprintf( stderr, "***ERROR*** Clog2 argument <= 0\n" ); abort(); }
 	int ln = Log2( n );
 	return ln + ( (n - (1 << ln)) != 0 );				// check for any 1 bits to the right of the most significant bit
 }
@@ -260,7 +260,7 @@ static struct cnts ** counters CALIGN;
 //------------------------------------------------------------------------------
 
 // Do not use VTYPE because -DATOMIC changes it.
-static _Atomic(TYPE) stop CALIGN = 0;
+static _Atomic(TYPE) stop CALIGN = false;
 static _Atomic(TYPE) Arrived CALIGN = 0;
 static uintptr_t N CALIGN, Threads CALIGN, Time CALIGN;
 static intptr_t Degree CALIGN = -1;
@@ -512,6 +512,18 @@ void affinity( pthread_t pthreadid, unsigned int tid ) {
 	#if defined( HYPERAFF )
 	int cpu = OFFSETSOCK * CORES + (tid / 2) + ((tid % 2 == 0) ? 0 : CORES * SOCKETS);
 	#endif // HYPERAFF
+#elif defined( swift )
+	#if ! defined( HYPERAFF ) && ! defined( LINEARAFF )	     // default affinity
+	#define HYPERAFF
+	#endif // HYPERAFF
+
+	enum { OFFSETSOCK = 1 /* 0 origin */, SOCKETS = 2, CORES = 128, HYPER = 1 };
+	#if defined( LINEARAFF )
+	int cpu = tid + ((tid < CORES) ? OFFSETSOCK * CORES : HYPER < 2 ? OFFSETSOCK * CORES : CORES * SOCKETS);
+	#endif // LINEARAFF
+	#if defined( HYPERAFF )
+	int cpu = OFFSETSOCK * CORES + (tid / 2) + ((tid % 2 == 0) ? 0 : CORES * SOCKETS);
+	#endif // HYPERAFF
 #elif defined( pyke )
 	#if ! defined( HYPERAFF ) && ! defined( LINEARAFF )		// default affinity
 	#define HYPERAFF
@@ -538,7 +550,7 @@ void affinity( pthread_t pthreadid, unsigned int tid ) {
 #elif defined( cfapi1 )
 	enum { OFFSETSOCK = 0 /* 0 origin */, SOCKETS = 1, CORES = 4, HYPER = 1 };
 #else // default
-	enum { OFFSETSOCK = 2 /* 0 origin */, SOCKETS = 4, CORES = 16, HYPER = 1 };
+	enum { OFFSETSOCK = 0 /* 0 origin */, SOCKETS = 2, CORES = 16, HYPER = 1 };
 #endif // HOSTS
 	int cpu = tid + ((tid < CORES) ? OFFSETSOCK * CORES : HYPER < 2 ? OFFSETSOCK * CORES : CORES * SOCKETS);
 #endif // 0
@@ -789,7 +801,7 @@ int main( int argc, char * argv[] ) {
 	for ( ; Run < RUNS;  ) {							// global variable
 		// threads start first experiment immediately
 		sleep( Time );									// delay for experiment duration
-		stop = 1;										// stop threads (atomic)
+		stop = true;									// stop threads (atomic)
 		while ( Arrived != Threads ) Pause();			// all threads stopped ?
 
 		if ( randomChecksum != sumOfThreadChecksums ) {
@@ -800,7 +812,7 @@ int main( int argc, char * argv[] ) {
 		CurrTid = ULONG_MAX;							// reset for next run
 
 		Run += 1;
-		stop = 0;										// start threads (atomic)
+		stop = false;									// start threads (atomic)
 		while ( Arrived != 0 ) Pause();					// all threads started ?
 	} // for
 
