@@ -1,3 +1,9 @@
+// Debra Hensgen, 1 Raphael Finkel, 1 and Udi Manber, Two Algorithms for Barrier Synchronization International Journal
+// of Parallel Programming, Vol. 17, No. 1, 1988 p. 7-8
+//
+// John M. Mellor-Crummey and Michael L. Scott, Algorithms for Scalable Synchronization on Shared-Memory Multiprocessors,
+// ACM Transactions on Computer Systems, 9(1), February 1991, Fig. 8, p. 34
+
 typedef struct {
 	VTYPE CALIGN flag;
 	TYPE CALIGN count;
