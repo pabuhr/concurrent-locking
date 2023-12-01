@@ -4,7 +4,8 @@ static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sha
 static barrier b CALIGN;
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
-#define BARRIER_CALL block( &b, p );
+#define BARRIER_DECL
+#define BARRIER_CALL block( b, p );
 
 static inline void block( barrier tog, TYPE p ) {
 	TYPE state = p > 0;									// optimization
