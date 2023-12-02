@@ -67,6 +67,8 @@ typedef uintptr_t TYPE;									// addressable word-size
 typedef volatile TYPE VTYPE;							// volatile addressable word-size
 typedef uint32_t RTYPE;									// unsigned 32-bit integer
 
+typedef uint8_t BYTESIZE;
+typedef volatile uint8_t VBYTESIZE;
 #if __WORDSIZE == 64
 typedef uint32_t HALFSIZE;
 typedef volatile uint32_t VHALFSIZE;
@@ -81,6 +83,8 @@ typedef volatile uint32_t VWHOLESIZE;
 
 #ifdef ATOMIC
 #define VTYPE _Atomic(TYPE)
+#define VBYTESIZE _Atomic(BYTESIZE)
+#define VHALFSIZE _Atomic(HALFSIZE)
 #define VWHOLESIZE _Atomic(WHOLESIZE)
 #endif // ATOMIC
 

@@ -67,7 +67,9 @@ static void * Worker( void * arg ) {
 } // Worker
 
 void __attribute__((noinline)) worker_ctor() {
+	#ifdef CFMT
 	if ( N == 1 ) printf( " TESTING freq=%#x/%d", Frequency, Frequency );
+	#endif // CFMT
 	cnt = Allocator( sizeof(typeof(cnt[0])) * N );
 } // worker_ctor
 
