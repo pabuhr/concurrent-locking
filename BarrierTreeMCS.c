@@ -4,17 +4,17 @@
 enum { FANIN = 4 };
 
 typedef union {
-	volatile uint32_t all;
-	uint8_t flags[FANIN];
+	VHALFSIZE all;
+	VBYTESIZE flags[FANIN];
 } Fanin;
 
 typedef struct CALIGN {
-	uint8_t * parent;
-	volatile uint8_t * children[2];
+	VBYTESIZE * parent;
+	VBYTESIZE * children[2];
 	Fanin has_child;
 	Fanin child_not_ready;
-	volatile uint8_t parent_sense;
-	uint8_t dummy;
+	VBYTESIZE parent_sense;
+	BYTESIZE dummy;
 } Tree_node;
 
 typedef struct {
@@ -33,7 +33,6 @@ static inline void block( barrier * b, TYPE p, TYPE * sense ) {
 
 	await( ! tree_node->child_not_ready.all );			// await for all fan-in to be false
 	tree_node->child_not_ready.all = tree_node->has_child.all;
-
 	*tree_node->parent = false;
 	// Only compiler fencing needed (volatile). Hardware fencing would only be necessary if the processor is able to
 	// hoist the entire await loop, which is unlikely. That is, any number of loads of parent_sense can occur in the
@@ -65,13 +64,13 @@ void __attribute__((noinline)) ctor() {
 			b.tree[i].child_not_ready.flags[j] = b.tree[i].has_child.flags[j];
 		} // for
 	
-		if ( i == 0 ) b.tree[i].parent = &b.tree[i].dummy;
+		if ( i == 0 ) b.tree[i].parent = (VBYTESIZE *)(&b.tree[i].dummy);
 		else b.tree[i].parent = &b.tree[(i - 1) / FANIN].child_not_ready.flags[(i - 1) % FANIN];
 
-		if ( 2 * i + 2 >= N ) b.tree[i].children[1] = &b.tree[i].dummy;
+		if ( 2 * i + 2 >= N ) b.tree[i].children[1] = (VBYTESIZE *)(&b.tree[i].dummy);
 		else b.tree[i].children[1] = &b.tree[2 * i + 2].parent_sense;
 
-		if ( 2 * i + 1 >= N ) b.tree[i].children[0] = &b.tree[i].dummy;
+		if ( 2 * i + 1 >= N ) b.tree[i].children[0] = (VBYTESIZE *)(&b.tree[i].dummy);
 		else b.tree[i].children[0] = &b.tree[2 * i + 1].parent_sense;
 	}
 	worker_ctor();
