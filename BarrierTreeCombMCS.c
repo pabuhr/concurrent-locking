@@ -32,7 +32,7 @@ static inline void block_aux( Barrier_node * bn, TYPE * sense ) {
 static inline void block( barrier * b, TYPE p, TYPE * sense ) {
 	block_aux( &b->bn[p], sense );
 	*sense = ! *sense;
-} // barrier
+} // block
 
 //#define TESTING
 #include "BarrierWorker.c"

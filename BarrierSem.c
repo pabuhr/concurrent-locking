@@ -38,7 +38,7 @@ static inline void block( Barrier * this ) {
 	sem_post( &this->mutex );
 	
 	sem_wait( &this->turnstile2 );
-} // barrier
+} // block
 
 //#define TESTING
 #include "BarrierWorker.c"

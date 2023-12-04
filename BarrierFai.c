@@ -1,4 +1,4 @@
-typedef	struct {
+typedef struct {
 	VTYPE CALIGN flag;
 	TYPE CALIGN count;
 } barrier;
@@ -20,7 +20,7 @@ static inline void block( barrier * b ) {
 		asm( "" : : : "memory" );						// prevent compiler code movement
 		b->flag = negflag;
 	} // if
-} // barrier
+} // block
 
 #define TESTING
 #include "BarrierWorker.c"
