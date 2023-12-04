@@ -30,7 +30,7 @@ static void * Worker( void * arg ) {
 					// cnt[p] and cnt[k] have been set in the previous NCS
 					for ( TYPE k = 0 ; k < N ; k += 1 ) {
 						if ( cnt[k] != cnt[p] ) {
-							printf( "Barrier failure Id:%zu\n", p );
+							printf( "***ERROR*** barrier failure Id:%zu\n", p );
 							abort();
 						} // if
 					} // for
