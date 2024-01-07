@@ -14,14 +14,14 @@
 #pragma once
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
-static volatile TYPE lock CALIGN;						// no reason to make ATOMIC(TYPE)
+static VTYPE lock CALIGN;
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 #ifndef NOEXPBACK
 enum { SPIN_START = 64, SPIN_END = 64 * 1024, };		// performance better with large SPIN_END
 #endif // ! NOEXPBACK
 
-void spin_lock( volatile TYPE * lock ) {				// no reason to make ATOMIC(TYPE)
+void spin_lock( VTYPE * lock ) {
 	#ifndef NOEXPBACK
 	TYPE spin = SPIN_START;
 	#endif // ! NOEXPBACK

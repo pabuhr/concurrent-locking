@@ -2,8 +2,8 @@
 
 typedef struct {
 	// 32 bit sufficient and can reduce 1 clock latency in some cases.
-	volatile uint32_t ticket CALIGN;
-	volatile uint32_t serving CALIGN;
+	VHALFSIZE ticket CALIGN;
+	VHALFSIZE serving CALIGN;
 } Lock;
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
