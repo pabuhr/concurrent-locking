@@ -1,11 +1,15 @@
-#include "FCFS.h"
+#include xstr(FCFS.h)									// include algorithm for testing
 
 #define inv( c ) ((c) ^ 1)
 
 #include "Binary.c"
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
+#ifndef ATOMIC
 static volatile Token ** t;								// triangular matrix, Token already CALIGN
+#else
+_Atomic(volatile Token **) t;
+#endif // ! ATOMIC
 TYPE depth CALIGN;
 FCFSGlobal();
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
@@ -37,8 +41,8 @@ static void * Worker( void * arg ) {
 				binary_prologue( lid & 1, &t[lv][lid >> 1] );
 				lid >>= 1;								// advance local id for next tree level
 			} // for
+			FCFSExitAcq();
 			WO( Fence(); )
-			FCFSExit();
 
 			randomThreadChecksum += CS( id );
 
@@ -47,6 +51,7 @@ static void * Worker( void * arg ) {
 				lid = id >> lv;
 				binary_epilogue( lid & 1, &t[lv][lid >> 1] );
 			} // for
+			FCFSExitRel();
 
 			#ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment

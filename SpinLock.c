@@ -1,6 +1,6 @@
 #include "SpinLock.h"
 
-#include "FCFS.h"
+#include xstr(FCFS.h)									// include algorithm for testing
 
 static TYPE PAD3 CALIGN __attribute__(( unused ));		// protect further false sharing
 FCFSGlobal();
@@ -26,11 +26,12 @@ static void * Worker( void * arg ) {
 
 			FCFSEnter();
 			spin_lock( &lock );
-			FCFSExit();
+			FCFSExitAcq();
 
 			randomThreadChecksum += CS( id );
 
 			spin_unlock( &lock );
+			FCFSExitRel();
 
 			#ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment

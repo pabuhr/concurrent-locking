@@ -1,7 +1,7 @@
 // Leslie Lamport, A Fast Mutual Exclusion Algorithm, ACM Transactions on Computer Systems, 5(1), 1987, Fig. 2, p. 5
 // N => do not want in, versus 0 in original paper, so "b" is dimensioned 0..N-1 rather than 1..N.
 
-#include "FCFS.h"
+#include xstr(FCFS.h)									// include algorithm for testing
 
 #include <stdbool.h>
 
@@ -61,7 +61,7 @@ static void * Worker( void * arg ) {
 				} // if
 			} // if
 			WO( Fence(); )
-			FCFSExit();
+			FCFSExitAcq();
 
 			randomThreadChecksum += CS( id );
 
@@ -70,6 +70,7 @@ static void * Worker( void * arg ) {
 			WO( Fence(); );								// write order matters
 			b[id] = false;
 			WO( Fence(); );
+			FCFSExitRel();
 
 			#ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment

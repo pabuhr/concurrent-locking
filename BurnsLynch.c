@@ -3,8 +3,7 @@
 // Leslie Lamport, The Mutual Exclusion Problem: Part II - Statement and Solutions, Journal of the ACM Apr 1986,
 // 33(2):327-348
 
-#include "FCFS.h"
-//#include "FCFS_A.h"
+#include xstr(FCFS.h)									// include algorithm for testing
 
 enum Intent { DontWantIn, WantIn };
 
@@ -47,13 +46,14 @@ static void * Worker( void * arg ) {
 		  L1: for ( j = id + 1; j < N; j += 1 ) {
 				if ( FASTPATH( intents[j] == WantIn ) ) { Pause(); goto L1; }
 			} // for
+			FCFSExitAcq();
 			Fence();									// force store before more loads
-			FCFSExit();
 
 			randomThreadChecksum += CS( id );
 
 			Fence();									// force store before more loads
 			intents[id] = DontWantIn;					// exit protocol
+			FCFSExitRel();
 
 			#ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
@@ -88,6 +88,5 @@ void __attribute__((noinline)) dtor() {
 } // dtor
 
 // Local Variables: //
-// tab-width: 4 //
-// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=BurnsLynchRetract Harness.c -lpthread -lm -D`hostname` -DCFMT -DCNT=0" //
+// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=BurnsLynch Harness.c -lpthread -lm -D`hostname` -DCFMT -DCNT=0" //
 // End: //

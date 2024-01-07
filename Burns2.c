@@ -1,7 +1,7 @@
 // James E. Burns, Symmetry in Systems of Asynchronous Processes. 22nd Annual Symposium on Foundations of Computer
 // Science, 1981, Figure 2, p 170. Some improvements have been made.
 
-#include "FCFS.h"
+#include xstr(FCFS.h)									// include algorithm for testing
 
 #include <stdbool.h>
 
@@ -55,12 +55,13 @@ static void * Worker( void * arg ) {
 				} // for
 			} // if
 			WO( Fence(); )
-			FCFSExit();
+			FCFSExitAcq();
 
 			randomThreadChecksum += CS( id );
 
 			WO( Fence(); );								// prevent write floating up
 			flag[id] = false;							// exit protocol
+			FCFSExitRel();
 
 			#ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment

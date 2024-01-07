@@ -1,7 +1,7 @@
 // G. L. Peterson, Myths About the Mutual Exclusion Problem, Information Processing Letters, 1981, 12(3), Fig. 3, p. 116
 // cnt is used to prove threads do not move evenly through levels.
 
-#include "FCFS.h"
+#include xstr(FCFS.h)									// include algorithm for testing
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
 static VTYPE * Q CALIGN, * turns CALIGN;
@@ -37,12 +37,13 @@ static void * Worker( void * arg ) {
 				} // for
 			} // for
 			WO( Fence(); )
-			FCFSExit();
+			FCFSExitAcq();
 
 			randomThreadChecksum += CS( id );
 
 			WO( Fence(); );								// prevent write floating up
 			Q[id] = 0;									// exit protocol
+			FCFSExitRel();
 
 			#ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
