@@ -24,6 +24,7 @@
 #include <poll.h>										// poll
 #include <malloc.h>										// memalign
 #include <unistd.h>										// getpid
+#include <string.h>										// strcmp
 #include <limits.h>										// ULONG_MAX
 #ifdef CFMT												// output comma format
 #include <locale.h>
@@ -269,8 +270,9 @@ static _Atomic(TYPE) Arrived CALIGN = 0;
 static uintptr_t N CALIGN, Threads CALIGN, Time CALIGN;
 static intptr_t Degree CALIGN = -1;
 
-enum { RUNS = 5 };
-volatile int Run CALIGN = 0;
+//enum { RUNS = 5 };
+static int RUNS = 5;									// total experiment repetitions
+static volatile int Run CALIGN = 0;						// current experiment repetition
 
 //------------------------------------------------------------------------------
 
@@ -585,9 +587,9 @@ void affinity( pthread_t pthreadid, unsigned int tid ) {
 static uint64_t ** entries CALIGN;						// holds CS entry results for each threads for all runs
 
 #ifdef __cplusplus
-#include xstr(Algorithm.cc)								// include software algorithm for testing
+#include xstr(Algorithm.cc)								// include algorithm for testing
 #else
-#include xstr(Algorithm.c)								// include software algorithm for testing
+#include xstr(Algorithm.c)								// include algorithm for testing
 #endif // __cplusplus
 
 //------------------------------------------------------------------------------
@@ -637,18 +639,32 @@ int main( int argc, char * argv[] ) {
 	Time = 10;											// seconds
 
 	switch ( argc ) {
+	  case 5:
+		if ( strcmp( argv[4], "d" ) != 0 ) {			// default ?
+			Degree = atoi( argv[4] );					// Zhang d-ary
+			if ( Degree < 2 ) goto USAGE;
+		} // if
 	  case 4:
-		Degree = atoi( argv[3] );
-		if ( Degree < 2 ) goto USAGE;
+		if ( strcmp( argv[3], "d" ) != 0 ) {			// default ?
+			RUNS = atoi( argv[3] );						// experiment repetitions
+			if ( RUNS < 1 || (RUNS & 1) == 0 ) goto USAGE;
+		} // if
 	  case 3:
-		Time = atoi( argv[2] );
-		N = atoi( argv[1] );
-		if ( Time < 1 || N < 1 ) goto USAGE;
+		if ( strcmp( argv[2], "d" ) != 0 ) {			// default ?
+			Time = atoi( argv[2] );						// experiment duration
+			if ( (intptr_t)Time < 1 ) goto USAGE;
+		} // if
+	  case 2:
+		if ( strcmp( argv[1], "d" ) != 0 ) {			// default ?
+			N = atoi( argv[1] );						// number of threads
+			if ( (intptr_t)N < 1 ) goto USAGE;
+		} // if
 		break;
 	  USAGE:
 	  default:
-		printf( "Usage: %s [ threads (> 0) %ju ] [ experiment duration (> 0, seconds) %ju ] [ Zhang D-ary (> 1) %jd ]\n",
-				argv[0], N, Time, Degree );
+		printf( "Usage: %s [ threads (> 0) | 'd' (default) %jd [ duration (> 0, seconds) | 'd' (default) %jd "
+				"[ repetitions (> 0 & odd) | 'd' (default) %d [ Zhang D-ary (> 1) | 'd' (default) %jd ] ] ] ]\n",
+				argv[0], (intptr_t)N, (intptr_t)Time, RUNS, Degree == -1 ? 0 : Degree );
 		exit( EXIT_FAILURE );
 	} // switch
 
@@ -705,15 +721,18 @@ int main( int argc, char * argv[] ) {
 			" MONITOR pause,"
 			#endif // MPAUSE
 			#ifdef FCFS
-			" FCFS,"
+			" %s,"
 			#endif // FCFS
 			#ifdef FCFSTest
 			" FCFSTest,"
 			#endif // FCFSTest
 			" %d NCS spins,"
 			" %d CS spins,"
-			" %d runs median"
-			, NCSTimes, CSTimes, RUNS
+			" %d runs median",
+			#ifdef FCFS
+			xstr(FCFS),
+			#endif // FCFS
+			NCSTimes, CSTimes, RUNS
 		);
 		if ( Degree != -1 ) printf( " %jd-ary", Degree ); // Zhang only
 		printf(
@@ -744,7 +763,7 @@ int main( int argc, char * argv[] ) {
 	#ifdef CNT
 	counters = (typeof(counters[0]) *)malloc( sizeof(typeof(counters[0])) * RUNS );
 	#endif // CNT
-	for ( size_t r = 0; r < RUNS; r += 1 ) {
+	for ( typeof(RUNS) r = 0; r < RUNS; r += 1 ) {
 		entries[r] = (typeof(entries[0][0]) *)Allocator( sizeof(typeof(entries[0][0])) * Threads );
 #ifdef CNT
 #ifdef FAST
@@ -759,7 +778,7 @@ int main( int argc, char * argv[] ) {
 //#ifdef FAST
 	// For FAST experiments, there is only thread but it changes its thread id to visit all the start points. Therefore,
 	// all the counters for each id must be initialized and summed at the end.
-	for ( size_t r = 0; r < RUNS; r += 1 ) {
+	for ( typeof(RUNS) r = 0; r < RUNS; r += 1 ) {
 		for ( size_t id = 0; id < N; id += 1 ) {
 			for ( size_t i = 0; i < CNT + 1; i += 1 ) { // reset for each run
 				counters[r][id].cnts[i] = 0;
@@ -784,11 +803,11 @@ int main( int argc, char * argv[] ) {
 	for ( size_t i = 0; i < Threads; i += 1 ) set[ i ] = i;
 	// srand( getpid() );
 	// shuffle( set, Threads );							// randomize thread ids
-	#ifdef DEBUG
-	printf( "\nthread set: " );
-	for ( size_t i = 0; i < Threads; i += 1 ) printf( "%u ", set[ i ] );
-	printf( "\n" );
-	#endif // DEBUG
+	#ifdef STATS
+	fprintf( stderr, "\nthread set: " );
+	for ( size_t i = 0; i < Threads; i += 1 ) fprintf( stderr, "%u ", set[ i ] );
+	fprintf( stderr, "\n" );
+	#endif // STATS
 
 	pthread_t workers[Threads];
 
@@ -833,38 +852,38 @@ int main( int argc, char * argv[] ) {
 
 	double avg = 0.0, std = 0.0, rstd;
 
-	#ifdef DEBUG
-	printf( "\nthreads:\n" );
-	#endif // DEBUG
-	for ( size_t r = 0; r < RUNS; r += 1 ) {
-		#ifdef DEBUG
+	#ifdef STATS
+	fprintf( stderr, "\nthreads:\n" );
+	#endif // STATS
+	for ( typeof(RUNS) r = 0; r < RUNS; r += 1 ) {
+		#ifdef STATS
 		for ( size_t tid = 0; tid < Threads; tid += 1 ) {
-			printf( "%" QUOTE "ju ", entries[r][tid] );
+			fprintf( stderr, "%" QUOTE "ju ", entries[r][tid] );
 		} // for
-		#endif // DEBUG
+		#endif // STATS
 		statistics( Threads, entries[r], &avg, &std, &rstd );
-		#ifdef DEBUG
-		printf( ": avg %'1.f  std %'1.f  rstd %'2.f%%\n", avg, std, rstd );
-		#endif // DEBUG
+		#ifdef STATS
+		fprintf( stderr, ": avg %'1.f  std %'1.f  rstd %'2.f%%\n", avg, std, rstd );
+		#endif // STATS
 	} // for
 
 	uint64_t totalCols[RUNS];
 
-	#ifdef DEBUG
-	printf( "\nruns:\n" );
+	#ifdef STATS
+	fprintf( stderr, "\nruns:\n" );
 	for ( size_t tid = 0; tid < Threads; tid += 1 ) {
-		for ( size_t r = 0; r < RUNS; r += 1 ) {
+		for ( typeof(RUNS) r = 0; r < RUNS; r += 1 ) {
 			totalCols[r] = entries[r][tid];				// must copy, row major order
-			printf( "%" QUOTE "ju ", entries[r][tid] );
+			fprintf( stderr, "%" QUOTE "ju ", entries[r][tid] );
 		} // for
 		statistics( RUNS, totalCols, &avg, &std, &rstd );
-		printf( ": avg %'1.f  std %'1.f  rstd %'2.f%%\n", avg, std, rstd );
+		fprintf( stderr, ": avg %'1.f  std %'1.f  rstd %'2.f%%\n", avg, std, rstd );
 	} // for
-	#endif // DEBUG
+	#endif // STATS
 
 	uint64_t sort[RUNS];
 
-	for ( size_t r = 0; r < RUNS; r += 1 ) {
+	for ( typeof(RUNS) r = 0; r < RUNS; r += 1 ) {
 		totalCols[r] = 0;
 		for ( size_t tid = 0; tid < Threads; tid += 1 ) {
 			totalCols[r] += entries[r][tid];
@@ -872,25 +891,25 @@ int main( int argc, char * argv[] ) {
 		sort[r] = totalCols[r];
 	} // for
 	statistics( RUNS, totalCols, &avg, &std, &rstd );
-	const double percent = 15.0;
+	const double percent = 10.0;
 	if ( rstd > percent ) printf( "Warning relative standard deviation %.1f%% greater than %.0f%% over %d runs.\n", rstd, percent, RUNS );
 
 	qsort( sort, RUNS, sizeof(typeof(sort[0])), compare );
 	uint64_t med = median( sort );
-	size_t posn;										// run with median result
+	typeof(RUNS) posn;									// run with median result
 	for ( posn = 0; posn < RUNS && totalCols[posn] != med; posn += 1 ); // assumes RUNS is odd
 
-	#ifdef DEBUG
-	printf( "\ntotals: " );
-	for ( size_t i = 0; i < RUNS; i += 1 ) {			// print values
-		printf( "%" QUOTE "ju ", totalCols[i] );
+	#ifdef STATS
+	fprintf( stderr, "\ntotals: " );
+	for ( typeof(RUNS) i = 0; i < RUNS; i += 1 ) {		// print values
+		fprintf( stderr, "%" QUOTE "ju ", totalCols[i] );
 	} // for
-	printf( "\nsorted: " );
-	for ( size_t i = 0; i < RUNS; i += 1 ) {			// print values
-		printf( "%" QUOTE "ju ", sort[i] );
+	fprintf( stderr, "\nsorted: " );
+	for ( typeof(RUNS) i = 0; i < RUNS; i += 1 ) {		// print values
+		fprintf( stderr, "%" QUOTE "jd ", sort[i] );
 	} // for
-	printf( "\nmedian posn:%jd\n\n", posn );
-	#endif // DEBUG
+	fprintf( stderr, "\nmedian posn:%d\n\n", posn );
+	#endif // STATS
 
 	printf( "%" QUOTE "ju", med );						// median round
 	statistics( Threads, entries[posn], &avg, &std, &rstd ); // median thread
