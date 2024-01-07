@@ -9,7 +9,7 @@
 algorithms="LamportBakery Hehner Lycklama LycklamaBuhr TaubenfeldBWBakery HesselinkBWBakery HesselinkBWBakery2 MCS"
 time=10
 outdir=`hostname`
-Exec=`hostname`.out
+exec=`hostname`.out
 mkdir -p ${outdir}
 
 if [ ${#} -ne 0 ] ; then
@@ -27,7 +27,7 @@ runalgorithm() {
 	    outfile=${outdir}/${1}${2}${atomic}${contention}
 	    echo "${outfile}"
 	    gcc-10 ${cflag} ${atomic:+-D${atomic}} ${contention:+-D${contention}} -D${outdir} -DAlgorithm=${1} Harness.c -lpthread -lm -o ${outdir}.out
-	    ./run1 Time=${time} Exec="${Exec}" > "${outfile}"
+	    ./run1 time=${time} exec="${exec}" > "${outfile}"
 	    if [ -f core ] ; then
 		echo core generated for ${1}
 		break
@@ -41,4 +41,4 @@ for algorithm in ${algorithms} ; do
     runalgorithm ${algorithm}
 done
 
-rm -f "${Exec}"
+rm -f "${exec}"

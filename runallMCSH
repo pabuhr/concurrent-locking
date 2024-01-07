@@ -1,6 +1,6 @@
 #!/bin/sh -
 
-# Experiments for: MCS
+# Experiments for: MCSH
 
 # ARM -mno-outline-atomics => use LL/SC instead of calls to atomic routines: __aarch64_swp_acq_rel, __aarch64_cas8_acq_rel
 # ARM -march=armv8.2-a+lse => generate Arm LSE extension instructions SWAP and CAS
@@ -9,7 +9,7 @@
 algorithms="MCS MCSFAS MCSK42 MCSH CLH HemLock QSpinLock PthreadLock SpinLock"
 time=60
 outdir=`hostname`
-Exec=`hostname`.out
+exec=`hostname`.out
 mkdir -p ${outdir}
 
 if [ ${#} -ne 0 ] ; then
@@ -27,7 +27,7 @@ runalgorithm() {
 	outfile=${outdir}/${1}${atomic}
 	echo "${outfile}"
 	gcc-10 ${cflag} ${atomic:+-D${atomic}} -D${outdir} -DAlgorithm=${1} -DNCS_DELAY=20 Harness.c -lpthread -lm -o ${outdir}.out
-	./run1 Time=${time} Exec="${Exec}" > "${outfile}"
+	./run1 time=${time} exec="${exec}" > "${outfile}"
 	if [ -f core ] ; then
 	    echo core generated for ${1}
 	    break
@@ -40,4 +40,4 @@ for algorithm in ${algorithms} ; do
     runalgorithm ${algorithm}
 done
 
-rm -f "${Exec}"
+rm -f "${exec}"

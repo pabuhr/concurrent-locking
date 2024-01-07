@@ -1,6 +1,6 @@
 #!/bin/sh -
 
-# Experiments for: MCSHLi
+# Experiments for: Barrier
 
 # ARM -mno-outline-atomics => use LL/SC instead of calls to atomic routines: __aarch64_swp_acq_rel, __aarch64_cas8_acq_rel
 # ARM -march=armv8.2-a+lse => generate Arm LSE extension instructions SWAP and CAS
@@ -9,7 +9,7 @@
 algorithms="BarrierButterfly BarrierDice BarrierDissem BarrierDissemMCS BarrierFai BarrierRing BarrierRingAravind BarrierSenseRev BarrierSym BarrierTour BarrierTourMCS BarrierTreeA BarrierTreeB BarrierTreeC BarrierTreeCombMCS BarrierTreeD BarrierTreeMCS"
 time=10
 outdir=`hostname`
-Exec=`hostname`.out
+exec=`hostname`.out
 atomicinst=
 
 mkdir -p ${outdir}
@@ -37,7 +37,7 @@ runalgorithm() {
 	outfile=${outdir}/${1}${atomic}
 	echo "${outfile}"
 	${CC} ${cflag} ${atomic:+-D${atomic}} ${atomicinst:+-DATOMICINST=${atomicinst}} -D${outdir} -DAlgorithm=${1} -DNCS_DELAY=20 Harness.c -lpthread -lm -o ${outdir}.out
-	./run1 Time=${time} Exec="${Exec}" > "${outfile}"
+	./run1 time="${time}" exec="${exec}" > "${outfile}"
 	if [ -f core ] ; then
 	    echo core generated for ${1}
 	    break
@@ -50,4 +50,4 @@ for algorithm in ${algorithms} ; do
     runalgorithm ${algorithm}
 done
 
-rm -f "${Exec}"
+rm -f "${exec}"
