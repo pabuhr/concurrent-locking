@@ -53,7 +53,7 @@ typedef struct {
 	VTYPE flag CALIGN;
 } QSLock;
 
-inline void acquire( QSLock * lock ) {
+static inline void acquire( QSLock * lock ) {
 	MCS_node node;
 	mcs_lock( &lock->mcs_lock, &node );
 	await( lock->flag == 0 );
@@ -61,7 +61,7 @@ inline void acquire( QSLock * lock ) {
 	mcs_unlock( &lock->mcs_lock, &node );
 } // acquire
 	
-inline void release( QSLock * lock ) {
+static inline void release( QSLock * lock ) {
 	WO( Fence(); );
 	lock->flag = 0;
 } // release

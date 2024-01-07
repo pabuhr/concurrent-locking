@@ -16,7 +16,7 @@ typedef MCS_node * MCS_lock;
 #define exchange( var, val, order ) atomic_exchange_explicit( var, val, order )
 #define fetch_add( var, val ) atomic_fetch_add_explicit( var, val, memory_order_seq_cst )
 
-inline void mcs_lock( MCS_lock * lock, MCS_node * node ) {
+static inline void mcs_lock( MCS_lock * lock, MCS_node * node ) {
 	store( &node->next, NULL, memory_order_relaxed );
 #ifndef MCS_OPT1										// default option
 	store( &node->spin, true, memory_order_relaxed );	// mark as waiting
@@ -30,7 +30,7 @@ inline void mcs_lock( MCS_lock * lock, MCS_node * node ) {
 	while ( load( &node->spin, memory_order_acquire ) ) Pause(); // busy wait on my spin variable
 } // mcs_lock
 
-inline void mcs_unlock( MCS_lock * lock, MCS_node * node ) {
+static inline void mcs_unlock( MCS_lock * lock, MCS_node * node ) {
 #ifdef MCS_OPT2											// original, default option
 	if ( FASTPATH( load( &node->next, memory_order_relaxed ) == NULL ) ) { // no one waiting ?
 		MCS_node * old_tail = exchange( lock, NULL, memory_order_seq_cst );

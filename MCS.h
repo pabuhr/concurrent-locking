@@ -17,7 +17,7 @@ typedef MCS_node * MCS_lock;
 typedef _Atomic(MCS_node *) MCS_lock;
 #endif // ! ATOMIC
 
-inline void mcs_lock( MCS_lock * lock, MCS_node * node ) {
+static inline void mcs_lock( MCS_lock * lock, MCS_node * node ) {
 	node->next = NULL;
 
 #ifndef MCS_OPT1										// default option
@@ -45,7 +45,7 @@ inline void mcs_lock( MCS_lock * lock, MCS_node * node ) {
 	WO( Fence(); ); // 4
 } // mcs_lock
 
-inline void mcs_unlock( MCS_lock * lock, MCS_node * node ) {
+static inline void mcs_unlock( MCS_lock * lock, MCS_node * node ) {
 	WO( Fence(); ); // 5
 #ifdef MCS_OPT2											// original, default option
 	if ( FASTPATH( node->next == NULL ) ) {				// no one waiting ?
