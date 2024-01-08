@@ -1,0 +1,65 @@
+#!/bin/sh -
+
+# Experiments for: MCS
+
+# ARM -mno-outline-atomics => use LL/SC instead of calls to atomic routines: __aarch64_swp_acq_rel, __aarch64_cas8_acq_rel
+# ARM -march=armv8.2-a+lse => generate Arm LSE extension instructions SWAP and CAS
+# https://community.arm.com/developer/tools-software/tools/b/tools-software-ides-blog/posts/making-the-most-of-the-arm-architecture-in-gcc-10
+
+algorithms1=""
+algorithms2="MCS MCSFAS MCS3 MCS4 MCSK42"
+time=10
+outdir=`hostname`
+exec=`hostname`.out
+mkdir -p ${outdir}
+
+if [ ${#} -ne 0 ] ; then
+    algorithms="${@}"
+fi
+
+cflag="-Wall -Wextra -Werror -Wno-implicit-fallthrough -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN" #
+if [ ${outdir} = "algol" ] ; then
+    cflag=${cflag}" -mno-outline-atomics"	# use ARM LL/SC instructions for atomics
+fi
+
+runalgorithm1() {
+    for contention in "" "FAST" ; do
+	outfile=${outdir}/${1}${2}${optcnt}${atomic}${contention}
+	echo "${outfile}"
+	gcc-10 ${cflag} ${opts} ${atomic:+-D${atomic}} ${contention:+-D${contention}} -D${outdir} -DAlgorithm=${1} Harness.c -lpthread -lm -o ${outdir}.out
+	./run1 time=${time} exec="${exec}" > "${outfile}"
+	if [ -f core ] ; then
+	    echo core generated for ${1}
+	    break
+	fi
+    done
+}
+runalgorithm2() {
+    optcnt=0
+    for opts in "" "-DMCS_OPT1" "-DMCS_OPT2" "-DMCS_OPT1 -DMCS_OPT2" ; do
+	for atomic in "" "ATOMIC" ; do
+	    if [ \( "${1}" = "MCS3" -o "${1}" = "MCS4" \) -a "${atomic}" = "ATOMIC" ] ; then continue; fi
+	    for contention in "" "FAST" ; do
+		outfile=${outdir}/${1}${2}_${optcnt}${atomic}${contention}
+		echo "${outfile}"
+		gcc-10 ${cflag} ${opts} ${atomic:+-D${atomic}} ${contention:+-D${contention}} -D${outdir} -DAlgorithm=${1} Harness.c -lpthread -lm -o ${outdir}.out
+		./run1 time=${time} exec="${exec}" > "${outfile}"
+		if [ -f core ] ; then
+		    echo core generated for ${1}
+		    break
+		fi
+	    done
+	done
+	optcnt=`expr ${optcnt} + 1`
+    done
+}
+
+rm -rf core
+for algorithm in ${algorithms1} ; do
+    runalgorithm1 ${algorithm}
+done
+for algorithm in ${algorithms2} ; do
+    runalgorithm2 ${algorithm}
+done
+
+rm -f "${exec}"
