@@ -6,10 +6,11 @@
 # ARM -march=armv8.2-a+lse => generate Arm LSE extension instructions SWAP and CAS
 # https://community.arm.com/developer/tools-software/tools/b/tools-software-ides-blog/posts/making-the-most-of-the-arm-architecture-in-gcc-10
 
-algorithms="Burns2 BurnsLynchRetract LamportFast TaubenfeldBuhr SpinLock Hehner MCS"
-time=60
+algorithms="Burns2 BurnsLynch LamportFast TaubenfeldBuhr SpinLock Hehner MCS"
+time=20
+runs=15
 outdir=`hostname`
-Exec=`hostname`.out
+exec=`hostname`.out
 atomicinst=
 
 mkdir -p ${outdir}
@@ -18,7 +19,7 @@ if [ ${#} -ne 0 ] ; then
     algorithms="${@}"
 fi
 
-cflag="-Wall -Wextra -Werror -Wno-implicit-fallthrough -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN" #
+cflag="-Wall -Wextra -Werror -Wno-implicit-fallthrough -std=gnu11 -O3 -DSTATS -DNDEBUG -fno-reorder-functions -DPIN" #
 if [ ${outdir} = "algol" -o ${outdir} = "prolog" ] ; then
 #    atomicinst=-mno-outline-atomics	# use ARM LL/SC instructions for atomics
     atomicinst=-march=armv8.2-a+lse
@@ -35,9 +36,10 @@ runalgorithm() {
 #    for atomic in "" "ATOMIC" ; do
     for atomic in "" ; do
 	outfile=${outdir}/${1}${2:+${2}}${atomic}
+	stats="2> \${outfile}_stats"
 	echo "${outfile}"
 	${CC} ${cflag} ${atomic:+-D${atomic}} ${atomicinst:+-DATOMICINST=${atomicinst}} -D${outdir} -DAlgorithm=${1} ${2:+-D${2}} -DNCS_DELAY=20 Harness.c -lpthread -lm -o ${outdir}.out
-	./run1 Time=${time} Exec="${Exec}" > "${outfile}"
+	./run1 time="${time}" runs="${runs}" exec="${exec}" 1> "${outfile}" 2> ${outfile}_stats
 	if [ -f core ] ; then
 	    echo core generated for ${1}
 	    break
@@ -49,8 +51,8 @@ rm -rf core
 for algorithm in ${algorithms} ; do
     runalgorithm ${algorithm}
     if [ ${algorithm} != "Hehner" -a ${algorithm} != "MCS" ] ; then
-	runalgorithm ${algorithm} FCFS
+	runalgorithm ${algorithm} FCFS_WH24
     fi
 done
 
-rm -f "${Exec}"
+rm -f "${exec}"
