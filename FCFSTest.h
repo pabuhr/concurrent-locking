@@ -15,7 +15,7 @@
 	spin_lock( &FCFSLock ); \
 	for ( typeof(N) k = 0; k < N; k += 1 ) if ( FCFSTestPredec[id][k] ) { printf( "FCFS failure:%zu\n", id ); exit( EXIT_FAILURE ); } \
 	spin_unlock( &FCFSLock )
-#define FCFSTestExit()		\
+#define FCFSTestExit() \
 	spin_lock( &FCFSLock ); \
 	FCFSTestInside[id] = 0; \
 	for ( typeof(N) k = 0; k < N; k += 1 ) FCFSTestPredec[k][id] = 0; \
