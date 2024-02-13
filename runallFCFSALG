@@ -6,7 +6,7 @@
 # ARM -march=armv8.2-a+lse => generate Arm LSE extension instructions SWAP and CAS
 # https://community.arm.com/developer/tools-software/tools/b/tools-software-ides-blog/posts/making-the-most-of-the-arm-architecture-in-gcc-10
 
-algorithms="FCFS_AR_BL FCFS_AR_NA FCFS_LH FCFS_WH13_BL FCFS_WH15 FCFS_WH24"
+algorithms="FCFS_LH FCFS_AR_BL FCFS_AR_NA FCFS_WH13_BL FCFS_WH15 FCFS_WH24"
 time=20
 runs=15
 outdir=`hostname`
