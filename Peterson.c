@@ -41,6 +41,7 @@ static void * Worker( void * arg ) {
 
 			randomThreadChecksum += CS( id );
 
+			FCFSTestExit();
 			WO( Fence(); );								// prevent write floating up
 			Q[id] = 0;									// exit protocol
 			FCFSExitRel();

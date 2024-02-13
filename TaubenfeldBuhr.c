@@ -46,6 +46,7 @@ static void * Worker( void * arg ) {
 
 			randomThreadChecksum += CS( id );
 
+			FCFSTestExit();
 			WO( Fence(); );								// prevent write floating up
 			for ( int lv = mydepth - 1; lv >= 0; lv -= 1 ) { // exit protocol, retract reverse order
 				lid = id >> lv;

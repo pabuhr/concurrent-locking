@@ -30,6 +30,7 @@ static void * Worker( void * arg ) {
 
 			randomThreadChecksum += CS( id );
 
+			FCFSTestExit();
 			spin_unlock( &lock );
 			FCFSExitRel();
 

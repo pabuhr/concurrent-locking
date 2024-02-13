@@ -65,6 +65,7 @@ static void * Worker( void * arg ) {
 
 			randomThreadChecksum += CS( id );
 
+			FCFSTestExit();
 			WO( Fence(); );								// prevent write floating up
 			y = Bottom;									// exit protocol
 			WO( Fence(); );								// write order matters

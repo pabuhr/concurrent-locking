@@ -51,6 +51,7 @@ static void * Worker( void * arg ) {
 
 			randomThreadChecksum += CS( id );
 
+			FCFSTestExit();
 			Fence();									// force store before more loads
 			intents[id] = DontWantIn;					// exit protocol
 			FCFSExitRel();
