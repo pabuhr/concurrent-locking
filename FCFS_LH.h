@@ -35,11 +35,10 @@
 	Fence(); \
 	FCFSTestIntroMid(); \
 	for ( typeof(N) j = 0; j < N; j += 1 ) \
-		await( ! ( FCFSc[j] || ( FCFSv[j] && FCFS_S[j].atom == FCFSturn[j].atom ) ) ); \
+		await( ! ( FCFSc[j] || ( FCFSv[j] && FCFS_S[j].atom == FCFSturn[j].atom ) ) );
+#define FCFSExitAcq() \
 	FCFSTestIntroBot()
-#define FCFSExitAcq()
 #define FCFSExitRel() \
-	FCFSTestExit(); \
 	FCFSv[id] = false
 #define FCFSCtor() \
   	FCFSc = Allocator( sizeof(typeof(FCFSc[0])) * N ); \

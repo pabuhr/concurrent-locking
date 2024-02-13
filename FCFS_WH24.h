@@ -16,14 +16,12 @@
 	Fence(); \
 	for ( typeof(N) k = 0; k < N; k += 1 ) FCFScopy[k] = FCFSturn[k]; \
 	FCFSturn[id] = FCFSnx; \
-	Fence(); \
 	FCFSTestIntroMid(); \
 	for ( typeof(N) k = 0; k < N; k += 1 ) \
 		if ( odd( FCFScopy[k] ) ) \
-			await( FCFSturn[k] != FCFScopy[k] ); \
-	FCFSTestIntroBot();
+			await( FCFSturn[k] != FCFScopy[k] )
 #define FCFSExitAcq() \
-	FCFSTestExit(); \
+	FCFSTestIntroBot(); \
 	/* FCFSturn[id] = ((FCFSturn[id] + 1) % 6); */ \
 	/* FCFSturn[id] = (7 & (FCFSturn[id] + 1)); */ \
 	TYPE FCFStemp = FCFSturn[id]; \

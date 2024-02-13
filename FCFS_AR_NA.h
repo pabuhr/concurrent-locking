@@ -34,10 +34,9 @@
 	FCFSTestIntroMid(); \
 	for ( typeof(N) j = 0; j < N; j += 1 ) \
 		if ( FCFS_S[j].atom != 0 ) \
-			await( FCFS_S[j].atom != FCFS_T[j].atom ); \
-	FCFSTestIntroBot()
+			await( FCFS_S[j].atom != FCFS_T[j].atom )
 #define FCFSExitAcq() \
-	FCFSTestExit(); \
+	FCFSTestIntroBot(); \
 	FCFS_T[id].bits[FCFSb] = false; \
 	Fence(); \
 	for ( typeof(N) j = 0; j < N; j += 1 ) \

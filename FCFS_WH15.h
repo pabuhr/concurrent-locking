@@ -23,10 +23,9 @@
 	for ( typeof(Range) kk = 0; kk < Range; kk += 1 ) \
 		if ( FCFScopy[kk] ) { \
 			await( ! FCFSturn[kk] ); \
-		} \
-	FCFSTestIntroBot();
+		}
 #define FCFSExitAcq() \
-	FCFSTestExit(); \
+	FCFSTestIntroBot(); \
 	FCFSturn[2 * id + FCFSnx] = false; \
 	FCFSnx = ! FCFSnx; \
 	Fence(); \

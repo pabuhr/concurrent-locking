@@ -29,10 +29,9 @@
 		if ( FCFScopy[kk] != 0 ) { \
 			await( ! FCFSturn[kk] ); \
 			FCFScopy[kk] = false; \
-		} \
-	FCFSTestIntroBot()
+		}
 #define FCFSExitAcq() \
-	FCFSTestExit()
+	FCFSTestIntroBot()
 #define FCFSExitRel() \
 	FCFSturn[id * FCFS_R + FCFSnx] = false; \
 	FCFSnx = cycleUp( FCFSnx, FCFS_R )

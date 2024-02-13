@@ -24,10 +24,9 @@
 	FCFSTestIntroMid(); \
 	for ( typeof(N) j = 0; j < N; j += 1 ) \
 		if ( FCFS_S[j] != 0 ) \
-			await( FCFS_S[j] != FCFS_T[j] ); \
-	FCFSTestIntroBot()
+			await( FCFS_S[j] != FCFS_T[j] )
 #define FCFSExitAcq() \
-	FCFSTestExit(); \
+	FCFSTestIntroBot(); \
 	FCFS_T[id] = 0
 #define FCFSExitRel() \
 	if ( FCFS_t < 3 ) FCFS_t += 1; else FCFS_t = 1
