@@ -33,7 +33,7 @@
 #ifdef __ARM_ARCH
 #define WO( stmt ) stmt
 #else
-#define WO( stmt )
+#define WO( stmt ) do {} while (0)
 #endif
 
 #if __GNUC__ >= 7										// valid GNU compiler diagnostic ?
@@ -100,13 +100,13 @@ typedef volatile uint32_t VWHOLESIZE;
 	#if defined( LPAUSE ) || defined( MPAUSE )
 		#error Compilation options LPAUSE/MPAUSE are incompatible with ATOMIC.
 	#endif
-	#define Fence()
+	#define Fence() do {} while (0)
 #else
 	#if defined(__x86_64)
 		//#define Fence() __asm__ __volatile__ ( "mfence" )
-		#define Fence() __asm__ __volatile__ ( "lock; addq $0,(%%rsp);" ::: "cc" )
+		#define Fence() __asm__ __volatile__ ( "lock; addq $0,128(%%rsp);" ::: "cc" )
 	#elif defined(__i386)
-		#define Fence() __asm__ __volatile__ ( "lock; addl $0,(%%esp);" ::: "cc" )
+		#define Fence() __asm__ __volatile__ ( "lock; addl $0,128(%%esp);" ::: "cc" )
 	#elif defined(__ARM_ARCH)
 		#define Fence() __asm__ __volatile__ ( "DMB ISH" ::: )
 	#else
