@@ -31,6 +31,9 @@ static inline void mcs_lock( NMCS_lock * lock ) {
 		await( lock->flag );
 	} else {
 		prev->next = &mm;
+		// Possible correctness issue: the MCSH_node is allocated on the stack so escape analysis thinks the
+		// initialization cannot leak out before the fence, therefore the compiler might move all the initialization
+		// behind the fence (thereby making the fence ineffective). Jonas Oberhauser
 		await( ! mm.locked );
 	} // if
 
