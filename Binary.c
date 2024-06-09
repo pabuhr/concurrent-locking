@@ -121,7 +121,7 @@ static inline void binary_epilogue( TYPE c, volatile Token * t ) {
 	t->Q[c] = 0;
 	t->R = c;
 #else // PETERSONU & Peterson (default)
-	WO( Fence(); )										// force store before more loads
+	WO( Fence(); );										// force store before more loads
 	t->Q[c] = 0;
 #endif
 } // binary_epilogue

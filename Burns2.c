@@ -33,7 +33,7 @@ static void * Worker( void * arg ) {
 			FCFSEnter();
 		  L0: ;
 			flag[id] = true;							// entry protocol
-			WO( Fence(); )								// write order matters
+			WO( Fence(); );								// write order matters
 			turn = id;									// RACE
 			Fence();									// prevent reading turn below before intent is set above
 			if ( FASTPATH( turn != id ) ) {
@@ -54,7 +54,7 @@ static void * Worker( void * arg ) {
 					if ( SLOWPATH( j != id && flag[j] ) ) { goto L2; }
 				} // for
 			} // if
-			WO( Fence(); )
+			WO( Fence(); );
 			FCFSExitAcq();
 
 			randomThreadChecksum += CS( id );

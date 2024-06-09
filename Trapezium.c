@@ -151,7 +151,7 @@ static void * Worker( void * arg ) {
 				fp = &fastpaths[fa];					// optimization
 				if ( FASTPATH( fp->y == N ) ) {
 					fp->b[id] = true;
-					WO( Fence(); )						// force store before more loads
+					WO( Fence(); );						// force store before more loads
 					fp->x = id;
 					Fence();							// force store before more loads
 					if ( FASTPATH( fp->y == N ) ) {
@@ -168,7 +168,7 @@ static void * Worker( void * arg ) {
 						// If the loop consistently reads an outdated value of y (== id from assignment above), there is only
 						// the danger of starvation, and that is unlikely. Correctness only requires the value read after the
 						// loop is recent.
-						WO( Fence(); )
+						WO( Fence(); );
 						if ( FASTPATH( fp->y == id ) ) goto Fast;
 					} else {
 						fp->b[id] = false;
@@ -181,7 +181,7 @@ static void * Worker( void * arg ) {
 				fp = &fastpaths[fa];					// optimization
 				if ( SLOWPATH( fp->y != N ) ) continue;
 				fp->b[id] = true;						// entry protocol
-				WO( Fence(); )							// force store before more loads
+				WO( Fence(); );							// force store before more loads
 				fp->x = id;
 				Fence();								// force store before more loads
 				if ( SLOWPATH( fp->y != N ) ) {
@@ -201,7 +201,7 @@ static void * Worker( void * arg ) {
 					// If the loop consistently reads an outdated value of y (== id from assignment above), there is only
 					// the danger of starvation, and that is unlikely. Correctness only requires the value read after the
 					// loop is recent.
-					WO( Fence(); )						// read recent y
+					WO( Fence(); );						// read recent y
 					if ( SLOWPATH( fp->y != id ) ) continue;
 				} // if
 				goto Fast;
@@ -224,9 +224,9 @@ static void * Worker( void * arg ) {
 				binary_epilogue( i < fa, &fastpaths[i].B );
 			} // for
 
-			WO( Fence(); )								// prevent write floating up
+			WO( Fence(); );								// prevent write floating up
 			fp->y = N;
-			WO( Fence(); )								// write order matters
+			WO( Fence(); );								// write order matters
 			fp->b[id] = false;
 			goto Fini;
 

@@ -29,7 +29,7 @@ static void * Worker( void * arg ) {
 			FCFSEnter();
 			for ( TYPE rd = 1; rd < N; rd += 1 ) {		// entry protocol, round
 				Q[id] = rd;								// current round
-				WO( Fence(); )							// write order matters
+				WO( Fence(); );							// write order matters
 				turns[rd] = id;							// RACE
 				Fence();								// force store before more loads
 			  L: for ( typeof(N) k = 1; k <= N; k += 1 ) { // find loser

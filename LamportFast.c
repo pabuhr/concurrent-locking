@@ -34,7 +34,7 @@ static void * Worker( void * arg ) {
 			FCFSEnter();
 		  START: ;
 			b[id] = true;								// entry protocol
-			WO( Fence(); )								// write order matters
+			WO( Fence(); );								// write order matters
 			x = id;
 			Fence();									// write/read order matters
 			if ( FASTPATH( y != Bottom ) ) {
@@ -54,13 +54,13 @@ static void * Worker( void * arg ) {
 				// If the loop consistently reads an outdated value of y (== id from assignment above), there is only
 				// the danger of starvation, and that is unlikely. Correctness only requires the value read after the
 				// loop is recent.
-				WO( Fence(); )							// read recent y
+				WO( Fence(); );							// read recent y
 				if ( FASTPATH( y != id ) ) {
 					await( y == Bottom );				// optional
 					goto START;
 				} // if
 			} // if
-			WO( Fence(); )
+			WO( Fence(); );
 			FCFSExitAcq();
 
 			randomThreadChecksum += CS( id );

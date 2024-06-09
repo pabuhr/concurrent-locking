@@ -42,7 +42,7 @@ static void * Worker( void * arg ) {
 				lid >>= 1;								// advance local id for next tree level
 			} // for
 			FCFSExitAcq();
-			WO( Fence(); )
+			WO( Fence(); );
 
 			randomThreadChecksum += CS( id );
 

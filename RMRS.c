@@ -116,7 +116,7 @@ static void * Worker( void * arg ) {
 			*tEnter = false;
 			*tWait = false;
 			exits += 1 ;
-			WO( Fence(); )
+			WO( Fence(); );
 
 			randomThreadChecksum += CS( id );
 

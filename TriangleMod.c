@@ -88,7 +88,7 @@ static inline TYPE entryFast( TYPE id ) {
 #if 0
 	if ( FASTPATH( y == N ) ) {
 		b[id] = true;
-		WO( Fence(); )									// write order matters
+		WO( Fence(); );									// write order matters
 		x = id;
 		Fence();										// write/read order matters
 		if ( FASTPATH( y == N ) ) {
@@ -105,7 +105,7 @@ static inline TYPE entryFast( TYPE id ) {
 			// If the loop consistently reads an outdated value of y (== id from assignment above), there is only
 			// the danger of starvation, and that is unlikely. Correctness only requires the value read after the
 			// loop is recent.
-			WO( Fence(); )
+			WO( Fence(); );
 			if ( FASTPATH( y == id ) ) return true;
 		} else {
 			b[id] = false;
@@ -115,7 +115,7 @@ static inline TYPE entryFast( TYPE id ) {
 #else
 	if ( SLOWPATH( y != N ) ) return false;
 	b[id] = true;
-	WO( Fence(); )										// write order matters
+	WO( Fence(); );										// write order matters
 	x = id;
 	Fence();											// write/read order matters
 	if ( SLOWPATH( y != N ) ) {
@@ -138,7 +138,7 @@ static inline TYPE entryFast( TYPE id ) {
 				// If the loop consistently reads an outdated value of y (== id from assignment above), there is only
 				// the danger of starvation, and that is unlikely. Correctness only requires the value read after the
 				// loop is recent.
-		WO( Fence(); )									// read recent y
+		WO( Fence(); );									// read recent y
 		if ( SLOWPATH( y != id ) ) return false;
 		#endif // ALT
 	} // if
@@ -147,9 +147,9 @@ static inline TYPE entryFast( TYPE id ) {
 } // entryFast
 
 static inline void exitFast( TYPE id ) {
-	WO( Fence(); )										// prevent write floating up
+	WO( Fence(); );										// prevent write floating up
 	y = N;
-	WO( Fence(); )										// write order matters
+	WO( Fence(); );										// write order matters
 	b[id] = false;
 } // exitFast
 
