@@ -5,7 +5,7 @@ static TYPE PAD4 CALIGN __attribute__(( unused ));		// protect further false sha
 
 #ifndef FREQ
 #define FREQ 0xffff
-#endif // AMP
+#endif // FREQ
 
 enum { Frequency = FREQ };
 
