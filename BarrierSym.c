@@ -1,13 +1,13 @@
 typedef	VTYPE CALIGN * barrier;
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
-static barrier b CALIGN;
+static Barrier b CALIGN;
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 #define BARRIER_DECL
 #define BARRIER_CALL block( b, p );
 
-static inline void block( barrier tag, TYPE p ) {
+static inline void block( Barrier tag, TYPE p ) {
 	enum { R = 4 };
 
 	typeof(tag[0]) old = tag[p];
@@ -18,7 +18,6 @@ static inline void block( barrier tag, TYPE p ) {
 	} // for
 } // block
 
-//#define TESTING
 #include "BarrierWorker.c"
 
 void __attribute__((noinline)) ctor() {

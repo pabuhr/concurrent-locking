@@ -19,21 +19,23 @@ typedef struct CALIGN {
 
 typedef struct {
 	Tree_node * tree;
-} barrier;
+} Barrier;
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
-static barrier b CALIGN;
+static Barrier b CALIGN;
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 #define BARRIER_DECL TYPE sense = true
 #define BARRIER_CALL block( &b, p, &sense );
 
-static inline void block( barrier * b, TYPE p, TYPE * sense ) {
-	Tree_node * tree_node = &b->tree[p];				// optimization (compiler probably does it)
+static inline void block( Barrier * b, TYPE p, TYPE * sense ) {
+	Tree_node * tree_node = &b->tree[p];				// optimizations (compiler probably does it)
+	TYPE lsense = *sense;
 
 	await( ! tree_node->child_not_ready.all );			// await for all fan-in to be false
 	tree_node->child_not_ready.all = tree_node->has_child.all;
 	*tree_node->parent = false;
+	Fence();
 	// Only compiler fencing needed (volatile). Hardware fencing would only be necessary if the processor is able to
 	// hoist the entire await loop, which is unlikely. That is, any number of loads of parent_sense can occur in the
 	// loop before the store to parent occurs and some other thread breaks the loop.
@@ -41,16 +43,15 @@ static inline void block( barrier * b, TYPE p, TYPE * sense ) {
 
 	// if not root, wait until my parent signals wakeup
 	if ( p != 0 ) {
-		await( *sense == tree_node->parent_sense );		// sense: 1 read is enough => no volatile
+		await( lsense == tree_node->parent_sense );
 	} // if
 
 	// signal children in wakeup tree
-	*tree_node->children[0] = *sense;
-	*tree_node->children[1] = *sense;
-	*sense = ! *sense;
+	*tree_node->children[0] = lsense;
+	*tree_node->children[1] = lsense;
+	*sense = ! lsense;
 } // block
 
-#define TESTING
 #include "BarrierWorker.c"
 
 void __attribute__((noinline)) ctor() {
@@ -72,7 +73,7 @@ void __attribute__((noinline)) ctor() {
 
 		if ( 2 * i + 1 >= N ) b.tree[i].children[0] = (VBYTESIZE *)(&b.tree[i].dummy);
 		else b.tree[i].children[0] = &b.tree[2 * i + 1].parent_sense;
-	}
+	} // for
 	worker_ctor();
 } // ctor
 

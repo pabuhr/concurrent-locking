@@ -6,16 +6,16 @@ typedef	struct {
 	TYPE ** Opponent;									// table of tournament opponents
 	VTYPE Announcement[2];								// global announcement flags to hold threads until after tournament
 	VTYPE BarrierCount;									// which announcement is being used for current tournament
-} barrier;
+} Barrier;
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
-static barrier b CALIGN;
+static Barrier b CALIGN;
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 #define BARRIER_DECL
 #define BARRIER_CALL block( &b, p );
 
-static inline void block( barrier * b, TYPE p ) {
+static inline void block( Barrier * b, TYPE p ) {
 	TYPE power = 1, Clog2N = Clog2( N ), LocalBarrierCount;
 
 	LocalBarrierCount = b->BarrierCount;
@@ -25,6 +25,7 @@ static inline void block( barrier * b, TYPE p ) {
 		} // exit
 		if ( p > b->Opponent[p][instance] ) {			// loser
 			b->Answers[ b->Opponent[p][instance] ][instance] = true;
+			Fence();
 		} else if ( b->Opponent[p][instance] >= N ) {
 			// win by default if no opponent
 		} else {										// winner
@@ -34,19 +35,21 @@ static inline void block( barrier * b, TYPE p ) {
 			// (Opponent[p][instance]), since the loser's flag is never set.
 			await( b->Answers[p][instance] );
 			b->Answers[p][instance] = false;			// reinit
+			Fence();
 		} // if
 		power += power;
 	} // for
+
 	if ( p == 0 ) {										// process 0 is always the champion
 		b->BarrierCount = (b->BarrierCount + 1) % 2;
 		b->Announcement[b->BarrierCount] = false;		// reinit
 		b->Announcement[LocalBarrierCount] = true;		// all may proceed
+		Fence();
 	} else {											// not the champion
 		await( b->Announcement[LocalBarrierCount] );
 	} // if
 } // block
 
-//#define TESTING
 #include "BarrierWorker.c"
 
 void __attribute__((noinline)) ctor() {

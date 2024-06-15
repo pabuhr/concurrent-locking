@@ -8,25 +8,28 @@ struct flags {
 typedef struct {
 	TYPE exponent;
 	struct flags * allnodes;
-} barrier;
+} Barrier;
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
-static barrier b CALIGN;
+static Barrier b CALIGN;
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 #define BARRIER_DECL TYPE sense = true, parity = false;
 #define BARRIER_CALL block( &b, p, &sense, &parity );
 
-static inline void block( barrier * b, TYPE p, TYPE * sense, TYPE * parity ) { 
+static inline void block( Barrier * b, TYPE p, TYPE * sense, TYPE * parity ) { 
+	TYPE lsense = *sense, lparity = *parity;			// optimization (compiler probably does it)
+
 	for ( TYPE i = 0; i < b->exponent; i += 1 ) {
-		*b->allnodes[p].partner_flags[*parity][i] = *sense;
-		await( b->allnodes[p].my_flags[*parity][i] == *sense );
-	}
-	if ( *parity ) *sense = ! *sense;
-	*parity = ! *parity;
+		*b->allnodes[p].partner_flags[lparity][i] = lsense;
+		Fence();
+		await( b->allnodes[p].my_flags[lparity][i] == lsense );
+	} // for
+	if ( lparity ) *sense = ! lsense;
+	*parity = ! lparity;
+	Fence();
 }
 
-#define TESTING
 #include "BarrierWorker.c"
 
 void __attribute__((noinline)) ctor() {

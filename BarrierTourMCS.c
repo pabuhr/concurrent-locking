@@ -11,16 +11,17 @@ typedef struct CALIGN {
 
 typedef	struct {
 	rount_t ** rounds;
-} barrier;
+} Barrier;
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
-static barrier b CALIGN;
+static Barrier b CALIGN;
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 #define BARRIER_DECL TYPE sense = true;
 #define BARRIER_CALL block( &b, p, &sense );
 
-static inline void block( barrier * b, TYPE p, TYPE * sense ) {
+static inline void block( Barrier * b, TYPE p, TYPE * sense ) {
+	TYPE lsense = *sense;								// optimization (compiler probably does it)
 	TYPE round = 1;
 
 	// Special-case for N == 1 since it is assigned the "bye" role, which leads to an infinite loop in the first loop if
@@ -30,17 +31,19 @@ static inline void block( barrier * b, TYPE p, TYPE * sense ) {
 	for ( ;; ) {										// arrival
 		switch ( b->rounds[p][round].role ) {
 		  case loser:
-			*b->rounds[p][round].opponent = *sense;
-			await( b->rounds[p][round].flag == *sense ); // wait for champion to signal wakeup tree
+			*b->rounds[p][round].opponent = lsense;
+			Fence();
+			await( b->rounds[p][round].flag == lsense ); // wait for champion to signal wakeup tree
 			goto Loop1;
 		  case winner:
-			await( b->rounds[p][round].flag == *sense );
+			await( b->rounds[p][round].flag == lsense );
 			break; // go to next round of tournament
 		  case bye:										// do nothing
 			break; // go to next round of tournament
 		  case champion:
-			await( b->rounds[p][round].flag == *sense );
-			*b->rounds[p][round].opponent = *sense;
+			await( b->rounds[p][round].flag == lsense );
+			*b->rounds[p][round].opponent = lsense;
+			Fence();
 			goto Loop1;
 		  case dropout:									// impossible
 		  default:
@@ -56,7 +59,8 @@ static inline void block( barrier * b, TYPE p, TYPE * sense ) {
 		  case loser:									// impossible
 			abort();
 		  case winner:
-			*b->rounds[p][round].opponent = *sense;
+			*b->rounds[p][round].opponent = lsense;
+			Fence();
 			break;
 		  case bye:										// do nothing
 			break;
@@ -69,11 +73,9 @@ static inline void block( barrier * b, TYPE p, TYPE * sense ) {
 		} // switch
 	} // for
   Loop2: ;
-
-	*sense = ! *sense;
+	*sense = ! lsense;
 } // block
 
-//#define TESTING
 #include "BarrierWorker.c"
 
 void __attribute__((noinline)) ctor() {
@@ -82,15 +84,16 @@ void __attribute__((noinline)) ctor() {
 	b.rounds = Allocator( sizeof(typeof(b.rounds[0])) * N ); // rows
 
 	// must initialize cols first so that opponent can be set properly
-	for ( typeof(N) r = 0; r < N; r += 1 )
+	for ( typeof(N) r = 0; r < N; r += 1 ) {
 		b.rounds[r] = Allocator( sizeof(typeof(b.rounds[0][0])) * cols ); // cols
+	} // for
 
 	TYPE pow2 = 1, pow2m1 = 0;	
 	for ( typeof(N) c = 0; c < cols; c += 1 ) {
 		for ( typeof(N) r = 0; r < N; r += 1 ) {
 			b.rounds[r][c].flag = false;
 
-			if        ( c > 0 && r % pow2 == 0 && r + pow2m1 < N && pow2 < N ) {
+			if ( c > 0 && r % pow2 == 0 && r + pow2m1 < N && pow2 < N ) {
 				b.rounds[r][c].role = winner;
 				b.rounds[r][c].opponent = &b.rounds[r + pow2m1][c].flag;
 			} else if ( c > 0 && r % pow2 == 0 && r + pow2m1 >= N ) {
@@ -105,7 +108,7 @@ void __attribute__((noinline)) ctor() {
 				b.rounds[r][c].role = dropout;
 			} else {
 				// some matrix elements uninitialized
-			}
+			} // if
 		} // for
 		pow2m1 = pow2;
 		pow2 += pow2;

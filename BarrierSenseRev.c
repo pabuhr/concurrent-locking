@@ -8,16 +8,16 @@ typedef struct {
 	VTYPE CALIGN flag;
 	TYPE CALIGN count;
 	pthread_mutex_t lock;
-} barrier;
+} Barrier;
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
-static barrier b CALIGN = { .flag = 0, .count = 0, .lock = PTHREAD_MUTEX_INITIALIZER };
+static Barrier b CALIGN = { .flag = 0, .count = 0, .lock = PTHREAD_MUTEX_INITIALIZER };
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 #define BARRIER_DECL
 #define BARRIER_CALL block( &b );
 
-static inline void block( barrier * b ) {
+static inline void block( Barrier * b ) {
 	TYPE negflag = ! b->flag;
 	pthread_mutex_lock( &b->lock );
 	b->count += 1;
@@ -25,14 +25,12 @@ static inline void block( barrier * b ) {
 		pthread_mutex_unlock( &b->lock );
 		await( b->flag == negflag );
 	} else {
-		pthread_mutex_unlock( &b->lock );
 		b->count = 0;
-		asm( "" : : : "memory" );						// prevent compiler code movement
+		pthread_mutex_unlock( &b->lock );
 		b->flag = negflag;
 	} // if
 } // block
 
-#define TESTING
 #include "BarrierWorker.c"
 
 void __attribute__((noinline)) ctor() {

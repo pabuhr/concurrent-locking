@@ -4,41 +4,41 @@
 typedef struct {
 	TYPE exponent, ** precomputed_ids;
 	VTYPE ** shared_counters;
-} barrier;
+} Barrier;
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
-static barrier b CALIGN;
+static Barrier b CALIGN;
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 #define BARRIER_DECL
 #define BARRIER_CALL block( &b, p );
 
-static inline void handoff_start( barrier * b, TYPE their_idx, TYPE round ) {
+static inline void handoff_start( Barrier * b, TYPE their_idx, TYPE round ) {
 	await( ! b->shared_counters[round][their_idx] );
 	b->shared_counters[round][their_idx] = true;
 }
 
-static inline void handoff_end( barrier * b, TYPE p, TYPE round ) {
+static inline void handoff_end( Barrier * b, TYPE p, TYPE round ) {
 	await( b->shared_counters[round][p] );
 	b->shared_counters[round][p] = false;
 }
 
 // synchronizes with one other thread, identified by their_idx
-static inline void handoff( barrier * b, TYPE p, TYPE their_idx, TYPE round ) {
+static inline void handoff( Barrier * b, TYPE p, TYPE their_idx, TYPE round ) {
 	handoff_start( b, their_idx, round );
+	Fence();
 	handoff_end( b, p, round );   
 }
 
-static inline void block( barrier * b, TYPE p ) {
+static inline void block( Barrier * b, TYPE p ) {
 	TYPE curr_count = 0;
 	 
 	while ( curr_count < b->exponent ) {
 		handoff( b, p, b->precomputed_ids[curr_count][p], curr_count );
 		curr_count += 1;
-	}
+	} // while
 }
 
-#define TESTING
 #include "BarrierWorker.c"
 
 void __attribute__((noinline)) ctor() {

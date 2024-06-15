@@ -5,28 +5,29 @@ typedef struct {
 	VTYPE ** shared_counters;
 	TYPE next_power, exponent;
 	bool is_power_of_two;
-} barrier;
+} Barrier;
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
-static barrier b CALIGN;
+static Barrier b CALIGN;
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 #define BARRIER_DECL
 #define BARRIER_CALL block( &b, p );
 
-static inline void handoff_start( barrier * b, TYPE p, TYPE round ) {
+static inline void handoff_start( Barrier * b, TYPE p, TYPE round ) {
 	await( ! b->shared_counters[round][p] );
 	b->shared_counters[round][p] = true;
 } // handoff_start
 
-static inline void handoff_end( barrier * b, TYPE their_idx, TYPE round ) {
+static inline void handoff_end( Barrier * b, TYPE their_idx, TYPE round ) {
 	await( b->shared_counters[round][their_idx] );
 	b->shared_counters[round][their_idx] = false;
 } // handoff_end
 
 // synchronizes with one other thread, identified by their_idx
-static inline void handoff( barrier * b, TYPE p, TYPE their_idx, TYPE round ) {
+static inline void handoff( Barrier * b, TYPE p, TYPE their_idx, TYPE round ) {
 	handoff_start( b, p, round );
+	Fence();
 	handoff_end( b, their_idx, round );   
 } // handoff
 
@@ -35,7 +36,7 @@ static inline TYPE get_partner( TYPE p, TYPE curr_step ) {
 	return p % (2 * curr_step) >= curr_step ? p - curr_step : p + curr_step;
 } // get_partner
 
-static inline void block( barrier * b, TYPE p ) {
+static inline void block( Barrier * b, TYPE p ) {
 	// Gets the mirrored idx for use when N not a power of 2 used for masquerading as a missing task
 	TYPE mirror_idx = b->next_power - p - 1;
 	bool should_masquerade = ! b->is_power_of_two && mirror_idx > N - 1; 
@@ -51,7 +52,6 @@ static inline void block( barrier * b, TYPE p ) {
 	} // for
 }
 
-#define TESTING
 #include "BarrierWorker.c"
 
 void __attribute__((noinline)) ctor() {

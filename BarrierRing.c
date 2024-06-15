@@ -1,21 +1,22 @@
-typedef	VTYPE CALIGN * barrier;
+typedef	VTYPE CALIGN * Barrier;
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
-static barrier b CALIGN;
+static Barrier b CALIGN;
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 #define BARRIER_DECL
 #define BARRIER_CALL block( b, p );
 
-static inline void block( barrier tog, TYPE p ) {
+static inline void block( Barrier tog, TYPE p ) {
 	TYPE state = p > 0;									// optimization
 	await( tog[p] == state );
 	tog[ cycleUp( p, N ) ] = true;
+	Fence();
 	await( tog[p] != state );
 	tog[ cycleUp( p, N ) ] = false;
+	Fence();
 } // block
 
-//#define TESTING
 #include "BarrierWorker.c"
 
 void __attribute__((noinline)) ctor() {
