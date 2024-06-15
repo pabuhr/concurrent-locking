@@ -95,7 +95,6 @@ static inline void block( barrier * b ) {
 	} // if
 } // block
 
-//#define TESTING
 #include "BarrierWorker.c"
 
 void __attribute__((noinline)) ctor() {
