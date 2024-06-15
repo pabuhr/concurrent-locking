@@ -4,6 +4,7 @@
 #define FCFSLocal() int __attribute__(( unused )) FCFSLocal
 #define FCFSEnter() do {} while(0)
 #define FCFSExitAcq() do {} while(0)
+#define FCFSTestExit() do {} while(0)
 #define FCFSExitRel() do {} while(0)
 #define FCFSCtor() do {} while(0)
 #define FCFSDtor() do {} while(0)
