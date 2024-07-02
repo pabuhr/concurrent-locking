@@ -6,7 +6,6 @@ static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sha
 static VTYPE ** x CALIGN;
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
-#define min( x, y ) ((x) < (y) ? (x) : (y))
 #define logx( N, b ) (log(N) / log(b))
 
 static void * Worker( void * arg ) {
@@ -43,7 +42,7 @@ static void * Worker( void * arg ) {
 						goto yy;
 					} // if
 				} // for
-				for ( i = l + 1; i < min((k + 1) * Degree, len); i += 1 )
+				for ( i = l + 1; i < MIN((k + 1) * Degree, len); i += 1 )
 					while ( x[j][i] ) Pause();
 				l = l / Degree;
 				k = k / Degree;

@@ -42,7 +42,7 @@ static void * Worker( void * arg ) {
 				// into local variable read "v" preventing multiple reads.
 				if ( thr != id ) {
 					v = pair[thr];
-					lev = max( lev, fn( v, mcol ) );
+					lev = MAX( lev, fn( v, mcol ) );
 				} // if
 			} // for
 			*mypair = 2 * lev + mcol;

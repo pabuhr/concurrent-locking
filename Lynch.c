@@ -6,8 +6,6 @@ static VTYPE * intents CALIGN, * turns CALIGN;
 static TYPE depth CALIGN, width CALIGN, mask CALIGN;
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
-static inline TYPE min( TYPE a, TYPE b ) { return a < b ? a : b; }
-
 static void * Worker( void * arg ) {
 	TYPE id = (size_t)arg;
 	uint64_t entry;
@@ -34,7 +32,7 @@ static void * Worker( void * arg ) {
 				turns[comp] = role;						// RACE
 				Fence();								// force store before more loads
 				low = ((lid) ^ 1) << km1;				// lower competition
-				high = min( low | mask >> (depth - km1), N - 1 ); // higher competition
+				high = MIN( low | mask >> (depth - km1), N - 1 ); // higher competition
 				for ( TYPE i = low; i <= high; i += 1 )	// busy wait
 					while ( intents[i] >= k && turns[comp] == role ) Pause();
 			} // for

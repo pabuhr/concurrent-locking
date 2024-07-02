@@ -16,7 +16,6 @@ typedef union {
 #define R(s) ((s).state)
 #define EQ(a, b) ((a).state == (b).state)
 static inline int bit( int i, int k ) { return (i & (1 << (k - 1))) != 0; }
-static inline int min( int a, int b ) { return a < b ? a : b; }
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
 static int depth CALIGN, mask CALIGN;
@@ -25,7 +24,7 @@ static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sha
 
 WHOLESIZE QMAX( TYPE id, unsigned int k ) {
 	int low = ((id >> (k - 1)) ^ 1) << (k - 1);
-	int high = min( low | mask >> (depth - (k - 1)), N - 1 );
+	int high = MIN( low | mask >> (depth - (k - 1)), N - 1 );
 	WO( Fence(); );
 	Tuple opp;
 	for ( int i = low; i <= high; i += 1 ) {
