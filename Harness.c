@@ -10,6 +10,11 @@
 
 #ifndef __cplusplus
 #define _GNU_SOURCE										// See feature_test_macros(7)
+#define TYPEOF( T ) typeof( T )
+#else
+#include <atomic>
+#define _Atomic( T ) std::atomic<T>
+#define TYPEOF( T ) decltype( +T )						// silly magic with the '+'
 #endif // __cplusplus
 
 #include <stdio.h>
@@ -56,8 +61,8 @@
 	#define SLOWPATH(x) __builtin_expect(!!(x), 0)
 #endif // FASTPATH
 
-#define max( x, y ) (x > y ? x : y)
-#define min( x, y ) (x < y ? x : y)
+#define MIN( x, y ) (x < y ? x : y)
+#define MAX( x, y ) (x > y ? x : y)
 
 #define xstr(s) str(s)
 #define str(s) #s
@@ -137,8 +142,8 @@ typedef volatile uint32_t VWHOLESIZE;
 	inline void MWait( int timo __attribute__(( unused )) ) { // newer mwait takes an argument
 		__asm__ __volatile__ ( "xorq %%rcx,%%rcx; xorq %%rax,%%rax; mwaitx; " ::: "rax", "rcx" );
 	}
-	#define MPause( E, C ) { while ( (typeof(E))MonitorLD( (volatile TYPE *)(&(E)) ) C ) { MWait( 0 ); } }
-	#define MPauseS( S, E, C ) { while ( ( S (typeof(E))MonitorLD( (volatile TYPE *)(&(E)) ) ) C ) { MWait( 0 ); } }
+	#define MPause( E, C ) { while ( (TYPEOF(E))MonitorLD( (volatile TYPE *)(&(E)) ) C ) { MWait( 0 ); } }
+	#define MPauseS( S, E, C ) { while ( ( S (TYPEOF(E))MonitorLD( (volatile TYPE *)(&(E)) ) ) C ) { MWait( 0 ); } }
 	#define Pause() __asm__ __volatile__ ( "pause" ::: )
 #else
 	#define Pause() __asm__ __volatile__ ( "pause" ::: )
@@ -158,8 +163,8 @@ typedef volatile uint32_t VWHOLESIZE;
 
 	#define sevl() __asm__ __volatile__ ( "sevl" )
 	// Polymorphic on operand using type erasure => use uintptr_t so both values and pointers work.
-	#define MPause( E, C ) { sevl(); while ( (typeof(E))MonitorLD( (volatile TYPE *)(&(E)) ) C ) {} }
-	#define MPauseS( S, E, C ) { sevl(); while ( ( S (typeof(E))MonitorLD( (volatile TYPE *)(&(E)) ) ) C ) {} }
+	#define MPause( E, C ) { sevl(); while ( (TYPEOF(E))MonitorLD( (volatile TYPE *)(&(E)) ) C ) {} }
+	#define MPauseS( S, E, C ) { sevl(); while ( ( S (TYPEOF(E))MonitorLD( (volatile TYPE *)(&(E)) ) ) C ) {} }
 	#define Pause() __asm__ __volatile__ ( "YIELD" ::: )
 #else
 	#define Pause() __asm__ __volatile__ ( "YIELD" ::: )
@@ -171,21 +176,25 @@ typedef volatile uint32_t VWHOLESIZE;
 
 //------------------------------------------------------------------------------
 
-#define Clr( lock ) __atomic_clear( lock, __ATOMIC_RELEASE )
-#define Clrm( lock, memorder ) __atomic_clear( lock, memorder )
+#define Clr( lock ) __atomic_clear( (lock), __ATOMIC_RELEASE )
+#define Clrm( lock, memorder ) __atomic_clear( (lock), memorder )
 #define Tas( lock ) __atomic_test_and_set( (lock), __ATOMIC_ACQUIRE )
 #define Tasm( lock, memorder ) __atomic_test_and_set( (lock), memorder )
-#define Cas( change, comp, assn ) ({typeof(comp) __temp = (comp); __atomic_compare_exchange_n( (change), &(__temp), (assn), false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST ); })
-#define Casm( change, comp, assn, smemorder, fmemorder ) ({typeof(comp) * __temp = &(comp); __atomic_compare_exchange_n( (change), &(__temp), (assn), false, smemorder, fmemorder ); })
-#define Casw( change, comp, assn ) ({typeof(comp) __temp = (comp); __atomic_compare_exchange_n( (change), &(__temp), (assn), true, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST ); })
-#define Caswm( change, comp, assn, smemorder, fmemorder ) ({typeof(comp) __temp = (comp); __atomic_compare_exchange_n( (change), &(__temp), (assn), true, smemorder, smemorder ); })
+#define Cas( change, comp, assn ) ({TYPEOF(comp) __temp = (comp); __atomic_compare_exchange_n( (change), &(__temp), (assn), false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST ); })
+#define Casm( change, comp, assn, smemorder, fmemorder ) ({TYPEOF(comp) * __temp = &(comp); __atomic_compare_exchange_n( (change), &(__temp), (assn), false, smemorder, fmemorder ); })
+#define Casw( change, comp, assn ) ({TYPEOF(comp) __temp = (comp); __atomic_compare_exchange_n( (change), &(__temp), (assn), true, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST ); })
+#define Caswm( change, comp, assn, smemorder, fmemorder ) ({TYPEOF(comp) __temp = (comp); __atomic_compare_exchange_n( (change), &(__temp), (assn), true, smemorder, smemorder ); })
 #define Casv( change, comp, assn ) __atomic_compare_exchange_n( (change), (comp), (assn), false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST )
 #define Casvm( change, comp, assn, smemorder, fmemorder ) __atomic_compare_exchange_n( (change), (comp), (assn), false, smemorder, fmemorder )
 #define Casvw( change, comp, assn ) __atomic_compare_exchange_n( (change), (comp), (assn), true, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST )
 #define Casvwm( change, comp, assn, smemorder, fmemorder ) __atomic_compare_exchange_n( (change), (comp), (assn), true, smemorder, fmemorder )
 #define Fas( change, assn ) __atomic_exchange_n( (change), (assn), __ATOMIC_SEQ_CST )
 #define Fasm( change, assn, memorder ) __atomic_exchange_n( (change), (assn), memorder )
+#ifndef __cplusplus
 #define Fai( change, Inc ) __atomic_fetch_add( (change), (Inc), __ATOMIC_SEQ_CST )
+#else
+#define Fai( change, Inc ) change.fetch_add( Inc )
+#endif // __cplusplus
 #define Faim( change, Inc, memorder ) __atomic_fetch_add( (change), (Inc), memorder )
 
 #define await( E ) while ( ! (E) ) Pause()
@@ -542,6 +551,18 @@ void affinity( pthread_t pthreadid, unsigned int tid ) {
 	#if defined( HYPERAFF )
 	int cpu = OFFSETSOCK * CORES + (tid / 2) + ((tid % 2 == 0) ? 0 : CORES * SOCKETS );
 	#endif // HYPERAFF
+#elif defined( java )
+	#if ! defined( HYPERAFF ) && ! defined( LINEARAFF )		// default affinity
+	#define HYPERAFF
+	#endif // HYPERAFF
+
+	enum { OFFSETSOCK = 0 /* 0 origin */, SOCKETS = 2, CORES = 32, HYPER = 1 /* wrap on socket */ };
+	#if defined( LINEARAFF )
+	int cpu = tid + ((tid < CORES) ? OFFSETSOCK * CORES : HYPER < 2 ? OFFSETSOCK * CORES : CORES * SOCKETS);
+	#endif // LINEARAFF
+	#if defined( HYPERAFF )
+	int cpu = OFFSETSOCK * CORES + (tid / 2) + ((tid % 2 == 0) ? 0 : CORES * SOCKETS );
+	#endif // HYPERAFF
 #else
 #if defined( HYPERAFF )
 	#error HYPERAFF unsupported for this architecture.
@@ -617,7 +638,7 @@ static int compare( const void * p1, const void * p2 ) {
 
 //------------------------------------------------------------------------------
 
-static void statistics( size_t N, uint64_t values[N], double * avg, double * std, double * rstd ) {
+static void statistics( size_t N, uint64_t values[], double * avg, double * std, double * rstd ) {
 	double sum = 0.;
 	for ( size_t r = 0; r < N; r += 1 ) {
 		sum += values[r];
@@ -753,23 +774,23 @@ int main( int argc, char * argv[] ) {
 	assert( N <= MaxStartPoints );
 	Threads = 1;										// fast test, Threads=1, N=1..32
 	NoStartPoints = MaxStartPoints / N * N;				// floor( MaxStartPoints / N )
-	Startpoints = Allocator( sizeof(typeof(Startpoints[0])) * NoStartPoints );
+	Startpoints = Allocator( sizeof(TYPEOF(Startpoints[0])) * NoStartPoints );
 	randPoints( Startpoints, NoStartPoints, N );
 	#else
 	Threads = N;										// allow testing of T < N
 	#endif // FAST
 
-	entries = (typeof(entries[0]) *)malloc( sizeof(typeof(entries[0])) * RUNS );
+	entries = (TYPEOF(entries[0]) *)malloc( sizeof(TYPEOF(entries[0])) * RUNS );
 	#ifdef CNT
-	counters = (typeof(counters[0]) *)malloc( sizeof(typeof(counters[0])) * RUNS );
+	counters = (TYPEOF(counters[0]) *)malloc( sizeof(TYPEOF(counters[0])) * RUNS );
 	#endif // CNT
-	for ( typeof(RUNS) r = 0; r < RUNS; r += 1 ) {
-		entries[r] = (typeof(entries[0][0]) *)Allocator( sizeof(typeof(entries[0][0])) * Threads );
+	for ( TYPEOF(RUNS) r = 0; r < RUNS; r += 1 ) {
+		entries[r] = (TYPEOF(entries[0][0]) *)Allocator( sizeof(TYPEOF(entries[0][0])) * Threads );
 #ifdef CNT
 #ifdef FAST
-		counters[r] = (typeof(counters[0][0]) *)Allocator( sizeof(typeof(counters[0][0])) * N );
+		counters[r] = (TYPEOF(counters[0][0]) *)Allocator( sizeof(TYPEOF(counters[0][0])) * N );
 #else
-		counters[r] = (typeof(counters[0][0]) *)Allocator( sizeof(typeof(counters[0][0])) * Threads );
+		counters[r] = (TYPEOF(counters[0][0]) *)Allocator( sizeof(TYPEOF(counters[0][0])) * Threads );
 #endif // FAST
 #endif // CNT
 	} // for
@@ -778,7 +799,7 @@ int main( int argc, char * argv[] ) {
 //#ifdef FAST
 	// For FAST experiments, there is only thread but it changes its thread id to visit all the start points. Therefore,
 	// all the counters for each id must be initialized and summed at the end.
-	for ( typeof(RUNS) r = 0; r < RUNS; r += 1 ) {
+	for ( TYPEOF(RUNS) r = 0; r < RUNS; r += 1 ) {
 		for ( size_t id = 0; id < N; id += 1 ) {
 			for ( size_t i = 0; i < CNT + 1; i += 1 ) { // reset for each run
 				counters[r][id].cnts[i] = 0;
@@ -855,7 +876,7 @@ int main( int argc, char * argv[] ) {
 	#ifdef STATS
 	fprintf( stderr, "\nthreads:\n" );
 	#endif // STATS
-	for ( typeof(RUNS) r = 0; r < RUNS; r += 1 ) {
+	for ( TYPEOF(RUNS) r = 0; r < RUNS; r += 1 ) {
 		#ifdef STATS
 		for ( size_t tid = 0; tid < Threads; tid += 1 ) {
 			fprintf( stderr, "%" QUOTE "ju ", entries[r][tid] );
@@ -872,7 +893,7 @@ int main( int argc, char * argv[] ) {
 	#ifdef STATS
 	fprintf( stderr, "\nruns:\n" );
 	for ( size_t tid = 0; tid < Threads; tid += 1 ) {
-		for ( typeof(RUNS) r = 0; r < RUNS; r += 1 ) {
+		for ( TYPEOF(RUNS) r = 0; r < RUNS; r += 1 ) {
 			totalCols[r] = entries[r][tid];				// must copy, row major order
 			fprintf( stderr, "%" QUOTE "ju ", entries[r][tid] );
 		} // for
@@ -883,7 +904,7 @@ int main( int argc, char * argv[] ) {
 
 	uint64_t sort[RUNS];
 
-	for ( typeof(RUNS) r = 0; r < RUNS; r += 1 ) {
+	for ( TYPEOF(RUNS) r = 0; r < RUNS; r += 1 ) {
 		totalCols[r] = 0;
 		for ( size_t tid = 0; tid < Threads; tid += 1 ) {
 			totalCols[r] += entries[r][tid];
@@ -894,18 +915,18 @@ int main( int argc, char * argv[] ) {
 	const double percent = 10.0;
 	if ( rstd > percent ) printf( "Warning relative standard deviation %.1f%% greater than %.0f%% over %d runs.\n", rstd, percent, RUNS );
 
-	qsort( sort, RUNS, sizeof(typeof(sort[0])), compare );
+	qsort( sort, RUNS, sizeof(TYPEOF(sort[0])), compare );
 	uint64_t med = median( sort );
-	typeof(RUNS) posn;									// run with median result
+	TYPEOF(RUNS) posn;									// run with median result
 	for ( posn = 0; posn < RUNS && totalCols[posn] != med; posn += 1 ); // assumes RUNS is odd
 
 	#ifdef STATS
 	fprintf( stderr, "\ntotals: " );
-	for ( typeof(RUNS) i = 0; i < RUNS; i += 1 ) {		// print values
+	for ( TYPEOF(RUNS) i = 0; i < RUNS; i += 1 ) {		// print values
 		fprintf( stderr, "%" QUOTE "ju ", totalCols[i] );
 	} // for
 	fprintf( stderr, "\nsorted: " );
-	for ( typeof(RUNS) i = 0; i < RUNS; i += 1 ) {		// print values
+	for ( TYPEOF(RUNS) i = 0; i < RUNS; i += 1 ) {		// print values
 		fprintf( stderr, "%" QUOTE "jd ", sort[i] );
 	} // for
 	fprintf( stderr, "\nmedian posn:%d\n\n", posn );
