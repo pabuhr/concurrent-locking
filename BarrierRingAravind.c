@@ -2,7 +2,7 @@
 // International Parallel and Distributed Processing Symposium Workshops (IPDPSW), Vancouver, BC, Canada, 2018,
 // pp. 773-782, Algorithm 1
 
-typedef	VTYPE CALIGN * Barrier;
+typedef VTYPE CALIGN * Barrier;
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
 static Barrier b CALIGN;

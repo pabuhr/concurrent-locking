@@ -1,4 +1,4 @@
-typedef	VTYPE CALIGN * barrier;
+typedef VTYPE CALIGN * Barrier;
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
 static Barrier b CALIGN;
