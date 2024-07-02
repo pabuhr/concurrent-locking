@@ -23,6 +23,7 @@
 
 T=1
 N=32		# T to N threads tested
+inc=1		# increment loop counter
 time=10 	# runs x time = length of experiment
 runs=5		# experiment repetitions
 degree=""	# tree degree (d-ary) for Zhang (optional)
@@ -30,7 +31,7 @@ exec=a.out	# name of executable file
 
 while [ ${#} -gt 0 ] ; do			# process command-line arguments
     case "${1}" in
-	"T="* | "N="* | "time="* | "runs="* | "degree="* | "exec="* )
+	"T="* | "N="* | "inc="* | "time="* | "runs="* | "degree="* | "exec="* )
 	    eval ${1}
 	    ;;
 	* )
@@ -45,10 +46,11 @@ rm -rf core
 
 while [ ${T} -le ${N} ] ; do
 #    perf stat -B -e L1-dcache-load-misses -e L1-dcache-prefetch-misses -e branch-load-misses ./a.out ${T} ${time} ${degree}	# Zhang d-ary
+#    /usr/bin/time -f "%Uu %Ss %Er %Mkb" ./${exec} ${T} ${time} ${runs} ${degree}	# Zhang d-ary
     ./${exec} ${T} ${time} ${runs} ${degree}	# Zhang d-ary
     if [ -f core ] ; then
 	echo core generated for ${T} ${Time}
 	break
     fi
-    T=`expr ${T} + 1`
+    T=`expr ${T} + ${inc}`
 done
