@@ -57,10 +57,18 @@ static void * Worker( void * arg ) {
 
 		cnt[p] = 0;
 
+		#ifndef __cplusplus
 		Fai( &Arrived, 1 );
+		#else
+		Fai( Arrived, 1 );
+		#endif // __cplusplus
 		while ( stop ) Pause();
 		if ( p == 0 ) stopcnt = 0;
+		#ifndef __cplusplus
 		Fai( &Arrived, -1 );
+		#else
+		Fai( Arrived, -1 );
+		#endif // __cplusplus
 	} // for
 
 	return NULL;
@@ -70,7 +78,7 @@ void __attribute__((noinline)) worker_ctor() {
 	#ifdef CFMT
 	if ( N == 1 ) printf( " TESTING freq=%#x/%d", Frequency, Frequency );
 	#endif // CFMT
-	cnt = Allocator( sizeof(typeof(cnt[0])) * N );
+	cnt = (TYPEOF(cnt))Allocator( sizeof(TYPEOF(cnt[0])) * N );
 } // worker_ctor
 
 void __attribute__((noinline)) worker_dtor() {
