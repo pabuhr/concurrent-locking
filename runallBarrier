@@ -6,7 +6,8 @@
 # ARM -march=armv8.2-a+lse => generate Arm LSE extension instructions SWAP and CAS
 # https://community.arm.com/developer/tools-software/tools/b/tools-software-ides-blog/posts/making-the-most-of-the-arm-architecture-in-gcc-10
 
-algorithms="BarrierButterfly BarrierDice BarrierDissem BarrierDissemMCS BarrierFai BarrierRing BarrierRingAravind BarrierSenseRev BarrierSym BarrierTour BarrierTourMCS BarrierTreeA BarrierTreeB BarrierTreeC BarrierTreeCombMCS BarrierTreeD BarrierTreeMCS"
+algorithms="BarrierButterfly BarrierCLH BarrierDice BarrierDissem BarrierDissemMCS BarrierFai BarrierPthread BarrierRing BarrierRingAravind BarrierSenseRev \
+	 BarrierSTD BarrierSym BarrierTicket BarrierTour BarrierTourMCS BarrierTreeA BarrierTreeB BarrierTreeC BarrierTreeCombMCS BarrierTreeD BarrierTreeMCS"
 time=10
 outdir=`hostname`
 exec=`hostname`.out
@@ -18,25 +19,28 @@ if [ ${#} -ne 0 ] ; then
     algorithms="${@}"
 fi
 
-cflag="-Wall -Wextra -Werror -Wno-implicit-fallthrough -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN" #
+cflag="-Wall -Wextra -Werror -Wno-implicit-fallthrough -O3 -DNDEBUG -fno-reorder-functions -DPIN" #
 if [ ${outdir} = "algol" -o ${outdir} = "prolog" ] ; then
 #    atomicinst=-mno-outline-atomics	# use ARM LL/SC instructions for atomics
     atomicinst=-march=armv8.2-a+lse
     cflag=${cflag}" ${atomicinst} -DATOMIC"
 fi
 
-if [ "${outdir}" = "prolog" -o "${outdir}" = "swift" ] ; then # Ubuntu 22.04
+if [ "${outdir}" = "prolog" -o "${outdir}" = "swift" -o "${outdir}" = "java" ] ; then # Ubuntu 22.04
     CC=gcc-12
 else
     CC=gcc-11
 fi
 
 runalgorithm() {
-#    for atomic in "" "ATOMIC" ; do
-    for atomic in "" ; do
+    for atomic in "" ; do # "ATOMIC"
 	outfile=${outdir}/${1}${atomic}
 	echo "${outfile}"
-	${CC} ${cflag} ${atomic:+-D${atomic}} ${atomicinst:+-DATOMICINST=${atomicinst}} -D${outdir} -DAlgorithm=${1} -DNCS_DELAY=20 Harness.c -lpthread -lm -o ${outdir}.out
+	if [ ${1} = "BarrierSTD" ] ; then	# C++ barrier ?
+	    `echo ${CC} | tr cc ++` ${cflag} -Wno-volatile -std=c++20 ${atomic:+-D${atomic}} ${atomicinst:+-DATOMICINST=${atomicinst}} -D${outdir} -DAlgorithm=${1} -DNCS_DELAY=20 Harness.c -lpthread -lm -o ${outdir}.out
+	else
+	    ${CC} ${cflag} -std=gnu11 ${atomic:+-D${atomic}} ${atomicinst:+-DATOMICINST=${atomicinst}} -D${outdir} -DAlgorithm=${1} -DNCS_DELAY=20 Harness.c -lpthread -lm -o ${outdir}.out
+	fi
 	./run1 time="${time}" exec="${exec}" > "${outfile}"
 	if [ -f core ] ; then
 	    echo core generated for ${1}
