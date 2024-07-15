@@ -38,7 +38,7 @@ runalgorithm() {
 	outfile=${outdir}/${1}${2:+${2}}${atomic}
 	stats="2> \${outfile}_stats"
 	echo "${outfile}"
-	${CC} ${cflag} ${atomic:+-D${atomic}} ${atomicinst:+-DATOMICINST=${atomicinst}} -D${outdir} -DAlgorithm=BurnsLynch ${2:+-D${2}} -DNCS_DELAY=20 -DFCFS=${1} Harness.c -lpthread -lm -o ${outdir}.out
+	${CC} ${cflag} ${atomic:+-D${atomic}} ${atomicinst:+-DATOMICINST=${atomicinst}} -D${outdir} -DAlgorithm=BurnsLynch ${2:+-D${2}} -DNCS_DELAY=20 -DFCFS=${1} Harness.c -lpthread -lm -o ${exec}
 	./run1 time=${time} runs=${runs} exec="${exec}"
 	if [ -f core ] ; then
 	    echo core generated for ${1}

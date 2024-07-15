@@ -35,19 +35,19 @@ fi
 runalgorithm() {
 #    for atomic in "" "ATOMIC" ; do
     for atomic in "" ; do
-	outfile=${outdir}/${1}${2:+${2}}${atomic}
+	outfile="${outdir}/${1}${2:+${2}}${atomic}"
 	stats="2> \${outfile}_stats"
 	echo "${outfile}"
-	${CC} ${cflag} ${atomic:+-D${atomic}} ${atomicinst:+-DATOMICINST=${atomicinst}} -D${outdir} -DAlgorithm=${1} ${2:+-D${2}} -DNCS_DELAY=20 Harness.c -lpthread -lm -o ${outdir}.out
+	${CC} ${cflag} ${atomic:+-D${atomic}} ${atomicinst:+-DATOMICINST=${atomicinst}} -D${outdir} -DAlgorithm=${1} ${2:+-D${2}} -DNCS_DELAY=20 Harness.c -lpthread -lm -o ${exec}
 	./run1 time="${time}" runs="${runs}" exec="${exec}" 1> "${outfile}" 2> ${outfile}_stats
 	if [ -f core ] ; then
 	    echo core generated for ${1}
+	    rm -rf core
 	    break
 	fi
     done
 }
 
-rm -rf core
 for algorithm in ${algorithms} ; do
     runalgorithm ${algorithm}
     if [ ${algorithm} != "Hehner" -a ${algorithm} != "MCS" ] ; then

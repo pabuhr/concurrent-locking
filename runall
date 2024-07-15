@@ -4,27 +4,44 @@
 # David Dice and Wim H. Hesselink, Concurrency and Computation: Practice and Experience,
 # http://dx.doi.org/10.1002/cpe.3263
 
-algorithms="Communicate Aravind Burns2 DeBruijn Dijkstra Eisenberg Hehner Hesselink Kessels Knuth LamportRetract LamportBakery LamportFast LycklamaBuhr Lynch Peterson PetersonT PetersonBuhr Szymanski Taubenfeld TaubenfeldBuhr Arbiter MCS SpinLock PthreadLock ZhangYA Zhang2T ZhangdT"
+algorithms="Communicate AravindF3 AravindF4 Burns2 DeBruijn Dijkstra Eisenberg Hehner Hesselink Kessels Knuth LamportRetract LamportBakery LamportFast LycklamaBuhr Lynch Peterson PetersonT PetersonBuhr Szymanski Taubenfeld TaubenfeldBuhr Arbiter MCS SpinLock PthreadLock ZhangYA Zhang2T ZhangdT"
+time=60
 outdir=`hostname`
+exec=`hostname`.out
+
 mkdir -p ${outdir}
 
 if [ ${#} -ne 0 ] ; then
     algorithms="${@}"
 fi
 
-cflag="-Wall -Wextra -Werror -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN" # -DFAST
+cflag="-Wall -Wextra -Werror -Wno-implicit-fallthrough -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN" #
+if [ ${outdir} = "algol" -o ${outdir} = "prolog" ] ; then
+#    atomicinst=-mno-outline-atomics	# use ARM LL/SC instructions for atomics
+    atomicinst=-march=armv8.2-a+lse
+    cflag=${cflag}" ${atomicinst} -DATOMIC"
+fi
+
+if [ "${outdir}" = "prolog" -o "${outdir}" = "swift" -o "${outdir}" = "java" ] ; then # Ubuntu 22.04
+    CC=gcc-12
+else
+    CC=gcc-11
+fi
 
 runalgorithm() {
-    echo "${outdir}/${1}${2}"
-    gcc ${cflag} -DAlgorithm=${1} Harness.c -lpthread -lm
-    ./run1 "${2}" > "${outdir}/${1}${2}"
-    if [ -f core ] ; then
-	echo core generated for ${1}
-	break
-    fi
+    for fast in "" "FAST" ; do
+	outfile="${outdir}/${1}${2}${fast}"
+	echo "${outfile}"
+	${CC} ${cflag} ${fast:+-D${fast}} -DAlgorithm=${1} Harness.c -lpthread -lm -o ${exec}
+	./run1 time=${time} exec="${exec}" degree="${2}" > "${outfile}"
+	if [ -f core ] ; then
+	    echo core generated for ${1}
+	    rm -rf core
+	    break
+	fi
+    done
 }
 
-rm -rf core
 for algorithm in ${algorithms} ; do
     if [ ${algorithm} = "ZhangdT" -o ${algorithm} = "ZhangdTWHH" ] ; then
 	d=2
@@ -36,3 +53,5 @@ for algorithm in ${algorithms} ; do
 	runalgorithm ${algorithm}
     fi
 done
+
+rm -f "${exec}"

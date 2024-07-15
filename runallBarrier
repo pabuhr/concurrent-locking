@@ -1,12 +1,14 @@
 #!/bin/sh -
 
+#zip Barrier.zip softsolutions/Barrier* softsolutions/Harness.c softsolutions/run1 softsolutions/runallBarrier 
+
 # Experiments for: Barrier
 
 # ARM -mno-outline-atomics => use LL/SC instead of calls to atomic routines: __aarch64_swp_acq_rel, __aarch64_cas8_acq_rel
 # ARM -march=armv8.2-a+lse => generate Arm LSE extension instructions SWAP and CAS
 # https://community.arm.com/developer/tools-software/tools/b/tools-software-ides-blog/posts/making-the-most-of-the-arm-architecture-in-gcc-10
 
-algorithms="BarrierButterfly BarrierCLH BarrierDice BarrierDissem BarrierDissemMCS BarrierFai BarrierPthread BarrierRing BarrierRingAravind BarrierSenseRev \
+algorithms="BarrierButterfly BarrierPopStack BarrierDissem BarrierDissemMCS BarrierFai BarrierPthread BarrierRing BarrierRingAravind BarrierSenseRev \
 	 BarrierSTD BarrierSym BarrierTicket BarrierTour BarrierTourMCS BarrierTreeA BarrierTreeB BarrierTreeC BarrierTreeCombMCS BarrierTreeD BarrierTreeMCS"
 time=10
 outdir=`hostname`
@@ -37,9 +39,9 @@ runalgorithm() {
 	outfile=${outdir}/${1}${atomic}
 	echo "${outfile}"
 	if [ ${1} = "BarrierSTD" ] ; then	# C++ barrier ?
-	    `echo ${CC} | tr cc ++` ${cflag} -Wno-volatile -std=c++20 ${atomic:+-D${atomic}} ${atomicinst:+-DATOMICINST=${atomicinst}} -D${outdir} -DAlgorithm=${1} -DNCS_DELAY=20 Harness.c -lpthread -lm -o ${outdir}.out
+	    `echo ${CC} | tr cc ++` ${cflag} -Wno-volatile -std=c++20 ${atomic:+-D${atomic}} ${atomicinst:+-DATOMICINST=${atomicinst}} -D${outdir} -DAlgorithm=${1} -DNCS_DELAY=20 Harness.c -lpthread -lm -o ${exec}
 	else
-	    ${CC} ${cflag} -std=gnu11 ${atomic:+-D${atomic}} ${atomicinst:+-DATOMICINST=${atomicinst}} -D${outdir} -DAlgorithm=${1} -DNCS_DELAY=20 Harness.c -lpthread -lm -o ${outdir}.out
+	    ${CC} ${cflag} -std=gnu11 ${atomic:+-D${atomic}} ${atomicinst:+-DATOMICINST=${atomicinst}} -D${outdir} -DAlgorithm=${1} -DNCS_DELAY=20 Harness.c -lpthread -lm -o ${exec}
 	fi
 	./run1 time="${time}" exec="${exec}" > "${outfile}"
 	if [ -f core ] ; then

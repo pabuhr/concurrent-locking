@@ -26,7 +26,7 @@ runalgorithm1() {
     for contention in "" "FAST" ; do
 	outfile=${outdir}/${1}${2}${optcnt}${atomic}${contention}
 	echo "${outfile}"
-	gcc-10 ${cflag} ${opts} ${atomic:+-D${atomic}} ${contention:+-D${contention}} -D${outdir} -DAlgorithm=${1} Harness.c -lpthread -lm -o ${outdir}.out
+	gcc-10 ${cflag} ${opts} ${atomic:+-D${atomic}} ${contention:+-D${contention}} -D${outdir} -DAlgorithm=${1} Harness.c -lpthread -lm -o ${exec}
 	./run1 time=${time} exec="${exec}" > "${outfile}"
 	if [ -f core ] ; then
 	    echo core generated for ${1}
@@ -42,7 +42,7 @@ runalgorithm2() {
 	    for contention in "" "FAST" ; do
 		outfile=${outdir}/${1}${2}_${optcnt}${atomic}${contention}
 		echo "${outfile}"
-		gcc-10 ${cflag} ${opts} ${atomic:+-D${atomic}} ${contention:+-D${contention}} -D${outdir} -DAlgorithm=${1} Harness.c -lpthread -lm -o ${outdir}.out
+		gcc-10 ${cflag} ${opts} ${atomic:+-D${atomic}} ${contention:+-D${contention}} -D${outdir} -DAlgorithm=${1} Harness.c -lpthread -lm -o ${exec}
 		./run1 time=${time} exec="${exec}" > "${outfile}"
 		if [ -f core ] ; then
 		    echo core generated for ${1}

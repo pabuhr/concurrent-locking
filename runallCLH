@@ -6,10 +6,11 @@
 # ARM -march=armv8.2-a+lse => generate Arm LSE extension instructions SWAP and CAS
 # https://community.arm.com/developer/tools-software/tools/b/tools-software-ides-blog/posts/making-the-most-of-the-arm-architecture-in-gcc-10
 
-algorithms="CLH CLH2 CLH_Scott_F12 CLH_Scott_F14 MCS HemLock"
-time=10
+algorithms="CLH CLH_Scott_F12 CLH_Scott_F14 MCS HemLock"
+time=60
 outdir=`hostname`
 exec=`hostname`.out
+
 mkdir -p ${outdir}
 
 if [ ${#} -ne 0 ] ; then
@@ -21,12 +22,18 @@ if [ ${outdir} = "algol" ] ; then
     cflag=${cflag}" -mno-outline-atomics"	# use ARM LL/SC instructions for atomics
 fi
 
+if [ "${outdir}" = "prolog" -o "${outdir}" = "swift" -o "${outdir}" = "java" ] ; then # Ubuntu 22.04
+    CC=gcc-12
+else
+    CC=gcc-11
+fi
+
 runalgorithm() {
     for atomic in "" "ATOMIC" ; do
 	for contention in "" "FAST" ; do
 	    outfile=${outdir}/${1}${2}${atomic}${contention}
 	    echo "${outfile}"
-	    gcc-10 ${cflag} ${atomic:+-D${atomic}} ${contention:+-D${contention}} -D${outdir} -DAlgorithm=${1} Harness.c -lpthread -lm -o ${outdir}.out
+	    ${CC} ${cflag} ${atomic:+-D${atomic}} ${contention:+-D${contention}} -D${outdir} -DAlgorithm=${1} Harness.c -lpthread -lm -o ${exec}
 	    ./run1 time=${time} exec="${exec}" > "${outfile}"
 	    if [ -f core ] ; then
 		echo core generated for ${1}

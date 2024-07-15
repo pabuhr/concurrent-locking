@@ -47,6 +47,10 @@
 //   I know of involve firing potentially redundant unpark() operations that might in turn cause spurious wakeups.
 //   That's fine in the world of park-unpark, but possibly not acceptable in your environment.
 
+//   Inspired by CLH in that there's no explicit lists of threads, and a waiting thread knows only about its immediate
+//   successor, whereas MCS, has "next" pointers in memory.  But it is unlike CLH in that it waits on a field in the
+//   queued element, instead of the previous element.
+
 typedef struct CALIGN waitelement {
 	VTYPE Ordinal;
 	VTYPE Gate;
@@ -63,7 +67,7 @@ static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sha
 
 static inline void block( barrier * b ) {
 	WaitElement W = { .Gate = 0, .Ordinal = 0 };		// mark as not yet resolved
-	WaitElement * pred = Fas( b, &W );
+	WaitElement * pred = Fas( *b, &W );
 	assert( pred != &W );
 	if ( pred != NULL ) {
 		await( pred->Ordinal != 0 );					// wait for predecessor's count to resolve
@@ -84,7 +88,7 @@ static inline void block( barrier * b ) {
 		#ifdef NDEBUG
 		*b = NULL;
 		#else
-		WaitElement * DetachedList = Fas( b, NULL );
+		WaitElement * DetachedList = Fas( *b, NULL );
 		assert( DetachedList == &W );
 		assert( DetachedList->Gate == 0 );
 		#endif
@@ -106,5 +110,5 @@ void __attribute__((noinline)) dtor() {
 } // dtor
 
 // Local Variables: //
-// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=BarrierDice Harness.c -lpthread -lm -D`hostname` -DCFMT" //
+// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=BarrierPopStack Harness.c -lpthread -lm -D`hostname` -DCFMT" //
 // End: //
