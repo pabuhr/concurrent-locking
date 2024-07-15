@@ -48,11 +48,11 @@ static void * Worker( void * arg ) {
 		for ( entry = 0; stop == 0; entry += 1 ) {
 			NCS;
 
-			myPlace = Fai( &queueLast, 1 );
+			myPlace = Fai( queueLast, 1 );
 			// Restore queueLast to [0,N) on roll over, but modified Fig 2 to remove modulus in the fast path by adding
 			// an extra atomic instruction every Nth entry.
 			if ( UNLIKELY( myPlace >= N ) ) {
-				if ( myPlace == N ) Fai( &queueLast, -N );
+				if ( myPlace == N ) Fai( queueLast, -N );
 				myPlace -= N;
 			} // if
 			while ( flags[myPlace] == MUST_WAIT ) Pause(); // busy wait
@@ -71,15 +71,15 @@ static void * Worker( void * arg ) {
 			#endif // FAST
 		} // for
 
-		Fai( &sumOfThreadChecksums, randomThreadChecksum );
+		Fai( sumOfThreadChecksums, randomThreadChecksum );
 
 		#ifdef FAST
 		id = oid;
 		#endif // FAST
 		entries[r][id] = entry;
-		Fai( &Arrived, 1 );
+		Fai( Arrived, 1 );
 		while ( stop != 0 ) Pause();
-		Fai( &Arrived, -1 );
+		Fai( Arrived, -1 );
 	} // for
 
 	return NULL;

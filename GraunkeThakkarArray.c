@@ -38,7 +38,7 @@ static void * Worker( void * arg ) {
 		for ( entry = 0; stop == 0; entry += 1 ) {
 			NCS;
 
-			temp.atom = Fas( &Tail.atom, ((Tailtype){ { &Slots[id], Slots[id].bit } }.atom) );
+			temp.atom = Fas( Tail.atom, ((Tailtype){ { &Slots[id], Slots[id].bit } }.atom) );
 			await( (*temp.last).bit != temp.bit );
 
 			randomThreadChecksum += CS( id );
@@ -51,15 +51,15 @@ static void * Worker( void * arg ) {
 			#endif // FAST
 		} // for
 
-		Fai( &sumOfThreadChecksums, randomThreadChecksum );
+		Fai( sumOfThreadChecksums, randomThreadChecksum );
 
 		#ifdef FAST
 		id = oid;
 		#endif // FAST
 		entries[r][id] = entry;
-		Fai( &Arrived, 1 );
+		Fai( Arrived, 1 );
 		while ( stop != 0 ) Pause();
-		Fai( &Arrived, -1 );
+		Fai( Arrived, -1 );
 	} // for
 
 	return NULL;

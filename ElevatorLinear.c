@@ -11,7 +11,7 @@ static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sha
 
 #ifdef CAS
 
-#define trylock( x ) Cas( &(fast), false, true )
+#define trylock( x ) Cas( (fast), false, true )
 
 #elif defined( WCasBL )
 
@@ -174,7 +174,7 @@ static void * Worker( void * arg ) {
 			#endif // FAST
 		} // for
 
-		Fai( &sumOfThreadChecksums, randomThreadChecksum );
+		Fai( sumOfThreadChecksums, randomThreadChecksum );
 
 		#ifdef FAST
 		id = oid;
@@ -186,9 +186,9 @@ static void * Worker( void * arg ) {
 		#endif // FLAG
 		#endif // FAST
 		entries[r][id] = entry;
-		Fai( &Arrived, 1 );
+		Fai( Arrived, 1 );
 		while ( stop != 0 ) Pause();
-		Fai( &Arrived, -1 );
+		Fai( Arrived, -1 );
 	} // for
 	return NULL;
 } // Worker

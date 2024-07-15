@@ -22,7 +22,7 @@ static inline void clh_lock( TYPE id ) {
 	qnode_ptr p = thread_qnode_ptrs[id];
 	(*p.qnode_ptr).qnode = true;
 	qnode_ptr pred;
-	pred.qnode_ptr = Fas( &(tail.qnode_ptr), p.qnode_ptr );
+	pred.qnode_ptr = Fas( (tail.qnode_ptr), p.qnode_ptr );
 	thread_qnode_ptrs[id] = pred;
 	await( ! (*pred.qnode_ptr).qnode );
 	head = p;
@@ -62,15 +62,15 @@ static void * Worker( void * arg ) {
 			#endif // FAST
 		} // for
 
-		Fai( &sumOfThreadChecksums, randomThreadChecksum );
+		Fai( sumOfThreadChecksums, randomThreadChecksum );
 
 		#ifdef FAST
 		id = oid;
 		#endif // FAST
 		entries[r][id] = entry;
-		Fai( &Arrived, 1 );
+		Fai( Arrived, 1 );
 		while ( stop != 0 ) Pause();
-		Fai( &Arrived, -1 );
+		Fai( Arrived, -1 );
 	} // for
 
 	return NULL;

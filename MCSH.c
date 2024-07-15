@@ -25,7 +25,7 @@ typedef struct {
 
 static inline void mcs_lock( NMCS_lock * lock ) {
 	MCSH_node mm = { .next = NULL, .locked = true };
-	MCSH_node_ptr prev = Fas( &lock->tail, &mm );
+	MCSH_node_ptr prev = Fas( lock->tail, &mm );
 
 	if ( FASTPATH( prev == NULL ) ) {
 		await( lock->flag );
@@ -42,7 +42,7 @@ static inline void mcs_lock( NMCS_lock * lock ) {
 	WO( Fence(); );
 	MCSH_node_ptr succ = mm.next;
 	if ( FASTPATH( succ == NULL ) ) {
-		if ( FASTPATH( ! Cas( &lock->tail, &mm, NULL ) ) ) {
+		if ( FASTPATH( ! Cas( lock->tail, &mm, NULL ) ) ) {
 			await( (succ = mm.next) != NULL );
 		} // if
 	} // if
@@ -94,15 +94,15 @@ static void * Worker( void * arg ) {
 			#endif // FAST
 		} // for
 
-		Fai( &sumOfThreadChecksums, randomThreadChecksum );
+		Fai( sumOfThreadChecksums, randomThreadChecksum );
 
 		#ifdef FAST
 		id = oid;
 		#endif // FAST
 		entries[r][id] = entry;
-		Fai( &Arrived, 1 );
+		Fai( Arrived, 1 );
 		while ( stop != 0 ) Pause();
-		Fai( &Arrived, -1 );
+		Fai( Arrived, -1 );
 	} // for
 
 	return NULL;

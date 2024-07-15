@@ -19,7 +19,7 @@ static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sha
 #define BARRIER_CALL block( &b, p, &sense );
 
 static inline void block_aux( Barrier_node * bn, TYPE sense ) {
-	if ( Fai( &bn->count, 1 ) == bn->k - 1 ) {
+	if ( Fai( bn->count, 1 ) == bn->k - 1 ) {
 		if ( bn->parent ) {
 			block_aux( bn->parent, sense );				// recursion
 		} // if

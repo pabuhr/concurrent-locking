@@ -49,7 +49,7 @@ static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sha
 
 #ifdef CAS
 
-#define trylock( x ) Cas( &(fast), false, true )
+#define trylock( x ) Cas( (fast), false, true )
 
 #elif defined( WCasBL )
 
@@ -194,29 +194,28 @@ static void * Worker( void * arg ) {
 			#ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
 			cnt = cycleUp( cnt, NoStartPoints );
-			valId = &vals[N + id].val;					// must reset
+			valId = &vals[N + id];						// must reset
 			#ifdef FLAG
-			flagId = &flags[id].flag;
-			flagN = &flags[N].flag;
+			flagId = &flags[id];
+			flagN = &flags[N];
 			#endif // FLAG
 			#endif // FAST
 		} // for
 
-		Fai( &sumOfThreadChecksums, randomThreadChecksum );
+		Fai( sumOfThreadChecksums, randomThreadChecksum );
 
 		#ifdef FAST
 		id = oid;
-
-		valId = &vals[N + id].val;						// must reset
+		valId = &vals[N + id];							// must reset
 		#ifdef FLAG
-		flagId = &flags[id].flag;
-		flagN = &flags[N].flag;
+		flagId = &flags[id];
+		flagN = &flags[N];
 		#endif // FLAG
 		#endif // FAST
 		entries[r][id] = entry;
-		Fai( &Arrived, 1 );
+		Fai( Arrived, 1 );
 		while ( stop != 0 ) Pause();
-		Fai( &Arrived, -1 );
+		Fai( Arrived, -1 );
 	} // for
 
 	return NULL;

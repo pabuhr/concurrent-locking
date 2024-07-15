@@ -18,16 +18,16 @@ typedef union {
 static inline int bit( int i, int k ) { return (i & (1 << (k - 1))) != 0; }
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
-static int depth CALIGN, mask CALIGN;
+static TYPE depth CALIGN, mask CALIGN;
 static Tuple * Q CALIGN;								// volatile fields
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
-WHOLESIZE QMAX( TYPE id, unsigned int k ) {
-	int low = ((id >> (k - 1)) ^ 1) << (k - 1);
-	int high = MIN( low | mask >> (depth - (k - 1)), N - 1 );
+WHOLESIZE QMAX( TYPE id, TYPE k ) {
+	TYPE low = ((id >> (k - 1)) ^ 1) << (k - 1);
+	TYPE high = MIN( (low | mask >> (depth - (k - 1))), N - 1 );
 	WO( Fence(); );
 	Tuple opp;
-	for ( int i = low; i <= high; i += 1 ) {
+	for ( typeof(high) i = low; i <= high; i += 1 ) {
 		opp.atom = Q[i].vatom;
 		if ( L(opp) >= k ) return opp.atom;
 	} // for
@@ -87,15 +87,15 @@ static void * Worker( void * arg ) {
 			#endif // FAST
 		} // for
 
-		Fai( &sumOfThreadChecksums, randomThreadChecksum );
+		Fai( sumOfThreadChecksums, randomThreadChecksum );
 
 		#ifdef FAST
 		id = oid;
 		#endif // FAST
 		entries[r][id] = entry;
-		Fai( &Arrived, 1 );
+		Fai( Arrived, 1 );
 		while ( stop != 0 ) Pause();
-		Fai( &Arrived, -1 );
+		Fai( Arrived, -1 );
 	} // for
 	return NULL;
 } // Worker

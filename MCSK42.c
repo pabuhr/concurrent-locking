@@ -16,16 +16,16 @@ static inline void mcs_lock( MCS_node * lock ) {
 	for ( ;; ) {
 		MCS_node * prev = lock->tail;
 		if ( prev == NULL ) {
-			if ( Cas( &(lock->tail), NULL, lock ) ) break; // Fence
+			if ( Cas( (lock->tail), NULL, lock ) ) break; // Fence
 		} else {
 			MCS_node n = { waiting, NULL };
-			if ( Cas( &(lock->tail), prev, &n ) ) {		// Fence
+			if ( Cas( (lock->tail), prev, &n ) ) {		// Fence
 				prev->next = &n;
 				await( n.tail != waiting );
 				MCS_node * succ = n.next;
 				if ( succ == NULL ) {
 					lock->next = NULL;
-					if ( ! Cas( &(lock->tail), &n, lock ) ) { // Fence
+					if ( ! Cas( (lock->tail), &n, lock ) ) { // Fence
 						await( (succ = n.next) != NULL );
 						WO( Fence(); );
 						lock->next = succ;
@@ -45,7 +45,7 @@ static inline void mcs_unlock( MCS_node * lock ) {
 	WO( Fence(); );
 	MCS_node * succ = lock->next;
 	if ( succ == NULL ) {
-		if ( Cas( &(lock->tail), lock, NULL ) ) return; // Fence
+		if ( Cas( (lock->tail), lock, NULL ) ) return; // Fence
 		await( (succ = lock->next) != NULL );
 		WO( Fence(); );
 	} // if
@@ -84,15 +84,15 @@ static void * Worker( void * arg ) {
 			#endif // FAST
 		} // for
 
-		Fai( &sumOfThreadChecksums, randomThreadChecksum );
+		Fai( sumOfThreadChecksums, randomThreadChecksum );
 
 		#ifdef FAST
 		id = oid;
 		#endif // FAST
 		entries[r][id] = entry;
-		Fai( &Arrived, 1 );
+		Fai( Arrived, 1 );
 		while ( stop != 0 ) Pause();
-		Fai( &Arrived, -1 );
+		Fai( Arrived, -1 );
 	} // for
 
 	return NULL;

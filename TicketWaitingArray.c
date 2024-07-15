@@ -32,7 +32,7 @@ static volatile intptr_t * ToSlot( int32_t TicketValue ) {
 }
 
 static inline void Acquire( TicketLock * L ) {
-	const int32_t tx = Fai( &L->Ticket, 1 );
+	const int32_t tx = Fai( L->Ticket, 1 );
 	int32_t dx = tx - L->Grant;
 
 	// Fast-path : uncontended
@@ -71,7 +71,7 @@ static inline void Acquire( TicketLock * L ) {
 
 static inline void Release( TicketLock * L ) {
 	// Don't actually need an atomic FAA here but we use one to avoid MESI S->M upgrades
-	const int32_t k = Fai( &L->Grant, 1 ) + 1;
+	const int32_t k = Fai( L->Grant, 1 ) + 1;
 
 	// poke successor of successor, if any, to shift it from long-term to short-term waiting
 	*ToSlot( k + NHOT ) = 0;
@@ -109,15 +109,15 @@ static void * Worker( void * arg ) {
 			#endif // FAST
 		} // for
 
-		Fai( &sumOfThreadChecksums, randomThreadChecksum );
+		Fai( sumOfThreadChecksums, randomThreadChecksum );
 
 		#ifdef FAST
 		id = oid;
 		#endif // FAST
 		entries[r][id] = entry;
-		Fai( &Arrived, 1 );
+		Fai( Arrived, 1 );
 		while ( stop != 0 ) Pause();
-		Fai( &Arrived, -1 );
+		Fai( Arrived, -1 );
 	} // for
 
 	return NULL;

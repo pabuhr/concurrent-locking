@@ -32,7 +32,7 @@ static void * Worker( void * arg ) {
 				turns[comp] = role;						// RACE
 				Fence();								// force store before more loads
 				low = ((lid) ^ 1) << km1;				// lower competition
-				high = MIN( low | mask >> (depth - km1), N - 1 ); // higher competition
+				high = MIN( (low | mask >> (depth - km1)), N - 1 ); // higher competition
 				for ( TYPE i = low; i <= high; i += 1 )	// busy wait
 					while ( intents[i] >= k && turns[comp] == role ) Pause();
 			} // for
@@ -49,15 +49,15 @@ static void * Worker( void * arg ) {
 			#endif // FAST
 		} // for
 
-		Fai( &sumOfThreadChecksums, randomThreadChecksum );
+		Fai( sumOfThreadChecksums, randomThreadChecksum );
 
 		#ifdef FAST
 		id = oid;
 		#endif // FAST
 		entries[r][id] = entry;
-		Fai( &Arrived, 1 );
+		Fai( Arrived, 1 );
 		while ( stop != 0 ) Pause();
-		Fai( &Arrived, -1 );
+		Fai( Arrived, -1 );
 	} // for
 
 	return NULL;

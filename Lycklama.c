@@ -18,15 +18,17 @@ static void * Worker( void * arg ) {
 	TYPE copy[N][2];
 	typeof(N) j, bit;
 
-	typeof(&c[0]) myc = &c[id];							// optimization
-	typeof(&v[0]) myv = &v[id];
-	typeof(&intents[0]) myintent = &intents[id];
 	typeof(&c[0]) otherc;
 	typeof(&v[0]) otherv;
 	typeof(&intents[0]) otherintent;
 
 	for ( int r = 0; r < RUNS; r += 1 ) {
 		RTYPE randomThreadChecksum = 0;
+
+		// Here because of FAST reset
+		typeof(&c[0]) myc = &c[id];						// optimization
+		typeof(&v[0]) myv = &v[id];
+		typeof(&intents[0]) myintent = &intents[id];
 		bit = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
@@ -73,18 +75,21 @@ static void * Worker( void * arg ) {
 			#ifdef FAST
 			id = startpoint( cnt );						// different starting point each experiment
 			cnt = cycleUp( cnt, NoStartPoints );
+			myc = &c[id];								// must reset
+			myv = &v[id];
+			myintent = &intents[id];
 			#endif // FAST
 		} // for
 
-		Fai( &sumOfThreadChecksums, randomThreadChecksum );
+		Fai( sumOfThreadChecksums, randomThreadChecksum );
 
 		#ifdef FAST
 		id = oid;
 		#endif // FAST
 		entries[r][id] = entry;
-		Fai( &Arrived, 1 );
+		Fai( Arrived, 1 );
 		while ( stop != 0 ) Pause();
-		Fai( &Arrived, -1 );
+		Fai( Arrived, -1 );
 	} // for
 	return NULL;
 } // Worker

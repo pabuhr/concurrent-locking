@@ -28,8 +28,8 @@ void spin_lock( VTYPE * lock ) {
 
 	for ( ;; ) {
 		// For whatever reason, Casw often out performances Tas
-	  // if ( *lock == 0 && Tas( lock ) == 0 ) break;		// Fence
-	  if ( *lock == 0 && Casw( lock, (typeof(lock))0, (typeof(lock))1 ) ) break; // Fence
+	  // if ( *lock == 0 && Tas( *lock ) == 0 ) break;		// Fence
+	  if ( *lock == 0 && Casw( *lock, (typeof(lock))0, (typeof(lock))1 ) ) break; // Fence
 
 		#ifndef NOEXPBACK
 		for ( TYPE s = 0; s < spin; s += 1 ) Pause();	// exponential spin
@@ -49,7 +49,7 @@ void spin_lock( VTYPE * lock ) {
 } // spin_lock
 
 void spin_unlock( VTYPE * lock ) {
-	Clr( lock );										// Fence
+	Clr( *lock );										// Fence
 } // spin_unlock
 
 // Local Variables: //

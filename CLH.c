@@ -25,7 +25,7 @@ static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sha
 
 static inline void clh_lock( CLH_lock * lock, qnode_ptr * prev  NPARM() ) {
 	*node = false;
-	*prev = Fas( lock, node );
+	*prev = Fas( *lock, node );
 	await( **prev );
 	WO( Fence(); );
 } // clh_lock
@@ -71,15 +71,15 @@ static void * Worker( void * arg ) {
 			#endif // FAST
 		} // for
 
-		Fai( &sumOfThreadChecksums, randomThreadChecksum );
+		Fai( sumOfThreadChecksums, randomThreadChecksum );
 
 		#ifdef FAST
 		id = oid;
 		#endif // FAST
 		entries[r][id] = entry;
-		Fai( &Arrived, 1 );
+		Fai( Arrived, 1 );
 		while ( stop != 0 ) Pause();
-		Fai( &Arrived, -1 );
+		Fai( Arrived, -1 );
 	} // for
 
 	#ifndef THREADLOCAL

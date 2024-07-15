@@ -105,10 +105,10 @@ static void * Worker( void * arg ) {
 				node >>= 1;
 			} // for
 
-			if ( FASTPATH( ! Cas( &first, FREE_LOCK, id ) ) ) {
+			if ( FASTPATH( ! Cas( first, FREE_LOCK, id ) ) ) {
 				typeof(exits) e = exits;
 				await( exits - e >= 2 || first == id || first == FREE_LOCK );
-				if ( FASTPATH( ! Cas( &first, FREE_LOCK, id ) ) ) {
+				if ( FASTPATH( ! Cas( first, FREE_LOCK, id ) ) ) {
 					await( *tWait );
 				} // if
 			} // if
@@ -155,15 +155,15 @@ static void * Worker( void * arg ) {
 			#endif // FAST
 		} // for
 
-		Fai( &sumOfThreadChecksums, randomThreadChecksum );
+		Fai( sumOfThreadChecksums, randomThreadChecksum );
 
 		#ifdef FAST
 		id = oid;
 		#endif // FAST
 		entries[r][id] = entry;
-		Fai( &Arrived, 1 );
+		Fai( Arrived, 1 );
 		while ( stop != 0 ) Pause();
-		Fai( &Arrived, -1 );
+		Fai( Arrived, -1 );
 	} // for
 
 	return NULL;

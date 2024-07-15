@@ -25,7 +25,7 @@ static inline void mcs_lock( MCS_lock * lock, MCS_node * node ) {
 	WO( Fence(); ); // 1
 #endif // MCS_OPT1
 
-	MCS_node * prev = Fas( lock, node );
+	MCS_node * prev = Fas( *lock, node );
 
   if ( SLOWPATH( prev == NULL ) ) return;				// no one on list ?
 
@@ -50,7 +50,7 @@ static inline void mcs_unlock( MCS_lock * lock, MCS_node * node ) {
 #ifdef MCS_OPT2											// original, default option
 	if ( FASTPATH( node->next == NULL ) ) {				// no one waiting ?
 
-  if ( SLOWPATH( Cas( lock, node, NULL ) ) ) return;	// Fence
+  if ( SLOWPATH( Cas( *lock, node, NULL ) ) ) return;	// Fence
 
 		#ifndef MPAUSE
 		while ( node->next == NULL ) Pause();			// busy wait until my node is modified
@@ -66,7 +66,7 @@ static inline void mcs_unlock( MCS_lock * lock, MCS_node * node ) {
 	if ( FASTPATH( succ == NULL ) ) {					// no one waiting ?
 		// node is potentially at the tail of the MCS chain
 
-  if ( SLOWPATH( Cas( lock, node, NULL ) ) ) return;	// Fence
+  if ( SLOWPATH( Cas( *lock, node, NULL ) ) ) return;	// Fence
 		// Either a new thread arrived in the LD-CAS window above or fetched a false NULL
 		// as the successor has yet to store into node->next.
 

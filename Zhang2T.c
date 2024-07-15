@@ -1,5 +1,5 @@
 static volatile TYPE **x CALIGN, **c CALIGN;
-int lN;
+TYPE lN;
 
 static void *Worker( void *arg ) {
 	TYPE id = (size_t)arg;
@@ -73,15 +73,15 @@ static void *Worker( void *arg ) {
 			#endif // FAST
 		} // for
 
-		Fai( &sumOfThreadChecksums, randomThreadChecksum );
+		Fai( sumOfThreadChecksums, randomThreadChecksum );
 
 		#ifdef FAST
 		id = oid;
 		#endif // FAST
 		entries[r][id] = entry;
-		Fai( &Arrived, 1 );
+		Fai( Arrived, 1 );
 		while ( stop != 0 ) Pause();
-		Fai( &Arrived, -1 );
+		Fai( Arrived, -1 );
 	} // for
 	return NULL;
 } // Worker
@@ -93,15 +93,15 @@ void ctor() {
 	if ( N % 2 == 1 ) lN += 1;
 
 	x = Allocator( sizeof(typeof(x[0])) * lN );
-	for ( int i = 0; i < lN; i += 1 ) {
+	for ( typeof(lN) i = 0; i < lN; i += 1 ) {
 		x[i] = Allocator( sizeof(typeof(x[0][0])) * lN );
 	} // for
 	c = Allocator( sizeof(typeof(c[0])) * lN );
-	for ( int i = 0; i < lN; i += 1 ) {
+	for ( typeof(lN) i = 0; i < lN; i += 1 ) {
 		c[i] = Allocator( sizeof(typeof(c[0][0])) * lN );
 	} // for
-	for ( int i = 0; i < lN; i += 1 ) {					// initialize shared data
-		for ( int j = 0; j < lN; j += 1 ) {
+	for ( typeof(lN) i = 0; i < lN; i += 1 ) {			// initialize shared data
+		for ( typeof(lN) j = 0; j < lN; j += 1 ) {
 			x[i][j] = -1;
 			c[i][j] = 0;
 		} // for
@@ -109,10 +109,10 @@ void ctor() {
 } // ctor
 
 void dtor() {
-	for ( int i = 0; i < N; i += 1 ) {
+	for ( typeof(N) i = 0; i < N; i += 1 ) {
 		free( (void *)c[i] );
 	} // for
-	for ( int i = 0; i < lN; i += 1 ) {
+	for ( typeof(lN) i = 0; i < lN; i += 1 ) {
 		free( (void *)x[i] );
 	} // for
 	free( (void *)c );

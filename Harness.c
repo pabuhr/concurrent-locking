@@ -61,8 +61,8 @@
 	#define SLOWPATH(x) __builtin_expect(!!(x), 0)
 #endif // FASTPATH
 
-#define MIN( x, y ) (x < y ? x : y)
-#define MAX( x, y ) (x > y ? x : y)
+#define MIN( x, y ) ((x < y) ? (x) : (y))
+#define MAX( x, y ) ((x > y) ? (x) : (y))
 
 #define xstr(s) str(s)
 #define str(s) #s
@@ -176,26 +176,27 @@ typedef volatile uint32_t VWHOLESIZE;
 
 //------------------------------------------------------------------------------
 
-#define Clr( lock ) __atomic_clear( (lock), __ATOMIC_RELEASE )
-#define Clrm( lock, memorder ) __atomic_clear( (lock), memorder )
-#define Tas( lock ) __atomic_test_and_set( (lock), __ATOMIC_ACQUIRE )
-#define Tasm( lock, memorder ) __atomic_test_and_set( (lock), memorder )
-#define Cas( change, comp, assn ) ({TYPEOF(comp) __temp = (comp); __atomic_compare_exchange_n( (change), &(__temp), (assn), false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST ); })
-#define Casm( change, comp, assn, smemorder, fmemorder ) ({TYPEOF(comp) * __temp = &(comp); __atomic_compare_exchange_n( (change), &(__temp), (assn), false, smemorder, fmemorder ); })
-#define Casw( change, comp, assn ) ({TYPEOF(comp) __temp = (comp); __atomic_compare_exchange_n( (change), &(__temp), (assn), true, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST ); })
-#define Caswm( change, comp, assn, smemorder, fmemorder ) ({TYPEOF(comp) __temp = (comp); __atomic_compare_exchange_n( (change), &(__temp), (assn), true, smemorder, smemorder ); })
-#define Casv( change, comp, assn ) __atomic_compare_exchange_n( (change), (comp), (assn), false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST )
-#define Casvm( change, comp, assn, smemorder, fmemorder ) __atomic_compare_exchange_n( (change), (comp), (assn), false, smemorder, fmemorder )
-#define Casvw( change, comp, assn ) __atomic_compare_exchange_n( (change), (comp), (assn), true, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST )
-#define Casvwm( change, comp, assn, smemorder, fmemorder ) __atomic_compare_exchange_n( (change), (comp), (assn), true, smemorder, fmemorder )
-#define Fas( change, assn ) __atomic_exchange_n( (change), (assn), __ATOMIC_SEQ_CST )
-#define Fasm( change, assn, memorder ) __atomic_exchange_n( (change), (assn), memorder )
+// Treat lock/change parameter as reference.
+#define Clr( lock ) __atomic_clear( (&(lock)), __ATOMIC_RELEASE )
+#define Clrm( lock, memorder ) __atomic_clear( (&(lock)), memorder )
+#define Tas( lock ) __atomic_test_and_set( (&(lock)), __ATOMIC_ACQUIRE )
+#define Tasm( lock, memorder ) __atomic_test_and_set( (&(lock)), memorder )
+#define Cas( change, comp, assn ) ({TYPEOF(comp) __temp = (comp); __atomic_compare_exchange_n( (&(change)), (&(__temp)), (assn), false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST ); })
+#define Casm( change, comp, assn, smemorder, fmemorder ) ({TYPEOF(comp) * __temp = &(comp); __atomic_compare_exchange_n( (&(change)), (&(__temp)), (assn), false, smemorder, fmemorder ); })
+#define Casw( change, comp, assn ) ({TYPEOF(comp) __temp = (comp); __atomic_compare_exchange_n( (&(change)), (&(__temp)), (assn), true, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST ); })
+#define Caswm( change, comp, assn, smemorder, fmemorder ) ({TYPEOF(comp) __temp = (comp); __atomic_compare_exchange_n( (&(change)), (&(__temp)), (assn), true, smemorder, smemorder ); })
+#define Casv( change, comp, assn ) __atomic_compare_exchange_n( (&(change)), (comp), (assn), false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST )
+#define Casvm( change, comp, assn, smemorder, fmemorder ) __atomic_compare_exchange_n( (&(change)), (comp), (assn), false, smemorder, fmemorder )
+#define Casvw( change, comp, assn ) __atomic_compare_exchange_n( (&(change)), (comp), (assn), true, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST )
+#define Casvwm( change, comp, assn, smemorder, fmemorder ) __atomic_compare_exchange_n( (&(change)), (comp), (assn), true, smemorder, fmemorder )
+#define Fas( change, assn ) __atomic_exchange_n( (&(change)), (assn), __ATOMIC_SEQ_CST )
+#define Fasm( change, assn, memorder ) __atomic_exchange_n( (&(change)), (assn), memorder )
 #ifndef __cplusplus
-#define Fai( change, Inc ) __atomic_fetch_add( (change), (Inc), __ATOMIC_SEQ_CST )
+#define Fai( change, Inc ) __atomic_fetch_add( (&(change)), (Inc), __ATOMIC_SEQ_CST )
 #else
 #define Fai( change, Inc ) change.fetch_add( Inc )
 #endif // __cplusplus
-#define Faim( change, Inc, memorder ) __atomic_fetch_add( (change), (Inc), memorder )
+#define Faim( change, Inc, memorder ) __atomic_fetch_add( (&(change)), (Inc), memorder )
 
 #define await( E ) while ( ! (E) ) Pause()
 
@@ -228,12 +229,12 @@ static inline TYPE rdtscl( void ) {
 // Optionally, sequester R on its own cache line to avoid false sharing
 // but on linux __thread "initial-exec" TLS variables are already segregated.
 
-static __thread RTYPE R;
+static __thread RTYPE RandomState;
 static __attribute__(( unused, noinline )) RTYPE PRNG() { // must be called
-	uint32_t ret = R;
-	R ^= R << 6;
-	R ^= R >> 21;
-	R ^= R << 7;
+	uint32_t ret = RandomState;
+	RandomState ^= RandomState << 6;
+	RandomState ^= RandomState >> 21;
+	RandomState ^= RandomState << 7;
 	return ret;
 } // PRNG
 
@@ -491,7 +492,7 @@ static int __attribute__((noinline)) PollBarrier() {
 
 	// Consider : shift Verbose printing to after incrementing Grant
 	if ( Verbose ) {
-		int k = Fai( &nrun, 1 );
+		int k = Fai( nrun, 1 );
 		if ( k == (ConcurrencyLevel-1) ) printf( "; " );
 		if ( k >= ConcurrencyLevel ) printf( "?" );
 	} // if
@@ -689,7 +690,7 @@ int main( int argc, char * argv[] ) {
 		exit( EXIT_FAILURE );
 	} // switch
 
-	R = rdtscl();										// seed PRNG
+	RandomState = rdtscl();								// seed PRNG
 
 	#ifdef CFMT
 	if ( N == 1 ) {										// title

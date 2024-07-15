@@ -13,7 +13,7 @@ static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sha
 static inline void block( Barrier * b ) {
 	TYPE negflag = ! b->flag;							// optimization (compiler probably does it)
 
-	if ( FASTPATH( Fai( &b->count, 1 ) < N - 1 ) ) {
+	if ( FASTPATH( Fai( b->count, 1 ) < N - 1 ) ) {
 		await( b->flag == negflag );
 	} else {
 		// CALL ACTION CALLBACK BEFORE TRIGGERING BARRIER

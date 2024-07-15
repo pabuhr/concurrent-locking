@@ -57,18 +57,10 @@ static void * Worker( void * arg ) {
 
 		cnt[p] = 0;
 
-		#ifndef __cplusplus
-		Fai( &Arrived, 1 );
-		#else
 		Fai( Arrived, 1 );
-		#endif // __cplusplus
 		while ( stop ) Pause();
 		if ( p == 0 ) stopcnt = 0;
-		#ifndef __cplusplus
-		Fai( &Arrived, -1 );
-		#else
 		Fai( Arrived, -1 );
-		#endif // __cplusplus
 	} // for
 
 	return NULL;

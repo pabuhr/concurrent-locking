@@ -49,15 +49,15 @@ static void *Worker( void *arg ) {
 			#endif // FAST
 		} // for
 
-		Fai( &sumOfThreadChecksums, randomThreadChecksum );
+		Fai( sumOfThreadChecksums, randomThreadChecksum );
 
 		#ifdef FAST
 		id = oid;
 		#endif // FAST
 		entries[r][id] = entry;
-		Fai( &Arrived, 1 );
+		Fai( Arrived, 1 );
 		while ( stop != 0 ) Pause();
-		Fai( &Arrived, -1 );
+		Fai( Arrived, -1 );
 	} // for
 	return NULL;
 } // Worker
@@ -74,17 +74,17 @@ void __attribute__((noinline)) ctor() {
 	states = Allocator( N * sizeof(typeof(states[0])) );
 	levels = Allocator( N * sizeof(typeof(levels[0])) );
 	levels[0] = -1;										// default for N=1
-	for ( int id = 0; id < N; id += 1 ) {
+	for ( typeof(N) id = 0; id < N; id += 1 ) {
 		t[id].Q[0] = t[id].Q[1] = 0;
 #if defined( KESSELS2 )
 		t[id].R[0] = t[id].R[1] = 0;
 #else
 		t[id].R = 0;
 #endif // KESSELS2
-		unsigned int start = N + id, level = Log2( start );
+		typeof(N) start = N + id, level = Log2( start );
 		states[id] = Allocator( level * sizeof(typeof(states[0][0])) );
 		levels[id] = level - 1;
-		for ( unsigned int s = 0; start > 1; start >>= 1, s += 1 ) {
+		for ( typeof(N) s = 0; start > 1; start >>= 1, s += 1 ) {
 			states[id][s].es = start & 1;
 			states[id][s].ns = &t[start >> 1];
 		} // for

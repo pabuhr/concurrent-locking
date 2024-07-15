@@ -30,9 +30,9 @@ static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sha
 
 static inline void hem_lock( HemLock * lock  GPARM ) {
 	STAR grant = false;
-	Grant * prev = Fas( lock, ADDR grant );
+	Grant * prev = Fas( *lock, ADDR grant );
 	if ( prev != NULL ) { 
-		await( Fas( prev, false ) );
+		await( Fas( *prev, false ) );
 	} // if
 	WO( Fence(); );
 } // hem_lock
@@ -40,7 +40,7 @@ static inline void hem_lock( HemLock * lock  GPARM ) {
 static inline void hem_unlock( HemLock * lock  GPARM ) {
 	WO( Fence(); );
 	STAR grant = true;
-	if ( ! Cas( lock, ADDR grant, NULL ) ) {
+	if ( ! Cas( *lock, ADDR grant, NULL ) ) {
 		await( ! STAR grant );
 	} // if
 } // hem_unlock
@@ -77,15 +77,15 @@ static void * Worker( void * arg ) {
 			#endif // FAST
 		} // for
 
-		Fai( &sumOfThreadChecksums, randomThreadChecksum );
+		Fai( sumOfThreadChecksums, randomThreadChecksum );
 
 		#ifdef FAST
 		id = oid;
 		#endif // FAST
 		entries[r][id] = entry;
-		Fai( &Arrived, 1 );
+		Fai( Arrived, 1 );
 		while ( stop != 0 ) Pause();
-		Fai( &Arrived, -1 );
+		Fai( Arrived, -1 );
 	} // for
 
 	return NULL;

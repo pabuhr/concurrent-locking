@@ -37,7 +37,7 @@ static void * Worker( void * arg ) {
 		for ( entry = 0; stop == 0; entry += 1 ) {
 			NCS;
 
-			prev = Fas( &last, (bitset( my, deref(my) )) );
+			prev = Fas( last, (bitset( my, deref(my) )) );
 			bit = bitv(prev);
 			VTYPE * temp = ptr( prev );					// optimize
 			await( (*temp & 1L) != bit );				// or eq.: await(deref(*temp) != bit); 
@@ -52,15 +52,15 @@ static void * Worker( void * arg ) {
 			#endif // FAST
 		} // for
 
-		Fai( &sumOfThreadChecksums, randomThreadChecksum );
+		Fai( sumOfThreadChecksums, randomThreadChecksum );
 
 		#ifdef FAST
 		id = oid;
 		#endif // FAST
 		entries[r][id] = entry;
-		Fai( &Arrived, 1 );
+		Fai( Arrived, 1 );
 		while ( stop != 0 ) Pause();
-		Fai( &Arrived, -1 );
+		Fai( Arrived, -1 );
 	} // for
 
 	return NULL;

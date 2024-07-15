@@ -26,7 +26,7 @@ static inline void mcs_lock( MCS_lock * lock, MCS_node * node ) {
 	WO( Fence(); ); // 1
 #endif // MCS_OPT1
 
-	MCS_node * prev = Fas( lock, node );
+	MCS_node * prev = Fas( *lock, node );
 
   if ( SLOWPATH( prev == NULL ) ) return;				// no one on list ?
 
@@ -50,11 +50,11 @@ static inline void mcs_unlock( MCS_lock * lock, MCS_node * node ) {
 	WO( Fence(); ); // 5
 #ifdef MCS_OPT2											// original, default option
 	if ( FASTPATH( node->next == NULL ) ) {				// no one waiting ?
-		MCS_node * old_tail = Fas( lock, NULL );
+		MCS_node * old_tail = Fas( *lock, NULL );
 
   if ( SLOWPATH( old_tail == node ) ) return;
 
-  		MCS_node * usurper = Fas( lock, old_tail );
+  		MCS_node * usurper = Fas( *lock, old_tail );
 		#ifndef MPAUSE
 		while ( node->next == NULL ) Pause();			// busy wait until my node is modified
 		#else
@@ -74,11 +74,11 @@ static inline void mcs_unlock( MCS_lock * lock, MCS_node * node ) {
 #else													// Scott book Figure 4.8
 	MCS_node * succ = node->next;
 	if ( FASTPATH( succ == NULL ) ) {					// no one waiting ?
-		MCS_node * old_tail = Fas( lock, NULL );
+		MCS_node * old_tail = Fas( *lock, NULL );
 
   if ( SLOWPATH( old_tail == node ) ) return;
 
-		MCS_node * usurper = Fas( lock, old_tail );
+		MCS_node * usurper = Fas( *lock, old_tail );
 		#ifndef MPAUSE
 		while ( (succ = node->next) == NULL ) Pause();	// busy wait until my node is modified
 		#else
@@ -132,15 +132,15 @@ static void * Worker( void * arg ) {
 			#endif // FAST
 		} // for
 
-		Fai( &sumOfThreadChecksums, randomThreadChecksum );
+		Fai( sumOfThreadChecksums, randomThreadChecksum );
 
 		#ifdef FAST
 		id = oid;
 		#endif // FAST
 		entries[r][id] = entry;
-		Fai( &Arrived, 1 );
+		Fai( Arrived, 1 );
 		while ( stop != 0 ) Pause();
-		Fai( &Arrived, -1 );
+		Fai( Arrived, -1 );
 	} // for
 
 	return NULL;
