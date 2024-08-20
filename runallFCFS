@@ -22,11 +22,11 @@ fi
 cflag="-Wall -Wextra -Werror -Wno-implicit-fallthrough -std=gnu11 -O3 -DSTATS -DNDEBUG -fno-reorder-functions -DPIN" #
 if [ ${outdir} = "algol" -o ${outdir} = "prolog" ] ; then
 #    atomicinst=-mno-outline-atomics	# use ARM LL/SC instructions for atomics
-    atomicinst=-march=armv8.2-a+lse
+    atomicinst=-march=armv8.2-a+lse	# use ARM LSE instructions for atomics
     cflag=${cflag}" ${atomicinst} -DATOMIC"
 fi
 
-if [ "${outdir}" = "prolog" -o "${outdir}" = "swift" ] ; then # Ubuntu 22.04
+if [ "${outdir}" = "prolog" -o "${outdir}" = "swift" -o "${outdir}" = "java" ] ; then # Ubuntu 22.04
     CC=gcc-12
 else
     CC=gcc-11
@@ -38,7 +38,7 @@ runalgorithm() {
 	outfile="${outdir}/${1}${2:+${2}}${atomic}"
 	stats="2> \${outfile}_stats"
 	echo "${outfile}"
-	${CC} ${cflag} ${atomic:+-D${atomic}} ${atomicinst:+-DATOMICINST=${atomicinst}} -D${outdir} -DAlgorithm=${1} ${2:+-D${2}} -DNCS_DELAY=20 Harness.c -lpthread -lm -o ${exec}
+	${CC} ${cflag} ${affinity:+-D${affinity}} ${atomic:+-D${atomic}} ${atomicinst:+-DATOMICINST=${atomicinst}} -D${outdir} -DAlgorithm=${1} ${2:+-D${2}} -DNCS_DELAY=20 Harness.c -lpthread -lm -o ${exec}
 	./run1 time="${time}" runs="${runs}" exec="${exec}" 1> "${outfile}" 2> ${outfile}_stats
 	if [ -f core ] ; then
 	    echo core generated for ${1}

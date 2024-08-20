@@ -18,7 +18,7 @@ fi
 cflag="-Wall -Wextra -Werror -Wno-implicit-fallthrough -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN" #
 if [ ${outdir} = "algol" -o ${outdir} = "prolog" ] ; then
 #    atomicinst=-mno-outline-atomics	# use ARM LL/SC instructions for atomics
-    atomicinst=-march=armv8.2-a+lse
+    atomicinst=-march=armv8.2-a+lse	# use ARM LSE instructions for atomics
     cflag=${cflag}" ${atomicinst} -DATOMIC"
 fi
 

@@ -8,6 +8,7 @@ algorithms="Burns2 LamportFast Taubenfeld TaubenfeldBuhr Kessels PetersonBuhr Ya
 time=5
 outdir=`hostname`
 exec=`hostname`.out
+atomicinst=
 
 mkdir -p ${outdir}
 
@@ -18,7 +19,7 @@ fi
 cflag="-Wall -Wextra -Werror -Wno-implicit-fallthrough -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN" #
 if [ ${outdir} = "algol" -o ${outdir} = "prolog" ] ; then
 #    atomicinst=-mno-outline-atomics	# use ARM LL/SC instructions for atomics
-    atomicinst=-march=armv8.2-a+lse
+    atomicinst=-march=armv8.2-a+lse	# use ARM LSE instructions for atomics
     cflag=${cflag}" ${atomicinst} -DATOMIC"
 fi
 
@@ -31,7 +32,7 @@ fi
 runalgorithm() {
     for flag in "" "FAST" ; do
 	echo "${outdir}/${1}${2}${flag}"
-	${CC} ${cflag} ${flag:+-D${flag}} ${2:+-D${2}} -DAlgorithm=${1} Harness.c -lpthread -lm -o ${exec}
+	${CC} ${cflag} ${affinity:+-D${affinity}} ${atomic:+-D${atomic}} ${atomicinst:+-DATOMICINST=${atomicinst}} -D${outdir} ${flag:+-D${flag}} ${2:+-D${2}} -DAlgorithm=${1} Harness.c -lpthread -lm -o ${exec}
 	./run1 time=${time} exec="${exec}" > "${outdir}/${1}${2}${flag}"
 	if [ -f core ] ; then
 	    echo core generated for ${1}

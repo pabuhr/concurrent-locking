@@ -11,6 +11,8 @@ algorithms2="MCS MCSFAS MCS3 MCS4 MCSK42"
 time=10
 outdir=`hostname`
 exec=`hostname`.out
+atomicinst=
+
 mkdir -p ${outdir}
 
 if [ ${#} -ne 0 ] ; then
@@ -18,15 +20,23 @@ if [ ${#} -ne 0 ] ; then
 fi
 
 cflag="-Wall -Wextra -Werror -Wno-implicit-fallthrough -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN" #
-if [ ${outdir} = "algol" ] ; then
-    cflag=${cflag}" -mno-outline-atomics"	# use ARM LL/SC instructions for atomics
+if [ ${outdir} = "algol" -o ${outdir} = "prolog" ] ; then
+    atomicinst=-mno-outline-atomics	# use ARM LL/SC instructions for atomics
+#    atomicinst=-march=armv8.2-a+lse	# use ARM LSE instructions for atomics
+    cflag=${cflag}" ${atomicinst} -DATOMIC"
+fi
+
+if [ "${outdir}" = "prolog" -o "${outdir}" = "swift" -o "${outdir}" = "java" ] ; then # Ubuntu 22.04
+    CC=gcc-12
+else
+    CC=gcc-11
 fi
 
 runalgorithm1() {
     for contention in "" "FAST" ; do
 	outfile=${outdir}/${1}${2}${optcnt}${atomic}${contention}
 	echo "${outfile}"
-	gcc-10 ${cflag} ${opts} ${atomic:+-D${atomic}} ${contention:+-D${contention}} -D${outdir} -DAlgorithm=${1} Harness.c -lpthread -lm -o ${exec}
+	${CC} ${cflag} ${opts} ${affinity:+-D${affinity}} ${atomic:+-D${atomic}} ${atomicinst:+-DATOMICINST=${atomicinst}} ${contention:+-D${contention}} -D${outdir} -DAlgorithm=${1} Harness.c -lpthread -lm -o ${exec}
 	./run1 time=${time} exec="${exec}" > "${outfile}"
 	if [ -f core ] ; then
 	    echo core generated for ${1}

@@ -17,7 +17,7 @@ if [ ${#} -ne 0 ] ; then
 fi
 
 cflag="-Wall -Wextra -Werror -Wno-implicit-fallthrough -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN" #
-if [ ${outdir} = "algol" ] ; then
+if [ ${outdir} = "algol" -o ${outdir} = "prolog" ] ; then
     cflag=${cflag}" -mno-outline-atomics"	# use ARM LL/SC instructions for atomics
 fi
 

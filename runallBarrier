@@ -10,7 +10,8 @@
 
 algorithms="BarrierButterfly BarrierPopStack BarrierDissem BarrierDissemMCS BarrierFai BarrierPthread BarrierRing BarrierRingAravind BarrierSenseRev \
 	 BarrierSTD BarrierSym BarrierTicket BarrierTour BarrierTourMCS BarrierTreeA BarrierTreeB BarrierTreeC BarrierTreeCombMCS BarrierTreeD BarrierTreeMCS"
-time=10
+time=25
+runs=13
 outdir=`hostname`
 exec=`hostname`.out
 atomicinst=
@@ -24,7 +25,7 @@ fi
 cflag="-Wall -Wextra -Werror -Wno-implicit-fallthrough -O3 -DNDEBUG -fno-reorder-functions -DPIN" #
 if [ ${outdir} = "algol" -o ${outdir} = "prolog" ] ; then
 #    atomicinst=-mno-outline-atomics	# use ARM LL/SC instructions for atomics
-    atomicinst=-march=armv8.2-a+lse
+    atomicinst=-march=armv8.2-a+lse	# use ARM LSE instructions for atomics
     cflag=${cflag}" ${atomicinst} -DATOMIC"
 fi
 
@@ -36,18 +37,22 @@ fi
 
 runalgorithm() {
     for atomic in "" ; do # "ATOMIC"
-	outfile=${outdir}/${1}${atomic}
-	echo "${outfile}"
-	if [ ${1} = "BarrierSTD" ] ; then	# C++ barrier ?
-	    `echo ${CC} | tr cc ++` ${cflag} -Wno-volatile -std=c++20 ${atomic:+-D${atomic}} ${atomicinst:+-DATOMICINST=${atomicinst}} -D${outdir} -DAlgorithm=${1} -DNCS_DELAY=20 Harness.c -lpthread -lm -o ${exec}
-	else
-	    ${CC} ${cflag} -std=gnu11 ${atomic:+-D${atomic}} ${atomicinst:+-DATOMICINST=${atomicinst}} -D${outdir} -DAlgorithm=${1} -DNCS_DELAY=20 Harness.c -lpthread -lm -o ${exec}
-	fi
-	./run1 time="${time}" exec="${exec}" > "${outfile}"
-	if [ -f core ] ; then
-	    echo core generated for ${1}
-	    break
-	fi
+	for affinity in "" ; do # "NOAFFINITY"
+	    outfile=${outdir}${affinity}/${1}${atomic}
+	    echo "${outfile}"
+	    if [ ${1} = "BarrierSTD" ] ; then	# C++ barrier ?
+		`echo ${CC} | tr cc ++` ${cflag} -Wno-volatile -std=c++20 ${affinity:+-D${affinity}} ${atomic:+-D${atomic}} ${atomicinst:+-DATOMICINST=${atomicinst}} -D${outdir} -DAlgorithm=${1} -DNCS_DELAY=20 Harness.c -lpthread -lm -o ${exec}
+	    else
+		${CC} ${cflag} -std=gnu11 ${affinity:+-D${affinity}} ${atomic:+-D${atomic}} ${atomicinst:+-DATOMICINST=${atomicinst}} -D${outdir} -DAlgorithm=${1} -DNCS_DELAY=20 Harness.c -lpthread -lm -o ${exec}
+	    fi
+	    ./run1 time="${time}" exec="${exec}" T=1 N=1 > "${outfile}"
+	    ./run1 time="${time}" exec="${exec}" T=2 N=32 inc=2 >> "${outfile}"
+	    ./run1 time="${time}" exec="${exec}" T=36 N=128 inc=4 >> "${outfile}"
+	    if [ -f core ] ; then
+		echo core generated for ${1}
+		break
+	    fi
+	done
     done
 }
 
