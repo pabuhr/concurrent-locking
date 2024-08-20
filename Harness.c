@@ -572,7 +572,7 @@ void affinity( pthread_t pthreadid, unsigned int tid ) {
 #if defined( algol )
 	enum { OFFSETSOCK = 1 /* 0 origin */, SOCKETS = 2, CORES = 48, HYPER = 1 };
 #elif defined( prolog )
-	enum { OFFSETSOCK = 1 /* 0 origin */, SOCKETS = 2, CORES = 64, HYPER = 1 }; // pretend 2 sockets
+	enum { OFFSETSOCK = 0 /* 0 origin */, SOCKETS = 2, CORES = 64, HYPER = 1 }; // pretend 2 sockets
 #elif defined( jax )
 	enum { OFFSETSOCK = 1 /* 0 origin */, SOCKETS = 4, CORES = 24, HYPER = 2 /* wrap on socket */ };
 #elif defined( cfapi1 )
@@ -840,7 +840,9 @@ int main( int argc, char * argv[] ) {
 			perror( "***ERROR*** pthread create" );
 			abort();
 		} // if
+		#ifndef NOAFFINITY
 		affinity( workers[tid], tid );
+		#endif // ! NOAFFINITY
 	} // for
 
 	for ( ; Run < RUNS;  ) {							// global variable
@@ -861,7 +863,7 @@ int main( int argc, char * argv[] ) {
 		while ( Arrived != 0 ) Pause();					// all threads started ?
 	} // for
 
-	for ( size_t tid = 0; tid < Threads; tid += 1 ) { // terminate workers
+	for ( size_t tid = 0; tid < Threads; tid += 1 ) {	// terminate workers
 		int rc = pthread_join( workers[tid], NULL );
 		if ( rc != 0 ) {
 			errno = rc;
