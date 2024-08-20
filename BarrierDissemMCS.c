@@ -34,19 +34,19 @@ static inline void block( Barrier * b, TYPE p, TYPE * sense, TYPE * parity ) {
 
 void __attribute__((noinline)) ctor() {
 	b.exponent = Clog2( N );
-	b.allnodes = malloc( sizeof(b.allnodes[0]) * N );
+	b.allnodes = Allocator( N * sizeof(b.allnodes[0]) );
 	
 	// for each node
 	for ( TYPE i = 0; i < N; i += 1 ) {
 		// alloc my flag array
-		b.allnodes[i].my_flags = malloc( 2 * sizeof(b.allnodes[i].my_flags[0]) );
-		b.allnodes[i].my_flags[0] = malloc( b.exponent * sizeof(b.allnodes[i].my_flags[0][0]) );
-		b.allnodes[i].my_flags[1] = malloc( b.exponent * sizeof(b.allnodes[i].my_flags[1][0]) );
+		b.allnodes[i].my_flags = Allocator( 2 * sizeof(b.allnodes[i].my_flags[0]) );
+		b.allnodes[i].my_flags[0] = Allocator( b.exponent * sizeof(b.allnodes[i].my_flags[0][0]) );
+		b.allnodes[i].my_flags[1] = Allocator( b.exponent * sizeof(b.allnodes[i].my_flags[1][0]) );
 		
 		// alloc partner flag arrays
-		b.allnodes[i].partner_flags = malloc( 2 * sizeof(b.allnodes[i].partner_flags[0]) );
-		b.allnodes[i].partner_flags[0] = malloc( b.exponent * sizeof(b.allnodes[i].partner_flags[0][0]) );
-		b.allnodes[i].partner_flags[1] = malloc( b.exponent * sizeof(b.allnodes[i].partner_flags[1][0]) );
+		b.allnodes[i].partner_flags = Allocator( 2 * sizeof(b.allnodes[i].partner_flags[0]) );
+		b.allnodes[i].partner_flags[0] = Allocator( b.exponent * sizeof(b.allnodes[i].partner_flags[0][0]) );
+		b.allnodes[i].partner_flags[1] = Allocator( b.exponent * sizeof(b.allnodes[i].partner_flags[1][0]) );
 	} // for
 
 	// init flag arrays
