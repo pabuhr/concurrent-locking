@@ -1,3 +1,9 @@
+// Wim H. Hesselink and Peter A. Buhr, MCSH, a Lock with the Standard Interface, ACM Transactions on Parallel Computing,
+// 10(2), June 2023, pp 1-23
+
+// There are two version of the algorithm: the paper original and with modification by Ting-Ching Li, National Chengchi
+// University, Taipei, Taiwan.
+
 #include <stdbool.h>
 
 typedef struct mcsh_node {
@@ -29,6 +35,7 @@ static inline void mcs_lock( NMCS_lock * lock ) {
 
 	if ( FASTPATH( prev == NULL ) ) {
 		await( lock->flag );
+		lock->flag = false;								// Li modification
 	} else {
 		prev->next = &mm;
 		// Possible correctness issue: the MCSH_node is allocated on the stack so escape analysis thinks the
@@ -37,8 +44,8 @@ static inline void mcs_lock( NMCS_lock * lock ) {
 		await( ! mm.locked );
 	} // if
 
-	WO( Fence(); );
-	lock->flag = false;
+	// WO( Fence(); );									// original paper
+	// lock->flag = false;
 	WO( Fence(); );
 	MCSH_node_ptr succ = mm.next;
 	if ( FASTPATH( succ == NULL ) ) {
@@ -56,9 +63,11 @@ static inline void mcs_lock( NMCS_lock * lock ) {
 static inline void mcs_unlock( NMCS_lock * lock ) {
 	MCSH_node_ptr succ = lock->msg;
 	WO( Fence(); );
-	lock->flag = true;
+	// lock->flag = true;								// original paper
 	if ( FASTPATH( succ != NULL ) ) {
 		succ->locked = false;
+	} else {											// Li modification
+		lock->flag = true;
 	} // if
 } // mcs_unlock
 
