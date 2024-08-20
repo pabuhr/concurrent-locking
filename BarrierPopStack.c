@@ -76,15 +76,14 @@ static inline void block( barrier * b ) {
 		W.Ordinal = 1 ;
 	} // if
 	assert( W.Ordinal != 0 );
-	if ( W.Ordinal < N ) {
-		// intermediate thread
+	if ( W.Ordinal < N ) {								// intermediate thread ?
 		await( W.Gate != 0 );							// primary waiting loop
 		if ( pred != NULL ) {
 			assert( pred->Gate == 0 );
 			pred->Gate = 1;								// propagate notification through the stack
 		} // if
-	} else {
-		// ultimate thread to arrive
+	} else {											// ultimate thread to arrive
+		// CALL ACTION CALLBACK BEFORE TRIGGERING BARRIER
 		#ifdef NDEBUG
 		*b = NULL;
 		#else
