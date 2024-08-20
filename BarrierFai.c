@@ -1,10 +1,11 @@
 typedef struct {
+	TYPE  CALIGN group;
 	VTYPE CALIGN flag;
 	VTYPE CALIGN count;
 } Barrier;
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
-static Barrier b CALIGN = { 0, 0 };
+static Barrier b CALIGN;
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 #define BARRIER_DECL
@@ -13,7 +14,7 @@ static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sha
 static inline void block( Barrier * b ) {
 	TYPE negflag = ! b->flag;							// optimization (compiler probably does it)
 
-	if ( FASTPATH( Fai( b->count, 1 ) < N - 1 ) ) {
+	if ( FASTPATH( Fai( b->count, 1 ) < b->group - 1 ) ) {
 		await( b->flag == negflag );
 	} else {
 		// CALL ACTION CALLBACK BEFORE TRIGGERING BARRIER
@@ -25,6 +26,7 @@ static inline void block( Barrier * b ) {
 #include "BarrierWorker.c"
 
 void __attribute__((noinline)) ctor() {
+	b = (Barrier){ .group = N, .flag = false, .count = 0 };
 	worker_ctor();
 } // ctor
 
