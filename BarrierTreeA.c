@@ -28,6 +28,7 @@ static inline void block( Barrier aa, TYPE p ) {
 			await( aap != aa[kk] );
 		} // for
 		#endif // 0
+		// CALL ACTION CALLBACK BEFORE TRIGGERING BARRIER
 		aa[0] = ! aap;									// release waiting threads
 		Fence();
 	} else {

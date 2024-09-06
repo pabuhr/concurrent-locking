@@ -17,6 +17,8 @@ static inline void block( Barrier aa, TYPE p ) {
 	state = 2 * p + 1;
 	if ( state < N ) {
 		await( aap != aa[state] );
+	} else {
+		// CALL ACTION CALLBACK BEFORE TRIGGERING BARRIER
 	} // if
 	aap = ! aap;
 	aa[p] = aap;

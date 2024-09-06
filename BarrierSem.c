@@ -33,6 +33,7 @@ static inline void block( Barrier * b ) {
 	sem_wait( &b->mutex );
 	b->count--;
 	if ( b->count == 0 ) {
+		// CALL ACTION CALLBACK BEFORE TRIGGERING BARRIER
 		sem_post_n( &b->turnstile2 );
 	}
 	sem_post( &b->mutex );

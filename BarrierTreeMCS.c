@@ -44,6 +44,7 @@ static inline void block( Barrier * b, TYPE p, TYPE * sense ) {
 	// if not root, wait until my parent signals wakeup
 	if ( p != 0 ) {
 		await( lsense == tree_node->parent_sense );
+		// CALL ACTION CALLBACK BEFORE TRIGGERING BARRIER
 	} // if
 
 	// signal children in wakeup tree

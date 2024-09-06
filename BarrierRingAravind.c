@@ -26,6 +26,7 @@ static inline void block( Barrier b, TYPE p, TYPE * go ) {
 			await( b[0] == *go );
 		} else {
 			await( b[p] == *go );
+			// CALL ACTION CALLBACK BEFORE TRIGGERING BARRIER
 			b[0] = *go;
 			Fence();
 		} // if

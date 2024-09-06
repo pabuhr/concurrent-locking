@@ -25,6 +25,7 @@ static inline void block( Barrier * b ) {
 		pthread_mutex_unlock( &b->lock );
 		await( b->flag == negflag );
 	} else {
+		// CALL ACTION CALLBACK BEFORE TRIGGERING BARRIER
 		b->count = 0;
 		pthread_mutex_unlock( &b->lock );
 		b->flag = negflag;

@@ -13,6 +13,8 @@ static inline void block( Barrier aa, TYPE p ) {
 		for ( TYPE kk = 1; kk < N ; kk++ ) {
 			await( aap != aa[p + 1] );
 		} // for
+	} else {
+		// CALL ACTION CALLBACK BEFORE TRIGGERING BARRIER
 	} // if
 	aap = ! aap;
 	aa[p] = aap;
