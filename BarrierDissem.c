@@ -44,7 +44,7 @@ static inline void block( Barrier * b, TYPE p ) {
 void __attribute__((noinline)) ctor() {
 	b.exponent = Clog2( N );
 	b.shared_counters = Allocator( b.exponent * sizeof(b.shared_counters[0]) );
-	b.precomputed_ids = Allocator(b.exponent * sizeof(b.precomputed_ids[0]) );
+	b.precomputed_ids = Allocator( b.exponent * sizeof(b.precomputed_ids[0]) );
 	TYPE power = 1;
 	for ( typeof(b.exponent) r = 0; r < b.exponent; r += 1 ) {
 		b.shared_counters[r] = Allocator( N * sizeof(b.shared_counters[0][0]) );
