@@ -1,5 +1,5 @@
-// Debra Hensgen, 1 Raphael Finkel, 1 and Udi Manber, Two Algorithms for Barrier Synchronization International Journal
-// of Parallel Programming, Vol. 17, No. 1, 1988 p. 11-13
+// Debra Hensgen, Raphael Finkel, and Udi Manber, Two Algorithms for Barrier Synchronization, International Journal
+// of Parallel Programming, Vol. 17, No. 1, 1988 pp. 11-13
 
 typedef	struct {
 	VTYPE ** Answers;									// flags waited on in each step of the tournament
