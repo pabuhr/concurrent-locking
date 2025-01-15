@@ -1,8 +1,8 @@
 // Wim H. Hesselink and Peter A. Buhr, MCSH, a Lock with the Standard Interface, ACM Transactions on Parallel Computing,
 // 10(2), June 2023, pp 1-23
 
-// There are two version of the algorithm: the paper original and with modification by Ting-Ching Li, National Chengchi
-// University, Taipei, Taiwan.
+// There are two versions of the algorithm: the original in the TOPC's paper and with modifications by Ting-Ching Li,
+// National Chengchi University, Taipei, Taiwan.
 
 #include <stdbool.h>
 

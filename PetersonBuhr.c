@@ -5,18 +5,18 @@
 #include "Binary.c"
 
 typedef struct CALIGN {
-	Token *ns;											// pointer to path node from leaf to root
+	Token * ns;											// pointer to path node from leaf to root
 	TYPE es;											// left/right opponent
 } Tuple;
 
-static Tuple **states CALIGN;							// handle N threads
-static int *levels CALIGN;								// minimal level for binary tree
+static Tuple ** states CALIGN;							// handle N threads
+static int * levels CALIGN;								// minimal level for binary tree
 //static Tuple states[64][6] CALIGN;						// handle 64 threads with maximal tree depth of 6 nodes (lg 64)
 //static int levels[64] = { -1 } CALIGN;					// minimal level for binary tree
-static Token *t CALIGN;
+static Token * t CALIGN;
 static TYPE PAD CALIGN __attribute__(( unused ));		// protect further false sharing
 
-static void *Worker( void *arg ) {
+static void * Worker( void * arg ) {
 	TYPE id = (size_t)arg;
 	uint64_t entry;
 
@@ -33,7 +33,7 @@ static void *Worker( void *arg ) {
 		RTYPE randomThreadChecksum = 0;
 
 		for ( entry = 0; stop == 0; entry += 1 ) {
-			for ( int lv = 0; lv <= level; lv += 1 ) {		// entry protocol
+			for ( int lv = 0; lv <= level; lv += 1 ) {	// entry protocol
 				binary_prologue( state[lv].es, state[lv].ns );
 			} // for
 
