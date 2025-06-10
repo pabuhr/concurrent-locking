@@ -177,20 +177,24 @@ typedef volatile uint32_t VWHOLESIZE;
 //------------------------------------------------------------------------------
 
 // Treat lock/change parameter as reference.
-#define Clr( lock ) __atomic_clear( (&(lock)), __ATOMIC_RELEASE )
+#define Ldm( lock, memorder ) __atomic_load_n( (&(lock)), memorder )
+#define Ld( lock ) Ldm( lock, __ATOMIC_ACQUIRE )
+#define Strm( lock, value, memorder ) __atomic_store_n( (&(lock)), value, memorder )
+#define Str( lock, value ) Strm( lock, value, __ATOMIC_RELEASE ) 
 #define Clrm( lock, memorder ) __atomic_clear( (&(lock)), memorder )
-#define Tas( lock ) __atomic_test_and_set( (&(lock)), __ATOMIC_ACQUIRE )
+#define Clr( lock ) Clrm( lock, __ATOMIC_RELEASE )
 #define Tasm( lock, memorder ) __atomic_test_and_set( (&(lock)), memorder )
-#define Cas( change, comp, assn ) ({TYPEOF(comp) __temp = (comp); __atomic_compare_exchange_n( (&(change)), (&(__temp)), (assn), false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST ); })
+#define Tas( lock ) Tasm( lock, __ATOMIC_ACQUIRE )
 #define Casm( change, comp, assn, smemorder, fmemorder ) ({TYPEOF(comp) * __temp = &(comp); __atomic_compare_exchange_n( (&(change)), (&(__temp)), (assn), false, smemorder, fmemorder ); })
-#define Casw( change, comp, assn ) ({TYPEOF(comp) __temp = (comp); __atomic_compare_exchange_n( (&(change)), (&(__temp)), (assn), true, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST ); })
+#define Cas( change, comp, assn ) Casm( change, comp, assn, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST )
 #define Caswm( change, comp, assn, smemorder, fmemorder ) ({TYPEOF(comp) __temp = (comp); __atomic_compare_exchange_n( (&(change)), (&(__temp)), (assn), true, smemorder, smemorder ); })
-#define Casv( change, comp, assn ) __atomic_compare_exchange_n( (&(change)), (comp), (assn), false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST )
-#define Casvm( change, comp, assn, smemorder, fmemorder ) __atomic_compare_exchange_n( (&(change)), (comp), (assn), false, smemorder, fmemorder )
-#define Casvw( change, comp, assn ) __atomic_compare_exchange_n( (&(change)), (comp), (assn), true, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST )
-#define Casvwm( change, comp, assn, smemorder, fmemorder ) __atomic_compare_exchange_n( (&(change)), (comp), (assn), true, smemorder, fmemorder )
-#define Fas( change, assn ) __atomic_exchange_n( (&(change)), (assn), __ATOMIC_SEQ_CST )
+#define Casw( change, comp, assn ) Caswm( change, comp, assn, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST )
+#define Casvm( change, comp, assn, smemorder, fmemorder ) __atomic_compare_exchange_n( (&(change)), (&(comp)), (assn), false, smemorder, fmemorder )
+#define Casv( change, comp, assn ) Casvm( change, comp, assn, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST )
+#define Casvwm( change, comp, assn, smemorder, fmemorder ) __atomic_compare_exchange_n( (&(change)), (&(comp)), (assn), true, smemorder, fmemorder )
+#define Casvw( change, comp, assn ) Casvwm( change, comp, assn, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST )
 #define Fasm( change, assn, memorder ) __atomic_exchange_n( (&(change)), (assn), memorder )
+#define Fas( change, assn ) Fasm( change, assn, __ATOMIC_SEQ_CST )
 #ifndef __cplusplus
 #define Fai( change, Inc ) __atomic_fetch_add( (&(change)), (Inc), __ATOMIC_SEQ_CST )
 #else
@@ -639,7 +643,7 @@ static int compare( const void * p1, const void * p2 ) {
 
 //------------------------------------------------------------------------------
 
-static void statistics( size_t N, uint64_t values[], double * avg, double * std, double * rstd ) {
+static void statistics( size_t N, uint64_t values[N], double * avg, double * std, double * rstd ) {
 	double sum = 0.;
 	for ( size_t r = 0; r < N; r += 1 ) {
 		sum += values[r];
