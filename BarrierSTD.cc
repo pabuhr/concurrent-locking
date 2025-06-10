@@ -17,5 +17,5 @@ void __attribute__((noinline)) dtor() {
 } // dtor
 
 // Local Variables: //
-// compile-command: "g++-11 -Wall -Wextra -Werror -Wno-volatile -O3 -std=c++20 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=BarrierSTD Harness.c -lpthread -lm -D`hostname` -DCFMT" //
+// compile-command: "g++-11 -Wall -Wextra -Werror -Wno-volatile -std=c++20 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=BarrierSTD Harness.c -lpthread -lm -D`hostname` -DCFMT" //
 // End: //
