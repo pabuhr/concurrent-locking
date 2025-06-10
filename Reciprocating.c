@@ -4,7 +4,11 @@
 // https://doi.org/10.1145/3710848.3710862 (ACM)
 // The code below closely follows Listing-1 in the above.
 // https://arxiv.org/abs/2501.02380 (Long form)
-// The Reciprocating lock gains performance by a controlled (small) amount of unfairness.
+
+// The Reciprocating lock gains performance by a controlled amount of unfairness, while ensuring an anti-starvation
+// guarantee. If thread T1 is waiting and T2 arrives after T1, then T2 can bypass T1 at most once before T1 gains
+// ownership. The maximum possible long-term unfairness induced by the lock's admission schedule is 2x, where the
+// fastest thread can only be admitted twice as often as the most unlucky thread over long periods.
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -25,11 +29,11 @@ static __thread WaitElement E CALIGN;
 
 static ReciprocatingLock lock CALIGN;
 
-static inline WaitElement * Acquire(ReciprocatingLock * lock, WaitElement ** _EndOfSegment ) {
-	atomic_store_explicit( &E.Gate, NULL, memory_order_release );
+static inline WaitElement * Acquire( ReciprocatingLock * lock, WaitElement ** _EndOfSegment ) {
+	Str( E.Gate, NULL );
 	WaitElement * succ = NULL;
 	WaitElement * EndOfSegment = &E;
-	WaitElement * const tail = atomic_exchange( &lock->Arrivals, &E );
+	WaitElement * const tail = Fas( lock->Arrivals, &E );
 	assert( tail != &E );
 	if ( tail != NULL ) {
 		// coerce LOCKEDEMPTY to null
@@ -42,7 +46,7 @@ static inline WaitElement * Acquire(ReciprocatingLock * lock, WaitElement ** _En
 		// That, in turn, would obviate the need to clear Gate at the top of Acquire
 		// and would avoid the MESI/MOESI/MESIF S->M coherence upgrade.
 		for ( ;; ) {
-			EndOfSegment = atomic_load_explicit( &E.Gate, memory_order_acquire );
+			EndOfSegment = Ld( E.Gate );
 			if ( EndOfSegment != NULL ) break;
 			Pause();
 		}
@@ -50,7 +54,7 @@ static inline WaitElement * Acquire(ReciprocatingLock * lock, WaitElement ** _En
 
 		// Detect logical end-of-segment terminus address
 		if ( succ == EndOfSegment ) {
-			succ = NULL;         // quash
+			succ = NULL;								// quash
 			EndOfSegment = LOCKEDEMPTY;
 		}
 	}
@@ -61,37 +65,37 @@ static inline WaitElement * Acquire(ReciprocatingLock * lock, WaitElement ** _En
 
 static inline void Release( ReciprocatingLock * lock, WaitElement * EndOfSegment, WaitElement * succ ) {
 	assert( EndOfSegment != NULL );
-	assert( atomic_load_explicit(&lock->Arrivals, memory_order_acquire) != NULL );
+	assert( Ld( lock->Arrivals ) != NULL );
 
 	if ( succ != NULL ) {
-		assert( atomic_load(&succ->Gate) == NULL );
-		atomic_store_explicit( &succ->Gate, EndOfSegment, memory_order_release );
+		assert( Ld( succ->Gate ) == NULL );
+		Str( succ->Gate, EndOfSegment );
 		return;
 	}
 
 	assert( EndOfSegment == LOCKEDEMPTY || EndOfSegment == &E );
 #if 0
 	WaitElement * v = EndOfSegment;
-	if ( atomic_compare_exchange_strong_explicit( &lock->Arrivals, &v, NULL, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST ) ) {
+	if ( Casv( lock->Arrivals, v, NULL ) ) {
 		// uncontended fast-path return
 		return;
 	}
 #else
-	if ( atomic_load_explicit( &lock->Arrivals, memory_order_acquire ) == EndOfSegment ) {
+	if ( Ld( lock->Arrivals ) == EndOfSegment ) {
 		WaitElement * v = EndOfSegment;
-		if ( atomic_compare_exchange_strong_explicit( &lock->Arrivals, &v, NULL, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST ) ) {
+		if ( Casv( lock->Arrivals, v, NULL ) ) {
 			// uncontended fast-path return
 			return;
 		}
 	}
 #endif
 
-	WaitElement * w = atomic_exchange( &lock->Arrivals, LOCKEDEMPTY );
+	WaitElement * w = Fas( lock->Arrivals, LOCKEDEMPTY );
 	assert( w != NULL );
 	assert( w != LOCKEDEMPTY );
 	assert( w != &E );
-	assert( atomic_load_explicit( &w->Gate, memory_order_acquire ) == NULL );
-	atomic_store_explicit( &w->Gate, EndOfSegment, memory_order_release );
+	assert( Ld( w->Gate ) == NULL );
+	Str( w->Gate, EndOfSegment );
 }
 
 static void * Worker( void * arg ) {
@@ -146,7 +150,7 @@ static void * Worker( void * arg ) {
 } // Worker
 
 void __attribute__((noinline)) ctor() {
-	atomic_store_explicit( &lock.Arrivals, NULL, memory_order_release );
+	Str( lock.Arrivals, NULL );
 } // ctor
 
 void __attribute__((noinline)) dtor() {
@@ -154,5 +158,5 @@ void __attribute__((noinline)) dtor() {
 
 // Local Variables: //
 // tab-width: 4 //
-// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=Reciprocating Harness.c -DNDEBUG=1 -lpthread -lm -D`hostname` -DCFMT -DCNT=0" //
+// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=Reciprocating Harness.c -lpthread -lm -D`hostname` -DCFMT -DCNT=0" //
 // End: //
