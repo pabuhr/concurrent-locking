@@ -643,7 +643,7 @@ static int compare( const void * p1, const void * p2 ) {
 
 //------------------------------------------------------------------------------
 
-static void statistics( size_t N, uint64_t values[N], double * avg, double * std, double * rstd ) {
+static void statistics( size_t N, uint64_t values[/* C++ does handle N */], double * avg, double * std, double * rstd ) {
 	double sum = 0.;
 	for ( size_t r = 0; r < N; r += 1 ) {
 		sum += values[r];
