@@ -69,8 +69,10 @@
 
 //------------------------------------------------------------------------------
 
-typedef uintptr_t TYPE;									// addressable word-size
-typedef volatile TYPE VTYPE;							// volatile addressable word-size
+typedef size_t TYPE;									// unsigned addressable unsigned word-size
+typedef ssize_t STYPE;									// signed addressable signed word-size
+typedef volatile TYPE VTYPE;							// volatile addressable unsigned word-size
+typedef volatile STYPE VSTYPE;							// volatile addressable signed word-size
 typedef uint32_t RTYPE;									// unsigned 32-bit integer
 
 typedef uint8_t BYTESIZE;
