@@ -1,56 +1,51 @@
-typedef VTYPE CALIGN * Barrier;
+#include "BarrierCallback.h"
+
+typedef struct {
+	TYPE CALIGN group;
+	VTYPE CALIGN * barrier;
+	CBDECL();
+} Barrier;
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
 static Barrier b CALIGN;
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 #define BARRIER_DECL
-#define BARRIER_CALL block( b, p );
+#define BARRIER_CALL block( &b, p );
 
-static inline void block( Barrier aa, TYPE p ) {
-	TYPE aap = aa[p];									// optimization
+static inline bool block( Barrier * b, TYPE p ) {
+	CBSTART();											// must be first
+	bool ret;
 	if ( p == 0 ) {
-		#if 0
-		TYPE sp, stack[N];								// Lamport attempt to reduce busy wait
-		for ( sp = 1; sp < N; sp += 1 ) stack[sp] = sp;
-		while ( sp > 1 ) {								// skip p[0]
-			for ( TYPE i = 1; i < sp; ) {
-				if ( aap != aa[stack[i]] ) {
-					sp -= 1;
-					stack[i] = stack[sp];
-				} else {
-					i += 1;
-				} // if
-			} // for
-		} // while
-		#else
-		for ( TYPE kk = 1; kk < N ; kk += 1 ) {			// skip p[0]
-			await( aap != aa[kk] );
+		for ( TYPE kk = 1; kk < b->group ; kk += 1 ) {	// skip p[0]
+			await( b->barrier[kk] );
 		} // for
-		#endif // 0
-		// CALL ACTION CALLBACK BEFORE TRIGGERING BARRIER
-		aa[0] = ! aap;									// release waiting threads
-		Fence();
+		CBEND();										// must appear in safe location
+		for ( TYPE kk = 1; kk < b->group ; kk += 1 ) {	// skip p[0]
+			b->barrier[kk] = false;						// release waiting threads
+		} // for
+		ret = true;
 	} else {
-		aap = ! aap;
-		aa[p] = aap;
-		Fence();
-		await( aap == aa[0] );							// wait for p0 to see all waiting threads
+		b->barrier[p] = true;
+		await( ! b->barrier[p] );						// wait for p0 to see all waiting threads
+		ret = false;
 	} // if
+	Fence();
+	return ret;
 } // block
 
 #include "BarrierWorker.c"
 
 void __attribute__((noinline)) ctor() {
 	worker_ctor();
-	b = Allocator( sizeof(typeof(b[0])) * N );
-	for ( size_t i = 0; i < N; i += 1 ) {
-		b[i] = false;
+	b = (Barrier){ .group = N, .barrier = Allocator( sizeof(typeof(b.barrier[0])) * N ) CBINIT() };
+	for ( typeof(N) i = 0; i < N; i += 1 ) {
+		b.barrier[i] = false;
 	} // for
 } // ctor
 
 void __attribute__((noinline)) dtor() {
-	free( (void *)b );
+	free( (void *)b.barrier );
 	worker_dtor();
 } // dtor
 

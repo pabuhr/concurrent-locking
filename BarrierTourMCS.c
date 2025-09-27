@@ -1,6 +1,8 @@
 // John M. Mellor-Crummey and Michael L. Scott, Algorithms for Scalable Synchronization on Shared-Memory Multiprocessors,
 // ACM Transactions on Computer Systems, 9(1), February 1991, Fig. 11, p. 40
 
+#include "BarrierCallback.h"
+
 typedef enum { winner, loser, bye, champion, dropout } Role;
 
 typedef struct CALIGN {
@@ -10,7 +12,9 @@ typedef struct CALIGN {
 } rount_t;
 
 typedef	struct {
+	TYPE CALIGN group;
 	rount_t ** rounds;
+	CBDECL();
 } Barrier;
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
@@ -20,13 +24,14 @@ static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sha
 #define BARRIER_DECL TYPE sense = true;
 #define BARRIER_CALL block( &b, p, &sense );
 
-static inline void block( Barrier * b, TYPE p, TYPE * sense ) {
+static inline bool block( Barrier * b, TYPE p, TYPE * sense ) {
+	CBSTART();											// must be first
 	TYPE lsense = *sense;								// optimization (compiler probably does it)
-	TYPE round = 1;
+	TYPE round = 1, champ;
 
 	// Special-case for N == 1 since it is assigned the "bye" role, which leads to an infinite loop in the first loop if
 	// not skipped. This results because for N > 1 all threads have a champion, but for N == 1 there is champion.
-	if ( N == 1 ) goto Loop1;
+	if ( b->group == 1 ) goto Loop1;
 	
 	for ( ;; ) {										// arrival
 		switch ( b->rounds[p][round].role ) {
@@ -41,7 +46,9 @@ static inline void block( Barrier * b, TYPE p, TYPE * sense ) {
 		  case bye:										// do nothing
 			break; // go to next round of tournament
 		  case champion:
+			champ = p;
 			await( b->rounds[p][round].flag == lsense );
+			CBEND();									// must appear in safe location
 			*b->rounds[p][round].opponent = lsense;
 			Fence();
 			goto Loop1;
@@ -74,6 +81,7 @@ static inline void block( Barrier * b, TYPE p, TYPE * sense ) {
 	} // for
   Loop2: ;
 	*sense = ! lsense;
+	return p == champ;
 } // block
 
 #include "BarrierWorker.c"
@@ -81,7 +89,7 @@ static inline void block( Barrier * b, TYPE p, TYPE * sense ) {
 void __attribute__((noinline)) ctor() {
 	worker_ctor();
 	TYPE cols = Log2( N ) + 2;							// zero to Log2 inclusive
-	b.rounds = Allocator( sizeof(typeof(b.rounds[0])) * N ); // rows
+	b = (Barrier){ .group = N, .rounds = Allocator( sizeof(typeof(b.rounds[0])) * N ) CBINIT() };
 
 	// must initialize cols first so that opponent can be set properly
 	for ( typeof(N) r = 0; r < N; r += 1 ) {

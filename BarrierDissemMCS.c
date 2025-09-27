@@ -1,11 +1,14 @@
 // John M. Mellor-Crummey and Michael L. Scott, Algorithms for Scalable Synchronization on Shared-Memory Multiprocessors,
 // ACM Transactions on Computer Systems, 9(1), February 1991, Fig. 10, p. 38
 
+// Cannot have callback/distinguished-thread without changing from symmetric to asymmetric.
+
 struct flags {
 	VTYPE ** my_flags, *** partner_flags;
 };
 
 typedef struct {
+	TYPE CALIGN group;
 	TYPE exponent;
 	struct flags * allnodes;
 } Barrier;
@@ -28,14 +31,13 @@ static inline void block( Barrier * b, TYPE p, TYPE * sense, TYPE * parity ) {
 	if ( lparity ) *sense = ! lsense;
 	*parity = ! lparity;
 	Fence();
-}
+} // block
 
 #include "BarrierWorker.c"
 
 void __attribute__((noinline)) ctor() {
-	b.exponent = Clog2( N );
-	b.allnodes = Allocator( N * sizeof(b.allnodes[0]) );
-	
+	worker_ctor();
+	b = (Barrier){ .exponent = Clog2( N ), .allnodes = Allocator( N * sizeof(b.allnodes[0]) ) };
 	// for each node
 	for ( TYPE i = 0; i < N; i += 1 ) {
 		// alloc my flag array
@@ -61,7 +63,6 @@ void __attribute__((noinline)) ctor() {
 		} // for
 		pow2 *= 2;
 	} // for
-	worker_ctor();
 } // ctor
 
 void __attribute__((noinline)) dtor() {

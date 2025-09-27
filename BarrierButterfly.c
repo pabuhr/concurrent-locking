@@ -1,7 +1,10 @@
 // Eugene D. Brooks III, The Butterfly Barrier, International Journal of Parallel Programming, Vol. 15, No. 4, 1986, pp
 // 295-307.
 
+// Cannot have callback/distinguished-thread without changing from symmetric to asymmetric.
+
 typedef struct {
+	TYPE CALIGN group;
 	VTYPE ** shared_counters;
 	TYPE next_power, exponent;
 	bool is_power_of_two;
@@ -39,9 +42,9 @@ static inline TYPE get_partner( TYPE p, TYPE curr_step ) {
 static inline void block( Barrier * b, TYPE p ) {
 	// Gets the mirrored idx for use when N not a power of 2 used for masquerading as a missing task
 	TYPE mirror_idx = b->next_power - p - 1;
-	bool should_masquerade = ! b->is_power_of_two && mirror_idx > N - 1; 
+	bool should_masquerade = ! b->is_power_of_two && mirror_idx > b->group - 1; 
 
-	for ( TYPE curr_step = 1, curr_count = 0; curr_step < N; curr_step *= 2, curr_count += 1 ) {
+	for ( TYPE curr_step = 1, curr_count = 0; curr_step < b->group; curr_step *= 2, curr_count += 1 ) {
 		if ( should_masquerade )						// handle non power-of-two case
 			handoff_start( b, mirror_idx, curr_count );
 
@@ -55,7 +58,9 @@ static inline void block( Barrier * b, TYPE p ) {
 #include "BarrierWorker.c"
 
 void __attribute__((noinline)) ctor() {
+	worker_ctor();
 	// O(1) check if N is a power of two
+	b.group = N;
 	b.is_power_of_two = (N & (N - 1)) == 0;
 
 	// exponent is x s.t. 2^x >= N > 2^(x-1)
@@ -68,7 +73,6 @@ void __attribute__((noinline)) ctor() {
 			b.shared_counters[r][c] = false;
 		} // for
 	} // for
-	worker_ctor();
 } // ctor
 
 void __attribute__((noinline)) dtor() {

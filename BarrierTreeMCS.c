@@ -1,6 +1,8 @@
 // John M. Mellor-Crummey and Michael L. Scott, Algorithms for Scalable Synchronization on Shared-Memory Multiprocessors,
 // ACM Transactions on Computer Systems, 9(1), February 1991, Fig. 12, p. 42
 
+#include "BarrierCallback.h"
+
 enum { FANIN = 4 };
 
 typedef union {
@@ -18,7 +20,9 @@ typedef struct CALIGN {
 } Tree_node;
 
 typedef struct {
+	CB( TYPE CALIGN group; )
 	Tree_node * tree;
+	CBDECL();
 } Barrier;
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
@@ -28,7 +32,8 @@ static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sha
 #define BARRIER_DECL TYPE sense = true
 #define BARRIER_CALL block( &b, p, &sense );
 
-static inline void block( Barrier * b, TYPE p, TYPE * sense ) {
+static inline bool block( Barrier * b, TYPE p, TYPE * sense ) {
+	CBSTART();											// must be first
 	Tree_node * tree_node = &b->tree[p];				// optimizations (compiler probably does it)
 	TYPE lsense = *sense;
 
@@ -42,21 +47,28 @@ static inline void block( Barrier * b, TYPE p, TYPE * sense ) {
 	// Fence(); // add if needed
 
 	// if not root, wait until my parent signals wakeup
+	bool ret;
 	if ( p != 0 ) {
 		await( lsense == tree_node->parent_sense );
-		// CALL ACTION CALLBACK BEFORE TRIGGERING BARRIER
+		CBEND();										// must appear in safe location
+		ret = true;
+	} else {
+		ret = false;
 	} // if
 
 	// signal children in wakeup tree
 	*tree_node->children[0] = lsense;
 	*tree_node->children[1] = lsense;
 	*sense = ! lsense;
+	return ret;
 } // block
 
 #include "BarrierWorker.c"
 
 void __attribute__((noinline)) ctor() {
-	b.tree = Allocator( sizeof(Tree_node) * N );
+	worker_ctor();
+	b = (Barrier){ CB( .group = N, ) .tree = Allocator( sizeof(Tree_node) * N ) CBINIT() };
+
 	for ( TYPE i = 0; i < N; i++ ) {
 		b.tree[i].parent_sense = false;
 		for ( int j = 0; j < FANIN; j++ ) {
@@ -75,12 +87,11 @@ void __attribute__((noinline)) ctor() {
 		if ( 2 * i + 1 >= N ) b.tree[i].children[0] = (VBYTESIZE *)(&b.tree[i].dummy);
 		else b.tree[i].children[0] = &b.tree[2 * i + 1].parent_sense;
 	} // for
-	worker_ctor();
 } // ctor
 
 void __attribute__((noinline)) dtor() {
-	worker_dtor();
 	free( b.tree );
+	worker_dtor();
 } // dtor
 
 // Local Variables: //

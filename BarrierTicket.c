@@ -1,7 +1,10 @@
+#include "BarrierCallback.h"
+
 typedef struct {
-	TYPE  CALIGN group;
-	VTYPE CALIGN ticket;
-	VTYPE CALIGN serving;
+	TYPE CALIGN group;
+	VSTYPE CALIGN ticket;
+	VSTYPE CALIGN serving;
+	CBDECL();
 } Barrier;
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
@@ -11,23 +14,25 @@ static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sha
 #define BARRIER_DECL
 #define BARRIER_CALL block( &b );
 
-static inline void block( Barrier * b ) {
-	TYPE myTicket = Fai( b->ticket, 1 );
+static inline bool block( Barrier * b ) {
+	CBSTART();											// must be first
+	STYPE myTicket = Fai( b->ticket, 1 );
 
-	if ( FASTPATH( b->serving - myTicket != 1 ) ) {
-		TYPE myGroup = myTicket + b->group;				// optimization (compiler probably does it)
-		await( myGroup < b->serving );					// wait for my group to fill
-	} else {
-		// CALL ACTION CALLBACK BEFORE TRIGGERING BARRIER
-		b->serving += b->group;							// current group full => advance to next group
+	if ( LIKELY( FASTPATH( b->serving - myTicket != 1 ) ) ) { // wait ?
+		STYPE myGroup = myTicket + b->group;			// optimization (compiler probably does it)
+		await( myGroup - b->serving < 0 );				// wait for my group to fill
+		return false;
 	} // if
+	CBEND();											// must appear in safe location
+	b->serving += b->group;								// current group full => advance to next group
+	return true;
 } // block
 
 #include "BarrierWorker.c"
 
 void __attribute__((noinline)) ctor() {
-	b = (Barrier){ .group = N, .ticket = 0, .serving = N };
 	worker_ctor();
+	b = (Barrier){ .group = N, .ticket = 0, .serving = N CBINIT() };
 } // ctor
 
 void __attribute__((noinline)) dtor() {

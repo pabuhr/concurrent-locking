@@ -2,32 +2,39 @@
 // International Parallel and Distributed Processing Symposium Workshops (IPDPSW), Vancouver, BC, Canada, 2018,
 // pp. 773-782, Algorithm 1
 
-typedef VTYPE CALIGN * Barrier;
+#include "BarrierCallback.h"
+
+typedef struct {
+	TYPE CALIGN group;
+	VTYPE CALIGN * barrier;
+	CBDECL();
+} Barrier;
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
 static Barrier b CALIGN;
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 #define BARRIER_DECL TYPE go = false;
-#define BARRIER_CALL block( b, p, &go );
+#define BARRIER_CALL block( &b, p, &go );
 
-static inline void block( Barrier b, TYPE p, TYPE * go ) {
-	if ( UNLIKELY( N == 1 ) ) return;					// special case
+static inline void block( Barrier * b, TYPE p, TYPE * go ) {
+	CBSTART();											// must be first
+	if ( UNLIKELY( b->group == 1 ) ) return;			// special case
 
 	if ( UNLIKELY( p == 0 ) ) {
-		b[p + 1] = *go;
+		b->barrier[p + 1] = *go;
 		Fence();
-		await( b[0] == *go );
+		await( b->barrier[0] == *go );
 	} else {
-		if ( LIKELY( p < N - 1 ) ) {
-			await( b[p] == *go );
-			b[p + 1] = *go;
+		if ( LIKELY( p < b->group - 1 ) ) {
+			await( b->barrier[p] == *go );
+			b->barrier[p + 1] = *go;
 			Fence();
-			await( b[0] == *go );
+			await( b->barrier[0] == *go );
 		} else {
-			await( b[p] == *go );
-			// CALL ACTION CALLBACK BEFORE TRIGGERING BARRIER
-			b[0] = *go;
+			await( b->barrier[p] == *go );
+			CBEND();									// must appear in safe location
+			b->barrier[0] = *go;
 			Fence();
 		} // if
 	} // if
@@ -39,14 +46,14 @@ static inline void block( Barrier b, TYPE p, TYPE * go ) {
 
 void __attribute__((noinline)) ctor() {
 	worker_ctor();
-	b = Allocator( sizeof(typeof(b[0])) * N );
+	b = (Barrier){ .group = N, .barrier = Allocator( sizeof(typeof(b.barrier[0])) * N ) };
 	for ( typeof(N) i = 0; i < N; i += 1 ) {
-		b[i] = true;
+		b.barrier[i] = true;
 	} // for
 } // ctor
 
 void __attribute__((noinline)) dtor() {
-	free( (void *)b );
+	free( (void *)b.barrier );
 	worker_dtor();
 } // dtor
 

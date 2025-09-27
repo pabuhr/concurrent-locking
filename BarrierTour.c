@@ -1,11 +1,15 @@
 // Debra Hensgen, Raphael Finkel, and Udi Manber, Two Algorithms for Barrier Synchronization, International Journal
 // of Parallel Programming, Vol. 17, No. 1, 1988 pp. 11-13
 
+#include "BarrierCallback.h"
+
 typedef	struct {
+	TYPE CALIGN group;
+	VTYPE BarrierCount;									// which announcement is being used for current tournament
+	VTYPE Announcement[2];								// global announcement flags to hold threads until after tournament
 	VTYPE ** Answers;									// flags waited on in each step of the tournament
 	TYPE ** Opponent;									// table of tournament opponents
-	VTYPE Announcement[2];								// global announcement flags to hold threads until after tournament
-	VTYPE BarrierCount;									// which announcement is being used for current tournament
+	CBDECL();
 } Barrier;
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
@@ -15,18 +19,19 @@ static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sha
 #define BARRIER_DECL
 #define BARRIER_CALL block( &b, p );
 
-static inline void block( Barrier * b, TYPE p ) {
-	TYPE power = 1, Clog2N = Clog2( N ), LocalBarrierCount;
+static inline bool block( Barrier * b, TYPE p ) {
+	CBSTART();											// must be first
+	TYPE power = 1, Clog2N = Clog2( b->group ), LocalBarrierCount;
 
 	LocalBarrierCount = b->BarrierCount;
 	for ( typeof(N) instance = 0; instance < Clog2N; instance += 1 ) {
 	  if ( p % power != 0 ) {
-			break;										// break out of loop; we are no longer active
+			break;										// break out of loop; no longer active
 		} // exit
 		if ( p > b->Opponent[p][instance] ) {			// loser
 			b->Answers[ b->Opponent[p][instance] ][instance] = true;
 			Fence();
-		} else if ( b->Opponent[p][instance] >= N ) {
+		} else if ( b->Opponent[p][instance] >= b->group ) {
 			// win by default if no opponent
 		} else {										// winner
 			// The following two lines are incorrectly indexed in the paper as b->Answers[b->Opponent[p][instance]][instance].
@@ -40,13 +45,16 @@ static inline void block( Barrier * b, TYPE p ) {
 		power += power;
 	} // for
 
-	if ( p == 0 ) {										// process 0 is always the champion
+	if ( UNLIKELY( p == 0 ) ) {							// process 0 is always the champion
+		CBEND();										// must appear in safe location
 		b->BarrierCount = (b->BarrierCount + 1) % 2;
 		b->Announcement[b->BarrierCount] = false;		// reinit
 		b->Announcement[LocalBarrierCount] = true;		// all may proceed
 		Fence();
+		return true;
 	} else {											// not the champion
 		await( b->Announcement[LocalBarrierCount] );
+		return false;
 	} // if
 } // block
 
@@ -56,6 +64,7 @@ void __attribute__((noinline)) ctor() {
 	worker_ctor();
 	TYPE cols = Clog2( N );
 
+	b = (Barrier){ .group = N, .BarrierCount = 0, .Announcement = { false, false } CBINIT() };
 	b.Answers = Allocator( sizeof(typeof(b.Answers[0])) * N ); // rows
 	b.Opponent = Allocator( sizeof(typeof(b.Opponent[0])) * N ); // rowa
 	for ( TYPE i = 0; i < N; i += 1 ) {
@@ -72,8 +81,6 @@ void __attribute__((noinline)) ctor() {
 		} // for
 		power += power;
 	} // for
-	b.Announcement[0] = b.Announcement[1] = false;
-	b.BarrierCount = 0;
 } // ctor
 
 void __attribute__((noinline)) dtor() {

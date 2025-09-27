@@ -51,24 +51,32 @@
 //   successor, whereas MCS, has "next" pointers in memory.  But it is unlike CLH in that it waits on a field in the
 //   queued element, instead of the previous element.
 
+#include "BarrierCallback.h"
+
 typedef struct CALIGN waitelement {
 	VTYPE Ordinal;
 	VTYPE Gate;
 } WaitElement;
 
-typedef CALIGN WaitElement * barrier;
+typedef struct {
+	TYPE CALIGN group;
+	WaitElement * barrier;
+	CBDECL();
+} Barrier;
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
-static barrier b CALIGN = NULL;
+static Barrier b CALIGN;
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 #define BARRIER_DECL
 #define BARRIER_CALL block( &b );
 
-static inline void block( barrier * b ) {
-	WaitElement W = { .Gate = 0, .Ordinal = 0 };		// mark as not yet resolved
-	WaitElement * pred = Fas( *b, &W );
+static inline bool block( Barrier * b ) {
+	CBSTART();											// must be first
+	WaitElement W = { .Gate = false, .Ordinal = 0 };	// mark as not yet resolved
+	WaitElement * pred = Fas( b->barrier, &W );
 	assert( pred != &W );
+
 	if ( pred != NULL ) {
 		await( pred->Ordinal != 0 );					// wait for predecessor's count to resolve
 		W.Ordinal = pred->Ordinal + 1;
@@ -76,32 +84,35 @@ static inline void block( barrier * b ) {
 		W.Ordinal = 1 ;
 	} // if
 	assert( W.Ordinal != 0 );
-	if ( W.Ordinal < N ) {								// intermediate thread ?
-		await( W.Gate != 0 );							// primary waiting loop
+
+	if ( LIKELY( W.Ordinal < b->group ) ) {				// intermediate thread ?
+		await( W.Gate );								// primary waiting loop
 		if ( pred != NULL ) {
-			assert( pred->Gate == 0 );
-			pred->Gate = 1;								// propagate notification through the stack
+			assert( ! pred->Gate );
+			pred->Gate = true;							// propagate notification through the stack
 		} // if
-	} else {											// ultimate thread to arrive
-		// CALL ACTION CALLBACK BEFORE TRIGGERING BARRIER
-		#ifdef NDEBUG
-		*b = NULL;
-		#else
-		WaitElement * DetachedList = Fas( *b, NULL );
-		assert( DetachedList == &W );
-		assert( DetachedList->Gate == 0 );
-		#endif
-		if ( pred != NULL ) {
-			assert( pred->Gate == 0 );
-			pred->Gate = 1;								// propagate notification through the stack
-		} // if
+		return false;
 	} // if
+	CBEND();											// must appear in safe location
+	#ifdef NDEBUG
+	b->barrier = NULL;
+	#else
+	WaitElement * DetachedList = Fas( *b, NULL );
+	assert( DetachedList == &W );
+	assert( ! DetachedList->Gate );
+	#endif
+	if ( pred != NULL ) {
+		assert( ! pred->Gate );
+		pred->Gate = true;								// propagate notification through the stack
+	} // if
+	return true;
 } // block
 
 #include "BarrierWorker.c"
 
 void __attribute__((noinline)) ctor() {
 	worker_ctor();
+	b = (Barrier){ .group = N, .barrier = NULL CBINIT() };
 } // ctor
 
 void __attribute__((noinline)) dtor() {

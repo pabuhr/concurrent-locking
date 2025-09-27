@@ -1,3 +1,5 @@
+#include "BarrierCallback.h"
+
 static TYPE PAD3 CALIGN __attribute__(( unused ));		// protect further false sharing
 static VTYPE CALIGN stopcnt = 0;
 static VTYPE CALIGN * cnt;
@@ -68,7 +70,11 @@ static void * Worker( void * arg ) {
 
 void __attribute__((noinline)) worker_ctor() {
 	#ifdef CFMT
-	if ( N == 1 ) printf( " TESTING freq=%#x/%d", Frequency, Frequency );
+	if ( N == 1 ) {
+		printf( " TESTING freq=%#x/%d", Frequency, Frequency );
+		CB( printf( ", CALLBACK" ); )
+		CBCHK( printf( ", CALLBACK CHECK" ); )
+	} // if
 	#endif // CFMT
 	cnt = (TYPEOF(cnt))Allocator( sizeof(TYPEOF(cnt[0])) * N );
 } // worker_ctor

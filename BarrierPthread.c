@@ -1,3 +1,5 @@
+// Cannot have callback/distinguished-thread without changing from symmetric to asymmetric.
+
 #include <pthread.h>
 
 typedef pthread_barrier_t Barrier;

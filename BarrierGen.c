@@ -1,10 +1,15 @@
 // This algorithm seems to be in the concurrency folklore (anonymous and transmitted orally), and hence, there is no
 // citation.
 
+// generation can overflow, but equality test works. 2^{32/64} + 1 threads must arrive simultaneously for failure.
+
+#include "BarrierCallback.h"
+
 typedef struct {
-	TYPE  CALIGN group;
+	TYPE CALIGN group;
 	VTYPE CALIGN count;
 	VTYPE CALIGN generation;
+	CBDECL();
 } Barrier;
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
@@ -14,23 +19,26 @@ static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sha
 #define BARRIER_DECL
 #define BARRIER_CALL block( &b );
 
-static inline void block( Barrier * b ) {
+static inline bool block( Barrier * b ) {
+	CBSTART();											// must be first
 	TYPE mygen = b->generation;
-	
-	if ( FASTPATH( Fai( b->count, 1 ) < b->group - 1 ) ) {
+
+	if ( LIKELY( Fai( b->count, 1 ) != b->group - 1 ) ) { // wait ?
 		await( b->generation != mygen );				// wait for my generation
-	} else {
-		// CALL ACTION CALLBACK BEFORE TRIGGERING BARRIER
-		b->count = 0;									// release current generation
-		b->generation += 1;								// start next generation
+		return false;
 	} // if
+	CBEND();											// must appear in safe location
+	b->count = 0;										// release current generation
+	WO( Fence(); );
+	b->generation += 1;									// start next generation
+	return true;
 } // block
 
 #include "BarrierWorker.c"
 
 void __attribute__((noinline)) ctor() {
-	b = (Barrier){ .group = N, .count = 0, .generation = 0 };
 	worker_ctor();
+	b = (Barrier){ .group = N, .count = 0, .generation = 0 CBINIT() };
 } // ctor
 
 void __attribute__((noinline)) dtor() {

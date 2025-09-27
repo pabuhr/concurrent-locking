@@ -1,43 +1,54 @@
-typedef VTYPE CALIGN * Barrier;
+#include "BarrierCallback.h"
+
+typedef struct {
+	TYPE CALIGN group;
+	VTYPE CALIGN * barrier;
+	CBDECL();
+} Barrier;
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
 static Barrier b CALIGN;
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 #define BARRIER_DECL
-#define BARRIER_CALL block( b, p );
+#define BARRIER_CALL block( &b, p );
 
-static inline void block( Barrier aa, TYPE p ) {
-	TYPE aap = aa[p];									// optimization
-	TYPE state = 2 * p + 2;
+static inline bool block( Barrier * b, TYPE p ) {
+	CBSTART();											// must be first
+	TYPE leftmost = 2 * p + 1;
 
-	if ( state < N ) {
-		await( aap != aa[state] );
+	if ( leftmost < b->group ) {
+		if ( leftmost + 1 < b->group ) await( b->barrier[leftmost + 1] );
+		await( b->barrier[leftmost] );
 	} // if
-	state = 2 * p + 1;
-	if ( state < N ) {
-		await( aap != aa[state] );
+	bool ret;
+	if ( p != 0 ) {
+		b->barrier[p] = true;
+		await( ! b->barrier[p] );
+		ret = false;
 	} else {
-		// CALL ACTION CALLBACK BEFORE TRIGGERING BARRIER
+		CBEND();										// must appear in safe location
+		ret = true;
 	} // if
-	aap = ! aap;
-	aa[p] = aap;
-	Fence();
-	await( aap == aa[0] );
+	if ( leftmost < b->group ) {
+		b->barrier[leftmost] = false;
+		if ( leftmost + 1 < b->group ) b->barrier[leftmost + 1 ] = false;
+	} // if
+	return ret;
 } // block
 
 #include "BarrierWorker.c"
 
 void __attribute__((noinline)) ctor() {
 	worker_ctor();
-	b = Allocator( sizeof(typeof(b[0])) * N );
-	for ( size_t i = 0; i < N; i += 1 ) {
-		b[i] = false;
+	b = (Barrier){ .group = N, .barrier = Allocator( sizeof(typeof(b.barrier[0])) * N ) CBINIT() };
+	for ( typeof(N) i = 0; i < N; i += 1 ) {
+		b.barrier[i] = false;
 	} // for
 } // ctor
 
 void __attribute__((noinline)) dtor() {
-	free( (void *)b );
+	free( (void *)b.barrier );
 	worker_dtor();
 } // dtor
 

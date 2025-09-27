@@ -1,6 +1,8 @@
 // Debra Hensgen, 1 Raphael Finkel, 1 and Udi Manber, Two Algorithms for Barrier Synchronization International Journal
 // of Parallel Programming, Vol. 17, No. 1, 1988 p. 9-10
 
+// Cannot have callback/distinguished-thread without changing from symmetric to asymmetric.
+
 typedef struct {
 	TYPE exponent, ** precomputed_ids;
 	VTYPE ** shared_counters;
@@ -42,6 +44,7 @@ static inline void block( Barrier * b, TYPE p ) {
 #include "BarrierWorker.c"
 
 void __attribute__((noinline)) ctor() {
+	worker_ctor();
 	b.exponent = Clog2( N );
 	b.shared_counters = Allocator( b.exponent * sizeof(b.shared_counters[0]) );
 	b.precomputed_ids = Allocator( b.exponent * sizeof(b.precomputed_ids[0]) );
@@ -55,7 +58,6 @@ void __attribute__((noinline)) ctor() {
 		} // for
 		power *= 2;
 	} // for
-	worker_ctor();
 } // ctor
 
 void __attribute__((noinline)) dtor() {
