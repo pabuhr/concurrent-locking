@@ -8,16 +8,18 @@
 // subtotal to the global counter, which is then stored.  Five identical experiments are performed, each lasting T
 // seconds. The median value of the five results is printed.
 
-#ifndef __cplusplus
-#define _GNU_SOURCE										// See feature_test_macros(7)
-#define TYPEOF( T ) typeof( T )
-#else
+#ifdef __cplusplus
 #include <atomic>
 #define _Atomic( T ) std::atomic<T>
 #define TYPEOF( T ) decltype( +T )						// silly magic with the '+'
+#else
+#define _GNU_SOURCE										// See feature_test_macros(7)
+#include <stdatomic.h>
+#define TYPEOF( T ) typeof( T )
 #endif // __cplusplus
 
 #include <stdio.h>
+#include <stddef.h>										// size_t, ssize_t
 #include <stdlib.h>										// abort, exit, atoi, rand, qsort
 #include <stdbool.h>									// true, false
 #include <math.h>										// sqrt
@@ -198,7 +200,7 @@ typedef volatile uint32_t VWHOLESIZE;
 #define Fasm( change, assn, memorder ) __atomic_exchange_n( (&(change)), (assn), memorder )
 #define Fas( change, assn ) Fasm( change, assn, __ATOMIC_SEQ_CST )
 #ifndef __cplusplus
-#define Fai( change, Inc ) __atomic_fetch_add( (&(change)), (Inc), __ATOMIC_SEQ_CST )
+#define Fai( change, Inc ) __atomic_fetch_add( ((TYPEOF(change) *)(&(change))), (Inc), __ATOMIC_SEQ_CST )
 #else
 #define Fai( change, Inc ) change.fetch_add( Inc )
 #endif // __cplusplus
@@ -364,7 +366,7 @@ static TYPE convoy[16][128][128];						// [RUNS][THREADS][THREADS]
 #endif // CONVOY
 
 #if CS_DELAY != 0
-static inline RTYPE CS( const TYPE tid __attribute__(( unused )) ) { // parameter unused for CSTIME == 0
+__attribute__(( unused )) static inline RTYPE CS( const TYPE tid __attribute__(( unused )) ) { // parameter unused for CSTIME == 0
 	#ifdef CONVOY
 	convoy[Run][tid][CurrTid] += 1;						// can be off by 1 for thread 0
 	#endif // CONVOY
@@ -763,12 +765,17 @@ int main( int argc, char * argv[] ) {
 			NCSTimes, CSTimes, RUNS
 		);
 		if ( Degree != -1 ) printf( " %jd-ary", Degree ); // Zhang only
+		#ifndef BARRIER
 		printf(
 			"\n  N   T    CS Entries           AVG           STD   RSTD"
 			#ifdef CNT
 			"   CAVG"
 			#endif // CNT
 			"\n"
+		#else
+		printf(
+			"\n  N   T    Barrier Entries\n"
+		#endif // ! BARRIER
 		);
 	} // if
 	#else
@@ -942,8 +949,10 @@ int main( int argc, char * argv[] ) {
 	#endif // STATS
 
 	printf( "%" QUOTE "ju", med );						// median round
+	#ifndef BARRIER
 	statistics( Threads, entries[posn], &avg, &std, &rstd ); // median thread
 	printf( " %" QUOTE ".1f %" QUOTE ".1f %5.1f%%", avg, std, rstd );
+	#endif // BARRIER
 
 	#ifdef CNT
 	// posn is the run containing the median result. Other runs are ignored.
