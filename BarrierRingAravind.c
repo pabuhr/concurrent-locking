@@ -4,9 +4,11 @@
 
 #include "BarrierCallback.h"
 
-typedef struct {
-	TYPE CALIGN group;
-	VTYPE CALIGN * barrier;
+typedef struct CALIGN {
+	TYPE group;
+	struct CALIGN {
+		VTYPE arr;
+	} * barrier;
 	CBDECL();
 } Barrier;
 
@@ -22,19 +24,19 @@ static inline void block( Barrier * b, TYPE p, TYPE * go ) {
 	if ( UNLIKELY( b->group == 1 ) ) return;			// special case
 
 	if ( UNLIKELY( p == 0 ) ) {
-		b->barrier[p + 1] = *go;
+		b->barrier[p + 1].arr = *go;
 		Fence();
-		await( b->barrier[0] == *go );
+		await( b->barrier[0].arr == *go );
 	} else {
 		if ( LIKELY( p < b->group - 1 ) ) {
-			await( b->barrier[p] == *go );
-			b->barrier[p + 1] = *go;
+			await( b->barrier[p].arr == *go );
+			b->barrier[p + 1].arr = *go;
 			Fence();
-			await( b->barrier[0] == *go );
+			await( b->barrier[0].arr == *go );
 		} else {
-			await( b->barrier[p] == *go );
+			await( b->barrier[p].arr == *go );
 			CBEND();									// must appear in safe location
-			b->barrier[0] = *go;
+			b->barrier[0].arr = *go;
 			Fence();
 		} // if
 	} // if
@@ -48,7 +50,7 @@ void __attribute__((noinline)) ctor() {
 	worker_ctor();
 	b = (Barrier){ .group = N, .barrier = Allocator( sizeof(typeof(b.barrier[0])) * N ) };
 	for ( typeof(N) i = 0; i < N; i += 1 ) {
-		b.barrier[i] = true;
+		b.barrier[i].arr = true;
 	} // for
 } // ctor
 
@@ -58,5 +60,5 @@ void __attribute__((noinline)) dtor() {
 } // dtor
 
 // Local Variables: //
-// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=BarrierRingAravind Harness.c -lpthread -lm -D`hostname` -DCFMT" //
+// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DBARRIER -DAlgorithm=BarrierRingAravind Harness.c -lpthread -lm -D`hostname` -DCFMT" //
 // End: //

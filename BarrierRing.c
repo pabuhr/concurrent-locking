@@ -1,8 +1,10 @@
 #include "BarrierCallback.h"
 
-typedef struct {
-	TYPE CALIGN group;
-	VTYPE CALIGN * barrier;
+typedef struct CALIGN {
+	TYPE group;
+	struct CALIGN {
+		VTYPE arr;
+	} * barrier;
 	CBDECL();
 } Barrier;
 
@@ -16,13 +18,13 @@ static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sha
 static inline bool block( Barrier * tog, TYPE p ) {
 	CBSTART();											// must be first
 	TYPE nz = p > 0;									// p0 special case
-	await( tog->barrier[p] == nz );						// wait for p0 to arrive
+	await( tog->barrier[p].arr == nz );					// wait for p0 to arrive
 	TYPE next = cycleUp( p, N );						// compute right partner
-	tog->barrier[ next ] = true;						// unblock partner
+	tog->barrier[ next ].arr = true;					// unblock partner
 	Fence();
-	await( tog->barrier[p] != nz );						// wait for left partner to unblock me
+	await( tog->barrier[p].arr != nz );					// wait for left partner to unblock me
 	CBEND();											// must appear in safe location
-	tog->barrier[ next ] = false;						// reset for next arrival
+	tog->barrier[ next ].arr = false;					// reset for next arrival
 	return ! nz;
 } // block
 
@@ -32,7 +34,7 @@ void __attribute__((noinline)) ctor() {
 	worker_ctor();
 	b = (Barrier){ .group = N, .barrier = Allocator( sizeof(typeof(b.barrier[0])) * N ) CBINIT() };
 	for ( typeof(N) i = 0; i < N; i += 1 ) {
-		b.barrier[i] = false;
+		b.barrier[i].arr = false;
 	} // for
 } // ctor
 
@@ -42,5 +44,5 @@ void __attribute__((noinline)) dtor() {
 } // dtor
 
 // Local Variables: //
-// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=BarrierRing Harness.c -lpthread -lm -D`hostname` -DCFMT" //
+// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DBARRIER -DAlgorithm=BarrierRing Harness.c -lpthread -lm -D`hostname` -DCFMT" //
 // End: //

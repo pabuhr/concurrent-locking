@@ -1,8 +1,11 @@
 // Cannot have callback/distinguished-thread without changing from symmetric to asymmetric.
+// Keeps track of R generations (epochs) to prevent the re-initialization problem.
 
-typedef struct {
-	TYPE CALIGN group;
-	VTYPE CALIGN * barrier;
+typedef struct CALIGN {
+	TYPE group;
+	struct CALIGN {
+		VTYPE arr;
+	} * barrier;
 } Barrier;
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
@@ -12,25 +15,26 @@ static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sha
 #define BARRIER_DECL
 #define BARRIER_CALL block( &b, p );
 
-static inline void block( Barrier * tag, TYPE p ) {
-	enum { R = 4 };
+enum { R = 3 };											// R > 2, 3 does well
 
-	typeof(tag->barrier[0]) old = tag->barrier[p];
-	tag->barrier[p] = cycleUp( old, R );
+static inline void block( Barrier * b, TYPE p ) {
+	typeof(b->barrier[0].arr) old = b->barrier[p].arr;
+	b->barrier[p].arr = cycleUp( old, R );
 	Fence();
-	// for ( size_t kk = 0; kk < b->group; kk += 1 ) { // Hesselink/Lamport
-    for ( ssize_t kk = tag->group - 1; kk >= 0; kk -= 1 ) { // Hesselink/Lamport/Parsons
-		await( tag->barrier[kk] != old );
+//	for ( ssize_t kk = b->group - 1; kk >= 0; kk -= 1 ) { // Hesselink/Lamport/Parsons
+	for ( size_t kk = cycleUp( p, b->group ); kk != p; kk = cycleUp( kk, b->group ) ) {
+		await( b->barrier[kk].arr != old );
 	} // for
 } // block
 
 #include "BarrierWorker.c"
 
 void __attribute__((noinline)) ctor() {
+	if ( N == 1 ) printf( " R = %d,", R );
 	worker_ctor();
 	b = (Barrier){ .group = N, .barrier = Allocator( sizeof(typeof(b.barrier[0])) * N ) };
 	for ( typeof(N) i = 0; i < N; i += 1 ) {
-		b.barrier[i] = false;
+		b.barrier[i].arr = 0;
 	} // for
 } // ctor
 
@@ -40,5 +44,5 @@ void __attribute__((noinline)) dtor() {
 } // dtor
 
 // Local Variables: //
-// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=BarrierSym Harness.c -lpthread -lm -D`hostname` -DCFMT" //
+// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DBARRIER -DAlgorithm=BarrierSym Harness.c -lpthread -lm -D`hostname` -DCFMT" //
 // End: //
