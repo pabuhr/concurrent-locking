@@ -1,12 +1,13 @@
 #include "BarrierCallback.h"
 
 static TYPE PAD3 CALIGN __attribute__(( unused ));		// protect further false sharing
-static VTYPE CALIGN stopcnt = 0;
-static VTYPE CALIGN * cnt;
+static VTYPE CALIGN stopecnt = 0;
+static VTYPE CALIGN * ecnt;
 static TYPE PAD4 CALIGN __attribute__(( unused ));		// protect further false sharing
 
 #ifndef FREQ
 #define FREQ 0xffff
+//#define FREQ 0x1
 #endif // FREQ
 
 enum { Frequency = FREQ };
@@ -19,49 +20,53 @@ static void * Worker( void * arg ) {
 
 	BARRIER_DECL;
 
-	for ( int r = 0; r < RUNS; r += 1 ) {
+	for ( int r = 0; r < RUNS; r += 1 ) {				// repeat experiment N times to obtain average throughput
 		// Stopping barriers for a time experiment is done using a monotonic counter that counts the total entries
 		// through the barrier. This counter ensures all threads remain in lockstep through the barrier, i.e., no thread
 		// barges ahead to a new cycle leaving other threads to complete the current cycle.
 		do {
-			NCS;
+			NCS;										// NCS can be empty because the barrier test provides a random delay
 
-			// testing the barrier condition:
+			// checking the barrier condition
 			if ( ((totalentries) & Frequency) == Frequency ) {
-				if ( p == 0 ) {
-					// cnt[p] and cnt[k] have been set in the previous NCS
-					for ( TYPE k = 0 ; k < N ; k += 1 ) {
-						if ( cnt[k] != cnt[p] ) {
-							printf( "***ERROR*** barrier failure Id:%zu\n", p );
-							abort();
-						} // if
-					} // for
-				} // if
+				// ecnt[p] and ecnt[k] have been set in the previous NCS
+				for ( TYPE k = 0 ; k < N ; k += 1 ) {
+					if ( ! (ecnt[p] <= ecnt[k] ) ) {	// assert
+						printf( "***ERROR*** barrier failure Id:%zu ecnt[%zd] = %zd ecnt[%zd] = %zd\n",
+								#ifndef ATOMIC
+								p, k, ecnt[k], p, ecnt[p]
+								#else
+								p, k, ecnt[k].load(), p, ecnt[p].load()
+								#endif // __cplusplus
+						);
+						abort();
+					} // if
+				} // for
 			} // if
 
 			totalentries += 1;
 
 			if ( (totalentries & Frequency) == Frequency ) { // to be implemented by masking
-				cnt[p] = totalentries;
+				ecnt[p] = totalentries;
 			} // if
 
 			if ( p == 0 && stop ) {						// termination code
 				// thread 0 has not yet entered the current barrier, therefore all other threads q have not yet passed
-				// this barrier and cannot pass it before the next assignment to stopcnt, implying cnt[q] <= cnt[0].
-				stopcnt = totalentries;
+				// this barrier and cannot pass it before the next assignment to stopecnt, implying ecnt[q] <= ecnt[0].
+				stopecnt = totalentries;
 			} // if
 
 			BARRIER_CALL;
-		} while ( totalentries != stopcnt );
+		} while ( totalentries != stopecnt );			// complete last barrier event, which may have started
 
 		entries[r][p] = totalentries;
 		totalentries = 0;
 
-		cnt[p] = 0;
+		ecnt[p] = 0;
 
 		Fai( Arrived, 1 );
 		while ( stop ) Pause();
-		if ( p == 0 ) stopcnt = 0;
+		if ( p == 0 ) stopecnt = 0;
 		Fai( Arrived, -1 );
 	} // for
 
@@ -71,14 +76,15 @@ static void * Worker( void * arg ) {
 void __attribute__((noinline)) worker_ctor() {
 	#ifdef CFMT
 	if ( N == 1 ) {
-		printf( " TESTING freq=%#x/%d", Frequency, Frequency );
+		printf( " CHECKING freq=%#x/%d", Frequency, Frequency );
 		CB( printf( ", CALLBACK" ); )
 		CBCHK( printf( ", CALLBACK CHECK" ); )
 	} // if
 	#endif // CFMT
-	cnt = (TYPEOF(cnt))Allocator( sizeof(TYPEOF(cnt[0])) * N );
+	ecnt = (TYPEOF(ecnt))Allocator( sizeof(TYPEOF(ecnt[0])) * N );
+	for ( TYPEOF(N) i = 0; i < N; i += 1 ) ecnt[i] = 0;
 } // worker_ctor
 
 void __attribute__((noinline)) worker_dtor() {
-	free( (void *)cnt );
+	free( (void *)ecnt );
 } // worker_dtor
