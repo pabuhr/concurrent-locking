@@ -28,10 +28,10 @@
 	#define CBINIT() \
 		CB(, .callback = NULL ) CBCHK(, .barcnt = 0 )
 #else
-#define CB( text... )
-#define CBCHK( text... )
-#define CBDECL( text... )
-#define CBINIT( text... )
-#define CBSTART( text... )
-#define CBEND( text... )
+	#define CB( text... )
+	#define CBCHK( text... )
+	#define CBDECL( text... )
+	#define CBINIT( text... )
+	#define CBSTART( text... )
+	#define CBEND( text... )
 #endif // CALLBACK
