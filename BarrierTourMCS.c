@@ -30,7 +30,7 @@ static inline bool block( Barrier * b, TYPE p, TYPE * sense ) {
 	TYPE round = 1, champ;
 
 	// Special-case for N == 1 since it is assigned the "bye" role, which leads to an infinite loop in the first loop if
-	// not skipped. This results because for N > 1 all threads have a champion, but for N == 1 there is champion.
+	// not skipped. This results because for N > 1 all threads have a champion, but for N == 1 there is no champion.
 	if ( b->group == 1 ) goto Loop1;
 	
 	for ( ;; ) {										// arrival
@@ -129,5 +129,5 @@ void __attribute__((noinline)) dtor() {
 } // dtor
 
 // Local Variables: //
-// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=BarrierTourMCS Harness.c -lpthread -lm -D`hostname` -DCFMT" //
+// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DBARRIER -DAlgorithm=BarrierTourMCS Harness.c -lpthread -lm -D`hostname` -DCFMT" //
 // End: //

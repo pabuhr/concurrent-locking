@@ -1,4 +1,4 @@
-// Forcce integer overflow to test conditions.
+// Force integer overflow to test conditions.
 
 #include "BarrierCallback.h"
 
@@ -41,5 +41,5 @@ void __attribute__((noinline)) dtor() {
 } // dtor
 
 // Local Variables: //
-// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=BarrierFai2S Harness.c -lpthread -lm -D`hostname` -DCFMT" //
+// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DBARRIER -DAlgorithm=BarrierFai2S Harness.c -lpthread -lm -D`hostname` -DCFMT" //
 // End: //
