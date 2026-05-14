@@ -15,24 +15,26 @@ static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sha
 
 static inline bool block( Barrier * b, TYPE p ) {
 	CBSTART();											// must be first
-	TYPE leftmost = 2 * p + 1;
+	TYPE left = 2 * p + 1, right = left + 1;
 
-	if ( leftmost < b->group ) {
-		if ( leftmost + 1 < b->group ) await( b->barrier[leftmost + 1] );
-		await( b->barrier[leftmost] );
+	if ( left < b->group ) {
+		if ( right < b->group ) await( b->barrier[right] );
+		await( b->barrier[left] );
 	} // if
 	bool ret;
 	if ( p != 0 ) {
 		b->barrier[p] = true;
+		WO( Fence(); );
 		await( ! b->barrier[p] );
 		ret = false;
 	} else {
 		CBEND();										// must appear in safe location
 		ret = true;
 	} // if
-	if ( leftmost < b->group ) {
-		b->barrier[leftmost] = false;
-		if ( leftmost + 1 < b->group ) b->barrier[leftmost + 1 ] = false;
+	if ( left < b->group ) {
+		b->barrier[left] = false;
+		WO( Fence(); );
+		if ( right < b->group ) b->barrier[right] = false;
 	} // if
 	return ret;
 } // block
@@ -53,5 +55,5 @@ void __attribute__((noinline)) dtor() {
 } // dtor
 
 // Local Variables: //
-// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=BarrierTreeC Harness.c -lpthread -lm -D`hostname` -DCFMT" //
+// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DBARRIER -DAlgorithm=BarrierTreeC Harness.c -lpthread -lm -D`hostname` -DCFMT" //
 // End: //
