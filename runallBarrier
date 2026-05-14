@@ -29,8 +29,8 @@ if [ ${outdir} = "algol" -o ${outdir} = "prolog" ] ; then
     cflag=${cflag}" ${atomicinst} -DATOMIC"
 fi
 
-if [ "${outdir}" = "prolog" -o "${outdir}" = "swift" -o "${outdir}" = "java" ] ; then # Ubuntu 22.04
-    CC=gcc-12
+if [ "${outdir}" = "prolog" -o "${outdir}" = "swift" -o "${outdir}" = "java" ] ; then # Ubuntu 24.04
+    CC=gcc-14
 else
     CC=gcc-11
 fi
