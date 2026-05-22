@@ -5,7 +5,7 @@
 typedef struct {
 	TYPE CALIGN group;
 	VTYPE CALIGN flag;
-	VTYPE CALIGN count;
+	VTYPE CALIGN counter;
 	CBDECL();
 } Barrier;
 
@@ -18,16 +18,16 @@ static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sha
 
 static inline bool block( Barrier * b ) {
 	CBSTART();											// must be first
-	TYPE negflag = ! b->flag;							// optimization (compiler probably does it)
+	TYPE nepoch = ! b->flag;							// optimization (compiler probably does it)
 
-	if ( LIKELY( Fai( b->count, 1 ) != b->group - 1 ) ) { // wait ?
-		await( b->flag == negflag );
+	if ( LIKELY( Fai( b->counter, 1 ) != b->group - 1 ) ) { // not leader ?
+		await( b->flag == nepoch );						// wait for quorum
 		return false;
 	} // if
 	CBEND();											// must appear in safe location
-	b->count = 0;
+	b->counter = 0;										// reset arrival counter
 	WO( Fence(); );
-	b->flag = negflag;
+	b->flag = nepoch;									// reset to next epoch
 	return true;
 } // block
 
@@ -35,7 +35,7 @@ static inline bool block( Barrier * b ) {
 
 void __attribute__((noinline)) ctor() {
 	worker_ctor();
-	b = (Barrier){ .group = N, .flag = false, .count = 0 CBINIT() };
+	b = (Barrier){ .group = N, .flag = false, .counter = 0 CBINIT() };
 } // ctor
 
 void __attribute__((noinline)) dtor() {

@@ -16,16 +16,19 @@ static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sha
 #define BARRIER_DECL
 #define BARRIER_CALL block( &b );
 
+// The first thread stops after it has incremented high, and has not incremented barcnt. Then the second thread sees
+// all threads are at the barrier but barcnt == 1.
+
 static inline bool block( Barrier * b ) {
 	CBSTART();											// must be first
-	short int ticket = Fai( b->high, 1 );
+	short int counter = Fai( b->high, 1 );
 
-	if ( LIKELY( (short int)(ticket + 1) != (short int)(b->low + b->group) ) ) { // wait ?
-		await( (short int)(ticket - b->low) < 0 );
+	if ( LIKELY( (short int)(counter - b->low) != (short int)(b->group - 1) ) ) { // wait ?
+		await( (short int)(counter - b->low) < 0 );
 		return false;
 	} // if
 	CBEND();											// must appear in safe location
-	b->low += b->group;
+	b->low = counter + 1;
 	return true;
 } // block
 

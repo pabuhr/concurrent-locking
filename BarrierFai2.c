@@ -19,14 +19,14 @@ static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sha
 
 static inline bool block( Barrier * b ) {
 	CBSTART();											// must be first
-	STYPE ticket = Fai( b->high, 1 );
+	STYPE counter = Fai( b->high, 1 );
 
-	if ( LIKELY( ticket - b->low != (STYPE)(b->group - 1) ) ) {	// wait ?
-		await( ticket - b->low < 0 );
+	if ( LIKELY( counter - b->low != (STYPE)(b->group - 1) ) ) { // wait ?
+		await( counter - b->low < 0 );
 		return false;
 	} // if
 	CBEND();											// must appear in safe location
-	b->low += b->group;
+	b->low = counter + 1;
 	return true;
 } // block
 
