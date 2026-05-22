@@ -33,11 +33,7 @@ static void * Worker( void * arg ) {
 				for ( TYPE k = 0 ; k < N ; k += 1 ) {
 					if ( ! (ecnt[p] <= ecnt[k] ) ) {	// assert
 						printf( "***ERROR*** barrier failure Id:%zu ecnt[%zd] = %zd ecnt[%zd] = %zd\n",
-								#ifndef ATOMIC
 								p, k, ecnt[k], p, ecnt[p]
-								#else
-								p, k, ecnt[k].load(), p, ecnt[p].load()
-								#endif // __cplusplus
 						);
 						abort();
 					} // if
@@ -76,7 +72,7 @@ static void * Worker( void * arg ) {
 void __attribute__((noinline)) worker_ctor() {
 	#ifdef CFMT
 	if ( N == 1 ) {
-		printf( " CHECKING freq=%#x/%d", Frequency, Frequency );
+		printf( " BARRIER CHECKING freq=%#x/%d", Frequency, Frequency );
 		CB( printf( ", CALLBACK" ); )
 		CBCHK( printf( ", CALLBACK CHECK" ); )
 	} // if
