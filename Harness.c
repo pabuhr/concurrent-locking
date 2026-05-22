@@ -171,7 +171,7 @@ typedef volatile uint32_t VWHOLESIZE;
 	#define MPauseS( S, E, C ) { sevl(); while ( ( S (TYPEOF(E))MonitorLD( (volatile TYPE *)(&(E)) ) ) C ) {} }
 	#define Pause() __asm__ __volatile__ ( "YIELD" ::: )
 #else
-	#define Pause() __asm__ __volatile__ ( "YIELD" ::: )
+	#define Pause() __asm__ __volatile__ ( "ISB SY" ::: )
 #endif // LPAUSE
 
 #else
@@ -415,7 +415,7 @@ static inline RTYPE CS( const TYPE tid __attribute__(( unused )) ) { // paramete
 void randPoints( uint64_t points[], unsigned int numPoints, unsigned int N ) {
 	//printf( "randPoints points %p, numPoints %d, N %d\n", points, numPoints, N );
 	points[0] = N;
- 	for ( unsigned int i = 0; i < numPoints; i += N ) {
+	for ( unsigned int i = 0; i < numPoints; i += N ) {
 		for ( unsigned int j = i; j < i + N; j += 1 ) {
 			unsigned int v;
 		  L: v = rand() % N;
@@ -517,12 +517,12 @@ static int __attribute__((noinline)) PollBarrier() {
 
 //------------------------------------------------------------------------------
 
+#if defined( __linux ) && defined( PIN )
 void affinity( pthread_t pthreadid, unsigned int tid ) {
 // There are many ways to assign threads to processors: cores, chips, etc.
 // On the AMD, we find starting at core 32 and sequential assignment is sufficient.
 // Below are alternative approaches.
 
-#if defined( __linux ) && defined( PIN )
 #if 1
 #if defined( nasus )
 	#if ! defined( HYPERAFF ) && ! defined( LINEARAFF )		// default affinity
@@ -536,7 +536,7 @@ void affinity( pthread_t pthreadid, unsigned int tid ) {
 	#if defined( HYPERAFF )
 	int cpu = OFFSETSOCK * CORES + (tid / 2) + ((tid % 2 == 0) ? 0 : CORES * SOCKETS);
 	#endif // HYPERAFF
-#elif defined( swift )
+#elif defined( swift ) || defined( plg2 )
 	#if ! defined( HYPERAFF ) && ! defined( LINEARAFF )	     // default affinity
 	#define HYPERAFF
 	#endif // HYPERAFF
@@ -609,8 +609,8 @@ void affinity( pthread_t pthreadid, unsigned int tid ) {
 		perror( buf );
 		abort();
 	} // if
-#endif // linux && PIN
 } // affinity
+#endif // linux && PIN
 
 //------------------------------------------------------------------------------
 
@@ -757,12 +757,18 @@ int main( int argc, char * argv[] ) {
 			" FCFSTest,"
 			#endif // FCFSTest
 			" %d NCS spins,"
+			#ifndef BARRIER
 			" %d CS spins,"
+			#endif // ! BARRIER
 			" %d runs median",
 			#ifdef FCFS
 			xstr(FCFS),
 			#endif // FCFS
-			NCSTimes, CSTimes, RUNS
+			NCSTimes,
+			#ifndef BARRIER
+			CSTimes,
+			#endif // ! BARRIER
+			RUNS
 		);
 		if ( Degree != -1 ) printf( " %jd-ary", Degree ); // Zhang only
 		#ifndef BARRIER
@@ -774,7 +780,7 @@ int main( int argc, char * argv[] ) {
 			"\n"
 		#else
 		printf(
-			"\n  N   T    Barrier Entries\n"
+			"\n  N   T  Barrier Entries\n"
 		#endif // ! BARRIER
 		);
 	} // if
@@ -853,9 +859,9 @@ int main( int argc, char * argv[] ) {
 			perror( "***ERROR*** pthread create" );
 			abort();
 		} // if
-		#ifndef NOAFFINITY
+		#ifdef PIN
 		affinity( workers[tid], tid );
-		#endif // ! NOAFFINITY
+		#endif // PIN
 	} // for
 
 	for ( ; Run < RUNS;  ) {							// global variable
