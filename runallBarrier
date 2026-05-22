@@ -8,10 +8,11 @@
 # ARM -march=armv8.2-a+lse => generate Arm LSE extension instructions SWAP and CAS
 # https://community.arm.com/developer/tools-software/tools/b/tools-software-ides-blog/posts/making-the-most-of-the-arm-architecture-in-gcc-10
 
-algorithms="BarrierButterfly BarrierPopStack BarrierDissem BarrierDissemMCS BarrierFai BarrierPthread BarrierRing BarrierRingAravind BarrierSenseRev \
-	 BarrierSTD BarrierSym BarrierTicket BarrierTour BarrierTourMCS BarrierTreeA BarrierTreeB BarrierTreeC BarrierTreeCombMCS BarrierTreeD BarrierTreeMCS"
-time=25
-runs=13
+algorithms="BarrierButterfly BarrierDissem BarrierDissemMCS BarrierFai BarrierFai2 BarrierLeader BarrierPthread BarrierRing BarrierRingAravind BarrierSTDc BarrierSenseRev \
+	BarrierStack BarrierSym BarrierTour BarrierTourMCS BarrierTree dary=8 BarrierTreeA BarrierTreeB BarrierTreeC BarrierTreeCombMCS BarrrierTreeMCS"
+
+time=30
+runs=5
 outdir=`hostname`
 exec=`hostname`.out
 atomicinst=
@@ -29,7 +30,7 @@ if [ ${outdir} = "algol" -o ${outdir} = "prolog" ] ; then
     cflag=${cflag}" ${atomicinst} -DATOMIC"
 fi
 
-if [ "${outdir}" = "prolog" -o "${outdir}" = "swift" -o "${outdir}" = "java" ] ; then # Ubuntu 24.04
+if [ "${outdir}" = "prolog" -o "${outdir}" = "swift" -o "${outdir}" = "plg2" -o "${outdir}" = "java" ] ; then # Ubuntu 24.04
     CC=gcc-14
 else
     CC=gcc-11
@@ -43,11 +44,9 @@ runalgorithm() {
 	    if [ ${1} = "BarrierSTD" ] ; then	# C++ barrier ?
 		`echo ${CC} | tr cc ++` ${cflag} -Wno-volatile -std=c++20 ${affinity:+-D${affinity}} ${atomic:+-D${atomic}} ${atomicinst:+-DATOMICINST=${atomicinst}} -D${outdir} -DAlgorithm=${1} -DNCS_DELAY=20 Harness.c -lpthread -lm -o ${exec}
 	    else
-		${CC} ${cflag} -std=gnu11 ${affinity:+-D${affinity}} ${atomic:+-D${atomic}} ${atomicinst:+-DATOMICINST=${atomicinst}} -D${outdir} -DAlgorithm=${1} -DNCS_DELAY=20 Harness.c -lpthread -lm -o ${exec}
+		${CC} ${cflag} -std=gnu11 ${affinity:+-D${affinity}} ${atomic:+-D${atomic}} ${atomicinst:+-DATOMICINST=${atomicinst}} -D${outdir} -DBARRIER -DAlgorithm=${1} -DNCS_DELAY=0 Harness.c -lpthread -lm -o ${exec}
 	    fi
-	    ./run1 time="${time}" exec="${exec}" T=1 N=1 > "${outfile}"
-	    ./run1 time="${time}" exec="${exec}" T=2 N=32 inc=2 >> "${outfile}"
-	    ./run1 time="${time}" exec="${exec}" T=36 N=128 inc=4 >> "${outfile}"
+	    ./run1 time="${time}" runs="${runs}" exec="${exec}" T=1 N=128 inc=2 > "${outfile}"
 	    if [ -f core ] ; then
 		echo core generated for ${1}
 		break
