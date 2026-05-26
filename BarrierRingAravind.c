@@ -16,7 +16,7 @@ static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sha
 static Barrier b CALIGN;
 static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sharing
 
-#define BARRIER_DECL TYPE go = false;
+#define BARRIER_DECL static __thread TYPE go CALIGN = false;
 #define BARRIER_CALL block( &b, p, &go );
 
 static inline void block( Barrier * b, TYPE p, TYPE * go ) {
