@@ -1,3 +1,5 @@
+// Handles integer overflow by using a small window of size G allowing equality versus relational operations.
+
 #include "BarrierCallback.h"
 
 typedef struct {

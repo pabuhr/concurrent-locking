@@ -1,4 +1,4 @@
-// Force integer overflow to test conditions.
+// Force integer overflow more often using short integers to test conditions.
 
 #include "BarrierCallback.h"
 
