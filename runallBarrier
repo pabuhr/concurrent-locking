@@ -8,14 +8,15 @@
 # ARM -march=armv8.2-a+lse => generate Arm LSE extension instructions SWAP and CAS
 # https://community.arm.com/developer/tools-software/tools/b/tools-software-ides-blog/posts/making-the-most-of-the-arm-architecture-in-gcc-10
 
-algorithms="BarrierButterfly BarrierDissem BarrierDissemMCS BarrierFai BarrierFai2 BarrierLeader BarrierPthread BarrierRing BarrierRingAravind BarrierSTDc BarrierSenseRev \
-	BarrierStack BarrierSym BarrierTour BarrierTourMCS BarrierTree dary=8 BarrierTreeA BarrierTreeB BarrierTreeC BarrierTreeCombMCS BarrrierTreeMCS"
+algorithms="BarrierButterfly BarrierDissem BarrierDissemMCS BarrierFai BarrierFai2 BarrierLeader BarrierPthread BarrierRing BarrierRingAravind BarrierSTD BarrierSenseRev \
+	BarrierStack BarrierSym BarrierTour BarrierTourMCS BarrierTree BarrierTreeA BarrierTreeB BarrierTreeC BarrierTreeCombMCS BarrierTreeMCS"
 
 time=30
 runs=5
 outdir=`hostname`
-exec=`hostname`.out
+exec=${outdir}.out
 atomicinst=
+delay=0
 
 mkdir -p ${outdir}
 
@@ -41,10 +42,10 @@ runalgorithm() {
 	for affinity in "" ; do # "NOAFFINITY"
 	    outfile=${outdir}${affinity}/${1}${atomic}
 	    echo "${outfile}"
-	    if [ ${1} = "BarrierSTD" ] ; then	# C++ barrier ?
-		`echo ${CC} | tr cc ++` ${cflag} -Wno-volatile -std=c++20 ${affinity:+-D${affinity}} ${atomic:+-D${atomic}} ${atomicinst:+-DATOMICINST=${atomicinst}} -D${outdir} -DAlgorithm=${1} -DNCS_DELAY=20 Harness.c -lpthread -lm -o ${exec}
+	    if [ ${1} = "BarrierSTD" ] ; then		# C++ barrier ?
+		`echo ${CC} | tr cc ++` ${cflag} -Wno-volatile -std=c++20 ${affinity:+-D${affinity}} ${atomic:+-D${atomic}} ${atomicinst:+-DATOMICINST=${atomicinst}} -D${outdir} -DBARRIER -DAlgorithm=${1} -DNCS_DELAY="${delay}" Harness.c -lpthread -lm -o ${exec}
 	    else
-		${CC} ${cflag} -std=gnu11 ${affinity:+-D${affinity}} ${atomic:+-D${atomic}} ${atomicinst:+-DATOMICINST=${atomicinst}} -D${outdir} -DBARRIER -DAlgorithm=${1} -DNCS_DELAY=0 Harness.c -lpthread -lm -o ${exec}
+		${CC} ${cflag} -std=gnu11 ${affinity:+-D${affinity}} ${atomic:+-D${atomic}} ${atomicinst:+-DATOMICINST=${atomicinst}} -D${outdir} -DBARRIER -DAlgorithm=${1} -DNCS_DELAY="${delay}" -DRANDOM Harness.c -lpthread -lm -o ${exec}
 	    fi
 	    ./run1 time="${time}" runs="${runs}" exec="${exec}" T=1 N=128 inc=2 > "${outfile}"
 	    if [ -f core ] ; then
@@ -57,6 +58,7 @@ runalgorithm() {
 
 rm -rf core
 for algorithm in ${algorithms} ; do
+    rm -f ${exec}					# remove prior executable
     runalgorithm ${algorithm}
 done
 
