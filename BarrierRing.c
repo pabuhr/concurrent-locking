@@ -15,16 +15,17 @@ static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sha
 #define BARRIER_DECL
 #define BARRIER_CALL block( &b, p );
 
-static inline bool block( Barrier * tog, TYPE p ) {
+static inline bool block( Barrier * b, TYPE p ) {
 	CBSTART();											// must be first
 	TYPE nz = p > 0;									// p0 special case
-	await( tog->barrier[p].arr == nz );					// wait for p0 to arrive
 	TYPE next = cycleUp( p, N );						// compute right partner
-	tog->barrier[ next ].arr = true;					// unblock partner
+
+	await( b->barrier[p].arr == nz );					// wait for p0 to arrive
+	b->barrier[next].arr = true;						// unblock partner
 	Fence();
-	await( tog->barrier[p].arr != nz );					// wait for left partner to unblock me
-	CBEND();											// must appear in safe location
-	tog->barrier[ next ].arr = false;					// reset for next arrival
+	await( b->barrier[p].arr != nz );					// wait for left partner to unblock me
+	if ( ! nz ) CBEND();								// must appear in safe location
+	b->barrier[next].arr = false;						// reset for next arrival
 	return ! nz;
 } // block
 
