@@ -33,7 +33,11 @@ static void * Worker( void * arg ) {
 				for ( TYPE k = 0 ; k < N ; k += 1 ) {
 					if ( ! (ecnt[p] <= ecnt[k] ) ) {	// assert
 						printf( "***ERROR*** barrier failure Id:%zu ecnt[%zd] = %zd ecnt[%zd] = %zd\n",
+								#if defined( __cplusplus ) && defined( ATOMIC )
+								p, k, ecnt[k].load(), p, ecnt[p].load()
+								#else
 								p, k, ecnt[k], p, ecnt[p]
+								#endif // __cplusplus
 						);
 						abort();
 					} // if
