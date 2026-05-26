@@ -30,7 +30,9 @@ static inline void block( Barrier * b, TYPE p ) {
 #include "BarrierWorker.c"
 
 void __attribute__((noinline)) ctor() {
+	#ifdef CFMT
 	if ( N == 1 ) printf( " R = %d,", R );
+	#endif // CFMT
 	worker_ctor();
 	b = (Barrier){ .group = N, .barrier = Allocator( sizeof(typeof(b.barrier[0])) * N ) };
 	for ( typeof(N) i = 0; i < N; i += 1 ) {
