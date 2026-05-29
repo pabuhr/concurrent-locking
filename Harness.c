@@ -295,7 +295,7 @@ static volatile int Run CALIGN = 0;						// current experiment repetition
 //------------------------------------------------------------------------------
 
 // memory allocator to align or not align storage
-#define Allocator( size ) memalign( CACHE_ALIGN, (size) )
+#define Allocator( size ) memalign( CACHE_ALIGN, ((size) + CACHE_ALIGN - 1) ) /* protect allocation end from next allocation */
 
 //------------------------------------------------------------------------------
 
@@ -757,6 +757,9 @@ int main( int argc, char * argv[] ) {
 			" FCFSTest,"
 			#endif // FCFSTest
 			" %d NCS spins,"
+			#ifdef RANDOM
+			" RANDOM,"
+			#endif // RANDOM
 			#ifndef BARRIER
 			" %d CS spins,"
 			#endif // ! BARRIER
