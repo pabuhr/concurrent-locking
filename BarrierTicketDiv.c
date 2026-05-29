@@ -1,7 +1,7 @@
 // Colby Parsons
 
 // Requires unbounded integers, otherwise it eventually fails on overflow because of the inequality in the waiting
-// condition.  Cannot have callback/matching without changing from symmetric to asymmetric. The problem is that the FAI
+// condition.  Cannot have callback/matching without changing from symmetric. The problem is that the FAI
 // unconditionally triggers the other thread(s) to advance. Hence, even if a thread knows it triggers the barrier, it
 // has simultaneously unblocked the other threads so there is no safe point.
 

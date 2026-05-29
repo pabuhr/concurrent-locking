@@ -1,7 +1,7 @@
 // John M. Mellor-Crummey and Michael L. Scott, Algorithms for Scalable Synchronization on Shared-Memory Multiprocessors,
 // ACM Transactions on Computer Systems, 9(1), February 1991, Fig. 10, p. 38
 
-// Cannot have callback/distinguished-thread without changing from symmetric to asymmetric.
+// Cannot have callback/distinguished-thread without changing from symmetric.
 
 struct flags {
 	VTYPE ** my_flags, *** partner_flags;

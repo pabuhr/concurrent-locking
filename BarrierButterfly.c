@@ -1,7 +1,7 @@
 // Eugene D. Brooks III, The Butterfly Barrier, International Journal of Parallel Programming, Vol. 15, No. 4, 1986, pp
 // 295-307.
 
-// Cannot have callback/distinguished-thread without changing from symmetric to asymmetric.
+// Cannot have callback/distinguished-thread without changing from symmetric.
 
 typedef struct {
 	TYPE CALIGN group;

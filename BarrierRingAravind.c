@@ -2,6 +2,8 @@
 // International Parallel and Distributed Processing Symposium Workshops (IPDPSW), Vancouver, BC, Canada, 2018,
 // pp. 773-782, Algorithm 1
 
+// One pass token ring using thread-local storage.
+
 #include "BarrierCallback.h"
 
 typedef struct CALIGN {

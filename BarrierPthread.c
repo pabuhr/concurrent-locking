@@ -1,4 +1,4 @@
-// Cannot have callback/distinguished-thread without changing from symmetric to asymmetric.
+// Cannot have callback/distinguished-thread without changing from symmetric.
 
 #include <pthread.h>
 

@@ -1,7 +1,7 @@
 // Debra Hensgen, 1 Raphael Finkel, 1 and Udi Manber, Two Algorithms for Barrier Synchronization International Journal
 // of Parallel Programming, Vol. 17, No. 1, 1988 p. 9-10
 
-// Cannot have callback/distinguished-thread without changing from symmetric to asymmetric.
+// Cannot have callback/distinguished-thread without changing from symmetric.
 
 typedef struct {
 	TYPE exponent, ** precomputed_ids;

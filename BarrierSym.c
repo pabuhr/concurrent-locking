@@ -1,4 +1,4 @@
-// Cannot have callback/distinguished-thread without changing from symmetric to asymmetric.
+// Cannot have callback/distinguished-thread without changing from symmetric.
 // Keeps track of R generations (epochs) to prevent the re-initialization problem.
 
 typedef struct CALIGN {
