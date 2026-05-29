@@ -1,3 +1,7 @@
+// Two pass token ring.
+
+// Cannot have callback without changing from symmetric.
+
 #include "BarrierCallback.h"
 
 typedef struct CALIGN {
@@ -5,7 +9,6 @@ typedef struct CALIGN {
 	struct CALIGN {
 		VTYPE arr;
 	} * barrier;
-	CBDECL();
 } Barrier;
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
@@ -16,7 +19,6 @@ static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sha
 #define BARRIER_CALL block( &b, p );
 
 static inline bool block( Barrier * b, TYPE p ) {
-	CBSTART();											// must be first
 	TYPE nz = p > 0;									// p0 special case
 	TYPE next = cycleUp( p, N );						// compute right partner
 
@@ -24,7 +26,6 @@ static inline bool block( Barrier * b, TYPE p ) {
 	b->barrier[next].arr = true;						// unblock partner
 	Fence();
 	await( b->barrier[p].arr != nz );					// wait for left partner to unblock me
-	if ( ! nz ) CBEND();								// must appear in safe location
 	b->barrier[next].arr = false;						// reset for next arrival
 	return ! nz;
 } // block
@@ -33,7 +34,7 @@ static inline bool block( Barrier * b, TYPE p ) {
 
 void __attribute__((noinline)) ctor() {
 	worker_ctor();
-	b = (Barrier){ .group = N, .barrier = Allocator( sizeof(typeof(b.barrier[0])) * N ) CBINIT() };
+	b = (Barrier){ .group = N, .barrier = Allocator( sizeof(typeof(b.barrier[0])) * N ) };
 	for ( typeof(N) i = 0; i < N; i += 1 ) {
 		b.barrier[i].arr = false;
 	} // for
