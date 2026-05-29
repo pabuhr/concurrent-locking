@@ -59,7 +59,7 @@ static void * Worker( void * arg ) {
 			BARRIER_CALL;
 		} while ( totalentries != stopecnt );			// complete last barrier event, which may have started
 
-		entries[r][p] = totalentries;
+		entries[r][p] = totalentries / N;				// convert to epochs
 		totalentries = 0;
 
 		ecnt[p] = 0;
