@@ -44,18 +44,11 @@ done
 
 rm -rf avgoutput core
 
-hostname=`hostname`
-if [ "${hostname}" = "swift" -o "${hostname}" = "plg2" ] ; then
-    cpustart=128				# second socket
-else    
-    cpustart=0
-fi
-
 singleton=0
 while [ ${T} -le ${N} ] ; do
 #    perf stat -B -e L1-dcache-load-misses -e L1-dcache-prefetch-misses -e branch-load-misses ./a.out ${T} ${time} ${degree}	# Zhang d-ary
 #    /usr/bin/time -f "%Uu %Ss %Er %Mkb" ./${exec} ${T} ${time} ${runs} ${degree}	# Zhang d-ary
-    taskset -c ${cpustart} ./${exec} ${T} ${time} ${runs} ${degree} | tee -a avgoutput	# Zhang d-ary
+    ./${exec} ${T} ${time} ${runs} ${degree} | tee -a avgoutput	# Zhang d-ary
     if [ -f core ] ; then
 	echo core generated for ${T} ${Time}
 	break
