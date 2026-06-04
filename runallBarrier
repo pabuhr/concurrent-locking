@@ -1,4 +1,4 @@
-#!/bin/sh -
+#!/bin/sh -x
 
 #zip Barrier.zip softsolutions/Barrier* softsolutions/Harness.c softsolutions/run1 softsolutions/runallBarrier 
 
@@ -8,8 +8,8 @@
 # ARM -march=armv8.2-a+lse => generate Arm LSE extension instructions SWAP and CAS
 # https://community.arm.com/developer/tools-software/tools/b/tools-software-ides-blog/posts/making-the-most-of-the-arm-architecture-in-gcc-10
 
-algorithms="BarrierButterfly BarrierDissem BarrierDissemMCS BarrierFai BarrierFai2 BarrierLeader BarrierPthread BarrierRing BarrierRingAravind BarrierSTD BarrierSenseRev \
-	BarrierStack BarrierSym BarrierTour BarrierTourMCS BarrierTree BarrierTreeA BarrierTreeB BarrierTreeC BarrierTreeCombMCS BarrierTreeMCS"
+algorithms="BarrierButterfly BarrierDissem BarrierDissemMCS BarrierFai BarrierLeader BarrierPthread BarrierRing BarrierRingAravind BarrierSTD BarrierSenseRev \
+	BarrierStack BarrierSym BarrierTour BarrierTourMCS BarrierTree BarrierTreeA BarrierTreeC BarrierTreeCombMCS BarrierTreeMCS"
 
 time=30
 runs=5
@@ -24,7 +24,7 @@ if [ ${#} -ne 0 ] ; then
     algorithms="${@}"
 fi
 
-cflag="-Wall -Wextra -Werror -Wno-implicit-fallthrough -O3 -DNDEBUG -fno-reorder-functions -DPIN" #
+cflag="-Wall -Wextra -Werror -Wno-implicit-fallthrough -O3 -DNDEBUG -fno-reorder-functions" #
 if [ ${outdir} = "algol" -o ${outdir} = "prolog" ] ; then
 #    atomicinst=-mno-outline-atomics	# use ARM LL/SC instructions for atomics
     atomicinst=-march=armv8.2-a+lse	# use ARM LSE instructions for atomics
@@ -39,13 +39,13 @@ fi
 
 runalgorithm() {
     for atomic in "" ; do # "ATOMIC"
-	for affinity in "" ; do # "NOAFFINITY"
+	for affinity in "PIN" "" ; do #
 	    outfile=${outdir}${affinity}/${1}${atomic}
 	    echo "${outfile}"
 	    if [ ${1} = "BarrierSTD" ] ; then		# C++ barrier ?
 		`echo ${CC} | tr cc ++` ${cflag} -Wno-volatile -std=c++20 ${affinity:+-D${affinity}} ${atomic:+-D${atomic}} ${atomicinst:+-DATOMICINST=${atomicinst}} -D${outdir} -DBARRIER -DAlgorithm=${1} -DNCS_DELAY="${delay}" Harness.c -lpthread -lm -o ${exec}
 	    else
-		${CC} ${cflag} -std=gnu11 ${affinity:+-D${affinity}} ${atomic:+-D${atomic}} ${atomicinst:+-DATOMICINST=${atomicinst}} -D${outdir} -DBARRIER -DAlgorithm=${1} -DNCS_DELAY="${delay}" -DRANDOM Harness.c -lpthread -lm -o ${exec}
+		${CC} ${cflag} -std=gnu11 ${affinity:+-D${affinity}} ${atomic:+-D${atomic}} ${atomicinst:+-DATOMICINST=${atomicinst}} -D${outdir} -DBARRIER -DAlgorithm=${1} -DNCS_DELAY="${delay}" Harness.c -lpthread -lm -o ${exec}
 	    fi
 	    ./run1 time="${time}" runs="${runs}" exec="${exec}" T=1 N=128 inc=2 > "${outfile}"
 	    if [ -f core ] ; then
