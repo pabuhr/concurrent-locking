@@ -518,7 +518,24 @@ static int __attribute__((noinline)) PollBarrier() {
 //------------------------------------------------------------------------------
 
 #if defined( __linux ) && defined( PIN )
-void affinity( pthread_t pthreadid, unsigned int tid ) {
+void setCPUmask( pthread_t pthreadid, int cpu ) {		// -1 => turn off affinity
+	cpu_set_t mask;
+	CPU_ZERO( &mask );
+
+	if ( cpu >= 0 ) { CPU_SET( cpu, &mask ); }
+	else { memset( &mask, '\xff', sizeof(cpu_set_t) ); } // must turn on all bits to reset
+
+	int rc = pthread_setaffinity_np( pthreadid, sizeof(cpu_set_t), &mask );
+	if ( rc != 0 ) {
+		errno = rc;
+		char buf[64];
+		snprintf( buf, 64, "***ERROR*** setaffinity failure for CPU %d", cpu );
+		perror( buf );
+		abort();
+	} // if
+} // setCPUmask
+
+size_t affinity( pthread_t pthreadid, unsigned int tid ) {
 // There are many ways to assign threads to processors: cores, chips, etc.
 // On the AMD, we find starting at core 32 and sequential assignment is sufficient.
 // Below are alternative approaches.
@@ -598,17 +615,8 @@ void affinity( pthread_t pthreadid, unsigned int tid ) {
 #endif // 0
 	//printf( "%d\n", cpu );
 
-	cpu_set_t mask;
-	CPU_ZERO( &mask );
-	CPU_SET( cpu, &mask );
-	int rc = pthread_setaffinity_np( pthreadid, sizeof(cpu_set_t), &mask );
-	if ( rc != 0 ) {
-		errno = rc;
-		char buf[64];
-		snprintf( buf, 64, "***ERROR*** setaffinity failure for CPU %d", cpu );
-		perror( buf );
-		abort();
-	} // if
+	setCPUmask( pthreadid, cpu );
+	return cpu;
 } // affinity
 #endif // linux && PIN
 
@@ -855,6 +863,9 @@ int main( int argc, char * argv[] ) {
 
 	pthread_t workers[Threads];
 
+	#ifdef PIN
+	affinity( pthread_self(), 0 );						// temporary pin to target CPU
+	#endif // PIN
 	for ( size_t tid = 0; tid < Threads; tid += 1 ) {	// start workers
 		int rc = pthread_create( &workers[tid], NULL, Worker, (void *)(size_t)set[tid] );
 		if ( rc != 0 ) {
@@ -866,6 +877,9 @@ int main( int argc, char * argv[] ) {
 		affinity( workers[tid], tid );
 		#endif // PIN
 	} // for
+	#ifdef PIN
+	setCPUmask( pthread_self(), -1 );					// unpin
+	#endif // PIN
 
 	for ( ; Run < RUNS;  ) {							// global variable
 		// threads start first experiment immediately
