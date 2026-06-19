@@ -15,31 +15,16 @@ static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sha
 #define BARRIER_DECL
 #define BARRIER_CALL block( &b, p );
 
-static inline void handoff_start( Barrier * b, TYPE their_idx, TYPE round ) {
-	await( ! b->shared_counters[round][their_idx] );
-	b->shared_counters[round][their_idx] = true;
-}
-
-static inline void handoff_end( Barrier * b, TYPE p, TYPE round ) {
-	await( b->shared_counters[round][p] );
-	b->shared_counters[round][p] = false;
-}
-
-// synchronizes with one other thread, identified by their_idx
-static inline void handoff( Barrier * b, TYPE p, TYPE their_idx, TYPE round ) {
-	handoff_start( b, their_idx, round );
-	Fence();
-	handoff_end( b, p, round );   
-}
-
 static inline void block( Barrier * b, TYPE p ) {
-	TYPE curr_count = 0;
-	 
-	while ( curr_count < b->exponent ) {
-		handoff( b, p, b->precomputed_ids[curr_count][p], curr_count );
-		curr_count += 1;
-	} // while
-}
+	for ( TYPE round = 0; round < b->exponent; round += 1 ) {
+		TYPE their_idx = b->precomputed_ids[round][p];	// optimization
+		await( ! b->shared_counters[round][their_idx] );
+		b->shared_counters[round][their_idx] = true;
+		Fence();
+		await( b->shared_counters[round][p] );
+		b->shared_counters[round][p] = false;
+	} // for
+} // block
 
 #include "BarrierWorker.c"
 
@@ -62,11 +47,11 @@ void __attribute__((noinline)) ctor() {
 
 void __attribute__((noinline)) dtor() {
 	for ( typeof(b.exponent) r = 0; r < b.exponent; r += 1 ) {
-		free( (void *)b.shared_counters[r] );
 		free( (void *)b.precomputed_ids[r] );
+		free( (void *)b.shared_counters[r] );
 	} // for
-	free( b.shared_counters );
 	free( b.precomputed_ids );
+	free( b.shared_counters );
 	worker_dtor();
 } // dtor
 
