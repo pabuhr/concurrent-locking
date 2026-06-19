@@ -1,6 +1,8 @@
 // John M. Mellor-Crummey and Michael L. Scott, Algorithms for Scalable Synchronization on Shared-Memory Multiprocessors,
 // ACM Transactions on Computer Systems, 9(1), February 1991, Fig. 10, p. 38
 
+// Note algorithm uses ranges 0..Clog2( N ) - 1 == Clog2( N ) for C dimension.
+
 // Cannot have callback/distinguished-thread without changing from symmetric.
 
 struct flags {
@@ -75,6 +77,7 @@ void __attribute__((noinline)) dtor() {
 		free( (void *)b.allnodes[i].my_flags[0] );
 		free( b.allnodes[i].my_flags );
 	} // for
+	free( b.allnodes );
 	worker_dtor();
 } // dtor
 
