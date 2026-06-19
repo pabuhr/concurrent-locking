@@ -1,4 +1,4 @@
-#!/bin/sh -x
+#!/bin/sh -
 
 #zip Barrier.zip softsolutions/Barrier* softsolutions/Harness.c softsolutions/run1 softsolutions/runallBarrier 
 
@@ -10,6 +10,7 @@
 
 algorithms="BarrierButterfly BarrierDissem BarrierDissemMCS BarrierFai BarrierLeader BarrierPthread BarrierRing BarrierRingAravind BarrierSTD BarrierSenseRev \
 	BarrierStack BarrierSym BarrierTour BarrierTourMCS BarrierTree BarrierTreeA BarrierTreeC BarrierTreeCombMCS BarrierTreeMCS"
+#algorithms="BarrierFai BarrierLeader"
 
 time=30
 runs=5
@@ -39,13 +40,14 @@ fi
 
 runalgorithm() {
     for atomic in "" ; do # "ATOMIC"
-	for affinity in "PIN" "" ; do #
+	for affinity in "" "NOPIN" ; do #
 	    outfile=${outdir}${affinity}/${1}${atomic}
 	    echo "${outfile}"
+	    if [ "${affinity}" = "" ] ; then affinity=-DPIN ; else affinity=""; fi
 	    if [ ${1} = "BarrierSTD" ] ; then		# C++ barrier ?
-		`echo ${CC} | tr cc ++` ${cflag} -Wno-volatile -std=c++20 ${affinity:+-D${affinity}} ${atomic:+-D${atomic}} ${atomicinst:+-DATOMICINST=${atomicinst}} -D${outdir} -DBARRIER -DAlgorithm=${1} -DNCS_DELAY="${delay}" Harness.c -lpthread -lm -o ${exec}
+		`echo ${CC} | tr cc ++` ${cflag} -Wno-volatile -std=c++20 ${affinity} ${atomic:+-D${atomic}} -D${outdir} -DBARRIER -DAlgorithm=${1} -DNCS_DELAY="${delay}" Harness.c -lpthread -lm -o ${exec}
 	    else
-		${CC} ${cflag} -std=gnu11 ${affinity:+-D${affinity}} ${atomic:+-D${atomic}} ${atomicinst:+-DATOMICINST=${atomicinst}} -D${outdir} -DBARRIER -DAlgorithm=${1} -DNCS_DELAY="${delay}" Harness.c -lpthread -lm -o ${exec}
+		${CC} ${cflag} -std=gnu11 ${affinity} ${atomic:+-D${atomic}} -D${outdir} -DBARRIER -DAlgorithm=${1} -DNCS_DELAY="${delay}" Harness.c -lpthread -lm -o ${exec}
 	    fi
 	    ./run1 time="${time}" runs="${runs}" exec="${exec}" T=1 N=128 inc=2 > "${outfile}"
 	    if [ -f core ] ; then
