@@ -1,4 +1,7 @@
-// Avoids integer overflow by reseting count after each barrier completion.
+// Similar to John M. Mellor-Crummey and Michael L. Scott, Algorithms for Scalable Synchronization on Shared-Memory
+// Multiprocessors, ACM Transactions on Computer Systems, 9(1), February 1991, Fig. 8, p. 34
+
+// Counts up versus down and avoids integer overflow by reseting count after each barrier completion.
 
 #include "BarrierCallback.h"
 
