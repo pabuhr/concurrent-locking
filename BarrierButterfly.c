@@ -1,5 +1,6 @@
 // Eugene D. Brooks III, The Butterfly Barrier, International Journal of Parallel Programming, Vol. 15, No. 4, 1986, pp
-// 295-307.
+// 295-307. The algorithm presented on pages 305-306 is a static marco expansion for N threads. This version is a
+// dynamic version of that algorithm, and hence is a best effort interpretation.
 
 // Cannot have callback/distinguished-thread without changing from symmetric.
 
