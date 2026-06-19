@@ -4,7 +4,8 @@
 #include "BarrierCallback.h"
 
 typedef	struct {
-	TYPE CALIGN group;
+	TYPE group;
+	TYPE LogNPROCS;
 	VTYPE BarrierCount;									// which announcement is being used for current tournament
 	VTYPE Announcement[2];								// global announcement flags to hold threads until after tournament
 	VTYPE ** Answers;									// flags waited on in each step of the tournament
@@ -21,10 +22,10 @@ static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sha
 
 static inline bool block( Barrier * b, TYPE p ) {
 	CBSTART();											// must be first
-	TYPE power = 1, Clog2N = Clog2( b->group ), LocalBarrierCount;
+	TYPE power = 1, LocalBarrierCount;
 
 	LocalBarrierCount = b->BarrierCount;
-	for ( typeof(N) instance = 0; instance < Clog2N; instance += 1 ) {
+	for ( typeof(N) instance = 0; instance < b->LogNPROCS; instance += 1 ) {
 	  if ( p % power != 0 ) {
 			break;										// break out of loop; no longer active
 		} // exit
@@ -62,19 +63,19 @@ static inline bool block( Barrier * b, TYPE p ) {
 
 void __attribute__((noinline)) ctor() {
 	worker_ctor();
-	TYPE cols = Clog2( N );
+	TYPE LogNPROCS = Clog2( N );
 
-	b = (Barrier){ .group = N, .BarrierCount = 0, .Announcement = { false, false } CBINIT() };
-	b.Answers = Allocator( sizeof(typeof(b.Answers[0])) * N ); // rows
-	b.Opponent = Allocator( sizeof(typeof(b.Opponent[0])) * N ); // rowa
+	b = (Barrier){ .group = N, .LogNPROCS = LogNPROCS, .BarrierCount = 0, .Announcement = { false, false } CBINIT() };
+	b.Answers = Allocator( N * sizeof(typeof(b.Answers[0])) ); // rows
+	b.Opponent = Allocator( N * sizeof(typeof(b.Opponent[0])) ); // rows
 	for ( TYPE i = 0; i < N; i += 1 ) {
-		b.Answers[i] = Allocator( sizeof(typeof(b.Answers[0][0])) * cols ); // cols
-		b.Opponent[i] = Allocator( sizeof(typeof(b.Opponent[0][0])) * cols ); // cols
+		b.Answers[i] = Allocator( LogNPROCS * sizeof(typeof(b.Answers[0][0])) ); // cols
+		b.Opponent[i] = Allocator( LogNPROCS * sizeof(typeof(b.Opponent[0][0])) ); // cols
 	} // for
 
 	TYPE power = 1;
 	// must initialize cols first so that power has correct value
-	for ( typeof(N) instance = 0; instance < cols; instance += 1 ) { // cols
+	for ( typeof(N) instance = 0; instance < LogNPROCS; instance += 1 ) { // cols
 		for ( typeof(N) process = 0; process < N; process += 1 ) { // rows
 			b.Opponent[process][instance] = process ^ power;
 			b.Answers[process][instance] = false;
