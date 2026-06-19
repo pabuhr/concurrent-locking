@@ -4,8 +4,9 @@
 // Cannot have callback/distinguished-thread without changing from symmetric.
 
 typedef struct {
-	TYPE exponent, ** precomputed_ids;
-	VTYPE ** shared_counters;
+	TYPE LogNPROCS;
+	TYPE ** intended;
+	VTYPE ** Answers;
 } Barrier;
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
@@ -16,13 +17,13 @@ static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sha
 #define BARRIER_CALL block( &b, p );
 
 static inline void block( Barrier * b, TYPE p ) {
-	for ( TYPE round = 0; round < b->exponent; round += 1 ) {
-		TYPE their_idx = b->precomputed_ids[round][p];	// optimization
-		await( ! b->shared_counters[round][their_idx] );
-		b->shared_counters[round][their_idx] = true;
+	for ( TYPE instance = 0; instance < b->LogNPROCS; instance += 1 ) {
+		TYPE their_idx = b->intended[p][instance];		// optimization
+		await( ! b->Answers[their_idx][instance] );
+		b->Answers[their_idx][instance] = true;
 		Fence();
-		await( b->shared_counters[round][p] );
-		b->shared_counters[round][p] = false;
+		await( b->Answers[p][instance] );
+		b->Answers[p][instance] = false;
 	} // for
 } // block
 
@@ -30,32 +31,36 @@ static inline void block( Barrier * b, TYPE p ) {
 
 void __attribute__((noinline)) ctor() {
 	worker_ctor();
-	b.exponent = Clog2( N );
-	b.shared_counters = Allocator( b.exponent * sizeof(b.shared_counters[0]) );
-	b.precomputed_ids = Allocator( b.exponent * sizeof(b.precomputed_ids[0]) );
+	TYPE LogNPROCS = Clog2( N );
+
+	b.LogNPROCS = LogNPROCS;
+	b.intended = Allocator( N * sizeof(b.intended[0]) );
+	b.Answers = Allocator( N * sizeof(b.Answers[0]) );
+	for ( typeof(N) r = 0; r < N; r += 1 ) {
+		b.intended[r] = Allocator( LogNPROCS * sizeof(b.intended[0][0]) );
+		b.Answers[r] = Allocator( LogNPROCS * sizeof(b.intended[0][0]) );
+	} // for
+
 	TYPE power = 1;
-	for ( typeof(b.exponent) r = 0; r < b.exponent; r += 1 ) {
-		b.shared_counters[r] = Allocator( N * sizeof(b.shared_counters[0][0]) );
-		b.precomputed_ids[r] = Allocator( N * sizeof(b.precomputed_ids[0][0]) );
-		for ( typeof(N) c = 0; c < N; c += 1 ) {
-			b.shared_counters[r][c] = false;
-			b.precomputed_ids[r][c] = (power + c) % N;
+	for ( typeof(LogNPROCS) c = 0; c < LogNPROCS; c += 1 ) {
+		for ( typeof(N) r = 0; r < N; r += 1 ) {
+			b.intended[r][c] = (power + r) % N;
+			b.Answers[r][c] = false;
 		} // for
 		power *= 2;
 	} // for
 } // ctor
 
 void __attribute__((noinline)) dtor() {
-	for ( typeof(b.exponent) r = 0; r < b.exponent; r += 1 ) {
-		free( (void *)b.precomputed_ids[r] );
-		free( (void *)b.shared_counters[r] );
+	for ( typeof(N) r = 0; r < N; r += 1 ) {
+		free( (void *)b.intended[r] );
+		free( (void *)b.Answers[r] );
 	} // for
-	free( b.precomputed_ids );
-	free( b.shared_counters );
+	free( b.intended );
+	free( b.Answers );
 	worker_dtor();
 } // dtor
 
 // Local Variables: //
-// tab-width: 4 //
-// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DBARRIER -DAlgorithm=BarrierDissem Harness.c -lpthread -lm -D`hostname` -DCFMT" //
+// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DBARRIER -DAlgorithm=BarrierDissem2 Harness.c -lpthread -lm -D`hostname` -DCFMT" //
 // End: //
