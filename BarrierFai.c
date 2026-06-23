@@ -3,6 +3,8 @@
 
 // Counts up versus down and avoids integer overflow by reseting count after each barrier completion.
 
+// Integer overflow works because of equality testing. Requires group size of integer-size + 1 to fail.
+
 #include "BarrierCallback.h"
 
 typedef struct {
