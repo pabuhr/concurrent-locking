@@ -32,7 +32,7 @@ static void * Worker( void * arg ) {
 				// ecnt[p] and ecnt[k] have been set in the previous NCS
 				for ( TYPE k = 0 ; k < N ; k += 1 ) {
 					if ( ! (ecnt[p] <= ecnt[k] ) ) {	// assert
-						printf( "***ERROR*** barrier failure Id:%zu ecnt[%zd] = %zd ecnt[%zd] = %zd\n",
+						fprintf( stderr, "***ERROR*** barrier failure Id:%zu ecnt[%zd] = %zd ecnt[%zd] = %zd\n",
 								#if defined( __cplusplus ) && defined( ATOMIC )
 								p, k, ecnt[k].load(), p, ecnt[p].load()
 								#else
