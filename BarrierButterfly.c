@@ -1,14 +1,140 @@
 // Eugene D. Brooks III, The Butterfly Barrier, International Journal of Parallel Programming, Vol. 15, No. 4, 1986, pp
-// 295-307. The algorithm presented on pages 305-306 is a static marco expansion for N threads. This version is a
-// dynamic version of that algorithm, and hence is a best effort interpretation.
+// 295-307. See Appredix (pp. 305-307) for algorithm.
 
 // Cannot have callback/distinguished-thread without changing from symmetric.
 
+#ifndef ATOMIC
+#define ATOMIC											// Too complex for hand fencing
+#endif // ! ATOMIC
+
+// Handshaking to prevent re-initialization problem.
+#define UNLOCK( i, p ) { while ( b->locks[i][p] ); b->locks[i][p] = 1; }
+#define LOCK( i, p ) { while ( ! b->locks[i][p] ); b->locks[i][p] = 0; }
+
+// The WORK #(p) macro implements the work for an # level barrier.  The argument p is the thread number. The WORK #M(p)
+// macro is the work section for a processor that has to perform substitutions.
+#define WORK1( p )  UNLOCK( 0, p ^ (1 << 0) ); LOCK( 0, p );
+
+#define WORK2( p )  UNLOCK( 0, p ^ (1 << 0) ); LOCK( 0, p ); \
+					UNLOCK( 1, p ^ (1 << 1) ); LOCK( 1, p );
+#define WORK2M( p ) UNLOCK( 0, (p ^ (4 - 1)) ^ (1 << 0) ); \
+					UNLOCK( 0, p ^ (1 << 0) ); \
+					LOCK( 0, p ); LOCK( 0, p ^ (4 - 1) ); \
+					UNLOCK( 1, (p ^ (4 - 1)) ^ (1 << 1) ); \
+					UNLOCK( 1, p ^ (1 << 1) ); \
+					LOCK( 1, p ); LOCK( 1, p ^ (4 - 1) );
+
+#define WORK3( p )  UNLOCK( 0, p ^ (1 << 0) ); LOCK( 0, p ); \
+					UNLOCK( 1, p ^ (1 << 1) ); LOCK( 1, p ); \
+					UNLOCK( 2, p ^ (1 << 2) ); LOCK( 2, p );
+#define WORK3M( p ) UNLOCK( 0, (p ^ (8 - 1)) ^ (1 << 0) ); \
+					UNLOCK( 0, (p ^ (1 << 0))); \
+					LOCK( 0, p ); LOCK( 0, p ^ (8 - 1) ); \
+					UNLOCK( 1, (p ^ (8 - 1)) ^ (1 << 1) ); \
+					UNLOCK( 1, (p ^ (1 << 1) ) ); \
+					LOCK( 1, p ); LOCK( 1, p ^ (8 - 1) ); \
+					UNLOCK( 2, (p ^ (8 - 1)) ^ (1 << 2) ); \
+					UNLOCK( 2, p ^ (1 << 2)); \
+					LOCK( 2, p ); LOCK( 2, p ^ (8 - 1) );
+
+#define WORK4( p )  UNLOCK( 0, p ^ (1 << 0) ); LOCK( 0, p ); \
+					UNLOCK( 1, p ^ (1 << 1) ); LOCK( 1, p ); \
+					UNLOCK( 2, p ^ (1 << 2) ); LOCK( 2, p ); \
+					UNLOCK( 3, p ^ (1 << 3) ); LOCK( 3, p );
+#define WORK4M( p ) UNLOCK( 0, (p ^ (16 - 1)) ^ (1 << 0) ); \
+					UNLOCK( 0, (p ^ (1 << 0))); \
+					LOCK( 0, p ); LOCK( 0, p ^ (16 - 1) ); \
+					UNLOCK( 1, (p ^ (16 - 1)) ^ (1 << 1) ); \
+					UNLOCK( 1, (p ^ (1 << 1) ) ); \
+					LOCK( 1, p ); LOCK( 1, p ^ (16 - 1) ); \
+					UNLOCK( 2, (p ^ (16 - 1)) ^ (1 << 2) ); \
+					UNLOCK( 2, p ^ (1 << 2)); \
+					LOCK( 2, p ); LOCK( 2, p ^ (16 - 1) ); \
+					UNLOCK( 3, (p ^ (16 - 1)) ^ (1 << 3) ); \
+					UNLOCK( 3, p ^ (1 << 3)); \
+					LOCK( 3, p ); LOCK( 3, p ^ (16 - 1) );
+
+#define WORK5( p )  UNLOCK( 0, p ^ (1 << 0) ); LOCK( 0, p ); \
+					UNLOCK( 1, p ^ (1 << 1) ); LOCK( 1, p ); \
+					UNLOCK( 2, p ^ (1 << 2) ); LOCK( 2, p ); \
+					UNLOCK( 3, p ^ (1 << 3) ); LOCK( 3, p ); \
+					UNLOCK( 4, p ^ (1 << 4) ); LOCK( 4, p );
+#define WORK5M( p ) UNLOCK( 0, (p ^ (32 - 1)) ^ (1 << 0) ); \
+					UNLOCK( 0, (p ^ (1 << 0))); \
+					LOCK( 0, p ); LOCK( 0, p ^ (32 - 1) ); \
+					UNLOCK( 1, (p ^ (32 - 1)) ^ (1 << 1) ); \
+					UNLOCK( 1, (p ^ (1 << 1) ) ); \
+					LOCK( 1, p ); LOCK( 1, p ^ (32 - 1) ); \
+					UNLOCK( 2, (p ^ (32 - 1)) ^ (1 << 2) ); \
+					UNLOCK( 2, p ^ (1 << 2)); \
+					LOCK( 2, p ); LOCK( 2, p ^ (32 - 1) ); \
+					UNLOCK( 3, (p ^ (32 - 1)) ^ (1 << 3) ); \
+					UNLOCK( 3, p ^ (1 << 3)); \
+					LOCK( 3, p ); LOCK( 3, p ^ (32 - 1) ); \
+					UNLOCK( 4, (p ^ (32 - 1)) ^ (1 << 4) ); \
+					UNLOCK( 4, p ^ (1 << 4)); \
+					LOCK( 4, p ); LOCK( 4, p ^ (32 - 1) );
+
+#define WORK6( p )  UNLOCK( 0, p ^ (1 << 0) ); LOCK( 0, p ); \
+					UNLOCK( 1, p ^ (1 << 1) ); LOCK( 1, p ); \
+					UNLOCK( 2, p ^ (1 << 2) ); LOCK( 2, p ); \
+					UNLOCK( 3, p ^ (1 << 3) ); LOCK( 3, p ); \
+					UNLOCK( 4, p ^ (1 << 4) ); LOCK( 4, p ); \
+					UNLOCK( 5, p ^ (1 << 5) ); LOCK( 5, p );
+#define WORK6M( p ) UNLOCK( 0, (p ^ (64 - 1)) ^ (1 << 0) ); \
+					UNLOCK( 0, (p ^ (1 << 0))); \
+					LOCK( 0, p ); LOCK( 0, p ^ (64 - 1) ); \
+					UNLOCK( 1, (p ^ (64 - 1)) ^ (1 << 1) ); \
+					UNLOCK( 1, (p ^ (1 << 1) ) ); \
+					LOCK( 1, p ); LOCK( 1, p ^ (64 - 1) ); \
+					UNLOCK( 2, (p ^ (64 - 1)) ^ (1 << 2) ); \
+					UNLOCK( 2, p ^ (1 << 2)); \
+					LOCK( 2, p ); LOCK( 2, p ^ (64 - 1) ); \
+					UNLOCK( 3, (p ^ (64 - 1)) ^ (1 << 3) ); \
+					UNLOCK( 3, p ^ (1 << 3)); \
+					LOCK( 3, p ); LOCK( 3, p ^ (64 - 1) ); \
+					UNLOCK( 4, (p ^ (64 - 1)) ^ (1 << 4) ); \
+					UNLOCK( 4, p ^ (1 << 4)); \
+					LOCK( 4, p ); LOCK( 4, p ^ (64 - 1) ); \
+					UNLOCK( 5, (p ^ (64 - 1)) ^ (1 << 5) ); \
+					UNLOCK( 5, p ^ (1 << 5)); \
+					LOCK( 5, p ); LOCK( 5, p ^ (64 - 1) );
+
+#define WORK7( p )  UNLOCK( 0, p ^ (1 << 0) ); LOCK( 0, p ); \
+					UNLOCK( 1, p ^ (1 << 1) ); LOCK( 1, p ); \
+					UNLOCK( 2, p ^ (1 << 2) ); LOCK( 2, p ); \
+					UNLOCK( 3, p ^ (1 << 3) ); LOCK( 3, p ); \
+					UNLOCK( 4, p ^ (1 << 4) ); LOCK( 4, p ); \
+					UNLOCK( 5, p ^ (1 << 5) ); LOCK( 5, p ); \
+					UNLOCK( 6, p ^ (1 << 6) ); LOCK( 6, p );
+#define WORK7M( p ) UNLOCK( 0, (p ^ (128 - 1)) ^ (1 << 0) ); \
+					UNLOCK( 0, (p ^ (1 << 0))); \
+					LOCK( 0, p ); LOCK( 0, p ^ (128 - 1) ); \
+					UNLOCK( 1, (p ^ (128 - 1)) ^ (1 << 1) ); \
+					UNLOCK( 1, (p ^ (1 << 1) ) ); \
+					LOCK( 1, p ); LOCK( 1, p ^ (128 - 1) ); \
+					UNLOCK( 2, (p ^ (128 - 1)) ^ (1 << 2) ); \
+					UNLOCK( 2, p ^ (1 << 2)); \
+					LOCK( 2, p ); LOCK( 2, p ^ (128 - 1) ); \
+					UNLOCK( 3, (p ^ (128 - 1)) ^ (1 << 3) ); \
+					UNLOCK( 3, p ^ (1 << 3)); \
+					LOCK( 3, p ); LOCK( 3, p ^ (128 - 1) ); \
+					UNLOCK( 4, (p ^ (128 - 1)) ^ (1 << 4) ); \
+					UNLOCK( 4, p ^ (1 << 4)); \
+					LOCK( 4, p ); LOCK( 4, p ^ (128 - 1) ); \
+					UNLOCK( 5, (p ^ (128 - 1)) ^ (1 << 5) ); \
+					UNLOCK( 5, p ^ (1 << 5)); \
+					LOCK( 5, p ); LOCK( 5, p ^ (128 - 1) ); \
+					UNLOCK( 6, (p ^ (128 - 1)) ^ (1 << 6) ); \
+					UNLOCK( 6, p ^ (1 << 6)); \
+					LOCK( 6, p ); LOCK( 6, p ^ (128 - 1) );
+
+#define LNMAXPROC 7 /* 2^7 == 128 maximum threads */
+#define MAXPROC (1 << LNMAXPROC)
+
 typedef struct {
 	TYPE CALIGN group;
-	VTYPE ** shared_counters;
-	TYPE next_power, exponent;
-	bool is_power_of_two;
+	VTYPE CALIGN locks[LNMAXPROC][MAXPROC];
 } Barrier;
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
@@ -18,69 +144,74 @@ static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sha
 #define BARRIER_DECL
 #define BARRIER_CALL block( &b, p );
 
-static inline void handoff_start( Barrier * b, TYPE p, TYPE round ) {
-	await( ! b->shared_counters[round][p] );
-	b->shared_counters[round][p] = true;
-} // handoff_start
-
-static inline void handoff_end( Barrier * b, TYPE their_idx, TYPE round ) {
-	await( b->shared_counters[round][their_idx] );
-	b->shared_counters[round][their_idx] = false;
-} // handoff_end
-
-// synchronizes with one other thread, identified by their_idx
-static inline void handoff( Barrier * b, TYPE p, TYPE their_idx, TYPE round ) {
-	handoff_start( b, p, round );
-	Fence();
-	handoff_end( b, their_idx, round );   
-} // handoff
-
-// gets partner for the current step of the butterfly
-static inline TYPE get_partner( TYPE p, TYPE curr_step ) {
-	return p % (2 * curr_step) >= curr_step ? p - curr_step : p + curr_step;
-} // get_partner
-
 static inline void block( Barrier * b, TYPE p ) {
-	// Gets the mirrored idx for use when N not a power of 2 used for masquerading as a missing task
-	TYPE mirror_idx = b->next_power - p - 1;
-	bool should_masquerade = ! b->is_power_of_two && mirror_idx > b->group - 1; 
-
-	for ( TYPE curr_step = 1, curr_count = 0; curr_step < b->group; curr_step *= 2, curr_count += 1 ) {
-		if ( should_masquerade )						// handle non power-of-two case
-			handoff_start( b, mirror_idx, curr_count );
-
-		handoff( b, p, get_partner( p, curr_step ), curr_count );
-
-		if ( should_masquerade )						// handle non power-of-two case
-			handoff_end( b, get_partner( mirror_idx, curr_step ), curr_count );
-	} // for
-}
+	switch( b->group ) {
+	  case 1:
+		break;
+	  case 2:
+		WORK1( p );
+		break;
+	  case 3 ... 4:
+		if ( p < 4 - b->group ) {
+			WORK2M( p );
+		} else {
+			WORK2( p );
+		}
+		break;
+	  case 5 ... 8:
+		if ( p < 8 - b->group ) {
+			WORK3M( p );
+		} else {
+			WORK3( p );
+		}
+		break;
+	  case 9 ... 16:
+		if ( p < 16 - b->group ) {
+			WORK4M( p );
+		} else {
+			WORK4( p );
+		}
+		break;
+	  case 17 ... 32:
+		if ( p < 32 - b->group ) {
+			WORK5M( p );
+		} else {
+			WORK5( p );
+		}
+		break;
+	  case 33 ... 64:
+		if ( p < 64 - b->group ) {
+			WORK6M( p );
+		} else {
+			WORK6( p );
+		}
+		break;
+	  case 65 ... 128:
+		if ( p < 128 - b->group ) {
+			WORK7M( p );
+		} else {
+			WORK7( p );
+		}
+		break;
+	  default:
+		fprintf( stderr, "*** Error *** unsupported processor %zd\n", p );
+		abort();
+	} // switch
+} // block
 
 #include "BarrierWorker.c"
 
 void __attribute__((noinline)) ctor() {
 	worker_ctor();
-	// O(1) check if N is a power of two
 	b.group = N;
-	b.is_power_of_two = (N & (N - 1)) == 0;
-
-	// exponent is x s.t. 2^x >= N > 2^(x-1)
-	b.exponent = Clog2( N );
-	b.next_power = pow( 2, b.exponent );
-	b.shared_counters = Allocator( b.exponent * sizeof(b.shared_counters[0]) );
-	for ( TYPE r = 0; r < b.exponent; r += 1 ) {
-		b.shared_counters[r] = Allocator( b.next_power * sizeof(b.shared_counters[0][0]));
-		for ( TYPE c = 0; c < b.next_power; c += 1 ) {
-			b.shared_counters[r][c] = false;
+	for ( typeof(N) r = 0; r < LNMAXPROC; r += 1 ) {
+		for ( typeof(N) c = 0; c < MAXPROC; c += 1 ) {
+			b.locks[r][c] = 0;
 		} // for
 	} // for
 } // ctor
 
 void __attribute__((noinline)) dtor() {
-	for ( TYPE r = 0; r < b.exponent; r += 1 ) {
-		free( (void *)b.shared_counters[r] );
-	} // for
-	free( b.shared_counters );
 	worker_dtor();
 } // dtor
 
