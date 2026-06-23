@@ -1,4 +1,5 @@
-// Handles integer overflow by using a small window of size G allowing equality versus relational operations.
+// Handles integer overflow by using a small window of size G allowing equality versus relational operations and uses
+// the window to prevent the re-initialization problem.
 
 #include "BarrierCallback.h"
 
@@ -44,5 +45,5 @@ void __attribute__((noinline)) dtor() {
 } // dtor
 
 // Local Variables: //
-// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DBARRIER -DAlgorithm=BarrierFai2 Harness.c -lpthread -lm -D`hostname` -DCFMT" //
+// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DBARRIER -DAlgorithm=BarrierFaiMR Harness.c -lpthread -lm -D`hostname` -DCFMT" //
 // End: //
