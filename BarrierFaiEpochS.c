@@ -1,7 +1,7 @@
 // This algorithm seems to be in the concurrency folklore (anonymous and transmitted orally), and hence, there is no
 // citation.
 
-// generation can overflow, but equality test works. 2^{32/64} + 1 threads must arrive simultaneously for failure.
+// epoch counter can overflow, but equality test works. 2^{32/64} + 1 threads must arrive simultaneously for failure.
 
 // works with TYPE == unsigned short int
 
@@ -48,5 +48,5 @@ void __attribute__((noinline)) dtor() {
 } // dtor
 
 // Local Variables: //
-// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DBARRIER -DAlgorithm=BarrierGenS Harness.c -lpthread -lm -D`hostname` -DCFMT" //
+// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DBARRIER -DAlgorithm=BarrierFaiEpochS Harness.c -lpthread -lm -D`hostname` -DCFMT" //
 // End: //
