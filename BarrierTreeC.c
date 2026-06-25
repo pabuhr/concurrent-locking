@@ -1,8 +1,10 @@
 #include "BarrierCallback.h"
 
-typedef struct {
-	TYPE CALIGN group;
-	VTYPE CALIGN * barrier;
+typedef struct CALIGN {
+	TYPE group;
+	struct CALIGN {
+		VTYPE arr;
+	} * barrier;
 	CBDECL();
 } Barrier;
 
@@ -18,23 +20,23 @@ static inline bool block( Barrier * b, TYPE p ) {
 	TYPE left = 2 * p + 1, right = left + 1;
 
 	if ( left < b->group ) {
-		if ( right < b->group ) await( b->barrier[right] );
-		await( b->barrier[left] );
+		if ( right < b->group ) await( b->barrier[right].arr );
+		await( b->barrier[left].arr );
 	} // if
 	bool ret;
 	if ( p != 0 ) {
-		b->barrier[p] = true;
+		b->barrier[p].arr = true;
 		WO( Fence(); );
-		await( ! b->barrier[p] );
+		await( ! b->barrier[p].arr );
 		ret = false;
 	} else {
 		CBEND();										// must appear in safe location
 		ret = true;
 	} // if
 	if ( left < b->group ) {
-		b->barrier[left] = false;
+		b->barrier[left].arr = false;
 		WO( Fence(); );
-		if ( right < b->group ) b->barrier[right] = false;
+		if ( right < b->group ) b->barrier[right].arr = false;
 	} // if
 	return ret;
 } // block
@@ -45,7 +47,7 @@ void __attribute__((noinline)) ctor() {
 	worker_ctor();
 	b = (Barrier){ .group = N, .barrier = Allocator( sizeof(typeof(b.barrier[0])) * N ) CBINIT() };
 	for ( typeof(N) i = 0; i < N; i += 1 ) {
-		b.barrier[i] = false;
+		b.barrier[i].arr = false;
 	} // for
 } // ctor
 
