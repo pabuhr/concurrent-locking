@@ -21,14 +21,16 @@ static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sha
 #define BARRIER_DECL static __thread TYPE go CALIGN = false;
 #define BARRIER_CALL block( &b, p, &go );
 
-static inline void block( Barrier * b, TYPE p, TYPE * go ) {
+static inline bool block( Barrier * b, TYPE p, TYPE * go ) {
 	CBSTART();											// must be first
-	if ( UNLIKELY( b->group == 1 ) ) return;			// special case
+	if ( UNLIKELY( b->group == 1 ) ) return true;		// special case
 
+	bool ret = false;
 	if ( UNLIKELY( p == 0 ) ) {
 		b->barrier[p + 1].arr = *go;
 		Fence();
 		await( b->barrier[0].arr == *go );
+		ret = true;
 	} else {
 		if ( LIKELY( p < b->group - 1 ) ) {
 			await( b->barrier[p].arr == *go );
@@ -44,6 +46,7 @@ static inline void block( Barrier * b, TYPE p, TYPE * go ) {
 	} // if
 	*go = ! *go;
 	Fence();
+	return ret;
 } // block
 
 #include "BarrierWorker.c"
