@@ -8,9 +8,9 @@
 # ARM -march=armv8.2-a+lse => generate Arm LSE extension instructions SWAP and CAS
 # https://community.arm.com/developer/tools-software/tools/b/tools-software-ides-blog/posts/making-the-most-of-the-arm-architecture-in-gcc-10
 
-algorithms="BarrierButterfly BarrierDissem BarrierDissemMCS BarrierFai BarrierLeader BarrierPthread BarrierRing BarrierRingAravind BarrierSTD BarrierSenseRev \
-	BarrierStack BarrierSym BarrierTour BarrierTourMCS BarrierTree BarrierTreeA BarrierTreeC BarrierTreeCombMCS BarrierTreeMCS"
-#algorithms="BarrierFai BarrierLeader"
+algorithms="BarrierTree BarrierTreeT BarrierTreeTSR BarrierTreeMCS BarrierRing BarrierRingAravind BarrierCycling BarrierButterfly BarrierDissem BarrierDissemMCS \
+	BarrierSenseRev BarrierTour BarrierTourMCS BarrierFai BarrierFaiMR BarrierStack BarrierTreeCombMCS BarrierC++STD BarrierPthread"
+#algorithms="BarrierFaiMR"
 
 time=30
 runs=5
@@ -44,7 +44,7 @@ runalgorithm() {
 	    outfile=${outdir}${affinity}/${1}${atomic}
 	    echo "${outfile}"
 	    if [ "${affinity}" = "" ] ; then affinity=-DPIN ; else affinity=""; fi
-	    if [ ${1} = "BarrierSTD" ] ; then		# C++ barrier ?
+	    if [ ${1} = "BarrierC++STD" ] ; then	# C++ barrier ?
 		`echo ${CC} | tr cc ++` ${cflag} -Wno-volatile -std=c++20 ${affinity} ${atomic:+-D${atomic}} -D${outdir} -DBARRIER -DAlgorithm=${1} -DNCS_DELAY="${delay}" Harness.c -lpthread -lm -o ${exec}
 	    else
 		${CC} ${cflag} -std=gnu11 ${affinity} ${atomic:+-D${atomic}} -D${outdir} -DBARRIER -DAlgorithm=${1} -DNCS_DELAY="${delay}" Harness.c -lpthread -lm -o ${exec}
