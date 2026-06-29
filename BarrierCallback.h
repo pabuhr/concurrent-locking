@@ -11,6 +11,7 @@
 		CBCHK( Fai( b->barcnt, 1 ) )
 	#define CBEND() \
 		if ( UNLIKELY( b->callback ) ) { \
+			WO( Fence(); );			/* ensure compuation data is visible for callback */ \
 			b->callback();			/* call action callback before triggering barrier */ \
 			Fence();				/* ensure callback data visible for next cycle */ \
 		} /* if */ \
