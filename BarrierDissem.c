@@ -3,6 +3,9 @@
 
 // Cannot have callback/distinguished-thread without changing from symmetric.
 
+// For TSO, no fencing required because reads and writes are disjoint: 0 != p + 1, so eventual progress updates the
+// reader. However, there is a delay seeing the read value. Unclear whether the fence or delay is more costly.
+
 typedef struct {
 	TYPE LogNPROCS;
 	TYPE ** intended;
@@ -21,7 +24,7 @@ static inline void block( Barrier * b, TYPE p ) {
 		TYPE their_idx = b->intended[p][instance];		// optimization
 		await( ! b->Answers[their_idx][instance] );
 		b->Answers[their_idx][instance] = true;
-		Fence();
+		// Fence(); // TSO optional
 		await( b->Answers[p][instance] );
 		b->Answers[p][instance] = false;
 	} // for
@@ -62,5 +65,5 @@ void __attribute__((noinline)) dtor() {
 } // dtor
 
 // Local Variables: //
-// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DBARRIER -DAlgorithm=BarrierDissem2 Harness.c -lpthread -lm -D`hostname` -DCFMT" //
+// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DBARRIER -DAlgorithm=BarrierDissem Harness.c -lpthread -lm -D`hostname` -DCFMT" //
 // End: //

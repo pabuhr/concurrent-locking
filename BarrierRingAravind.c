@@ -4,6 +4,9 @@
 
 // One pass token ring using thread-local storage.
 
+// For TSO, no fencing required because reads and writes are disjoint: 0 != p + 1, so eventual progress updates the
+// reader. However, there is a delay seeing the read value. Unclear whether the fence or delay is more costly.
+
 #include "BarrierCallback.h"
 
 typedef struct CALIGN {
@@ -28,14 +31,13 @@ static inline bool block( Barrier * b, TYPE p, TYPE * go ) {
 	bool ret = false;
 	if ( UNLIKELY( p == 0 ) ) {
 		b->barrier[p + 1].arr = *go;
-		Fence();
+		// Fence(); // TSO optional
 		await( b->barrier[0].arr == *go );
 		ret = true;
 	} else {
 		if ( LIKELY( p < b->group - 1 ) ) {
 			await( b->barrier[p].arr == *go );
 			b->barrier[p + 1].arr = *go;
-			Fence();
 			await( b->barrier[0].arr == *go );
 		} else {
 			await( b->barrier[p].arr == *go );

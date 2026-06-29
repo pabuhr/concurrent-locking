@@ -26,7 +26,7 @@ static inline bool block( Barrier * b, TYPE p ) {
 		} // for
 		CBEND();										// must appear in safe location
 		WO( Fence(); );
-		for ( TYPE kk = 1; kk < b->group; kk += 1 ) {	// wait for children to arrive
+		for ( TYPE kk = 1; kk < b->group; kk += 1 ) {	// unblock children
 			b->barrier[kk].arr = false;					// release waiting threads
 		} // for
 		return true;
@@ -54,5 +54,5 @@ void __attribute__((noinline)) dtor() {
 } // dtor
 
 // Local Variables: //
-// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DBARRIER -DAlgorithm=BarrierTreeA Harness.c -lpthread -lm -D`hostname` -DCFMT" //
+// compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DBARRIER -DAlgorithm=BarrierTreeT Harness.c -lpthread -lm -D`hostname` -DCFMT" //
 // End: //
