@@ -37,7 +37,7 @@ static inline bool block( Barrier * b ) {
 		if ( LIKELY( prev ) ) prev->release = true;
 		return false;
 	} // if
-	CBEND();										// must appear in safe location
+	CBEND();											// must appear in safe location
 	b->head = NULL;
 	if ( LIKELY( prev ) ) prev->release = true;
 	return true;
