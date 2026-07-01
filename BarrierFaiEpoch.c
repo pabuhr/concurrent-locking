@@ -7,7 +7,7 @@
 
 typedef struct {
 	TYPE CALIGN group;
-	TYPE CALIGN count;
+	VTYPE CALIGN count;
 	VTYPE CALIGN epoch;
 	CBDECL();
 } Barrier;
