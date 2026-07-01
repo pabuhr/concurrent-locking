@@ -13,7 +13,7 @@ typedef struct CALIGN {
 	TYPE group;
 	struct CALIGN {
 		VTYPE arr;
-	} * barrier;
+	} * token;
 	CBDECL();
 } Barrier;
 
@@ -30,24 +30,23 @@ static inline bool block( Barrier * b, TYPE p, TYPE * go ) {
 
 	bool ret = false;
 	if ( UNLIKELY( p == 0 ) ) {
-		b->barrier[p + 1].arr = *go;
+		b->token[p + 1].arr = *go;
 		// Fence(); // TSO optional
-		await( b->barrier[0].arr == *go );
+		await( b->token[0].arr == *go );
 		ret = true;
 	} else {
 		if ( LIKELY( p < b->group - 1 ) ) {
-			await( b->barrier[p].arr == *go );
-			b->barrier[p + 1].arr = *go;
-			await( b->barrier[0].arr == *go );
+			await( b->token[p].arr == *go );
+			b->token[p + 1].arr = *go;
+			// Fence(); // TSO optional
+			await( b->token[0].arr == *go );
 		} else {
-			await( b->barrier[p].arr == *go );
+			await( b->token[p].arr == *go );
 			CBEND();									// must appear in safe location
-			b->barrier[0].arr = *go;
-			Fence();
+			b->token[0].arr = *go;
 		} // if
 	} // if
 	*go = ! *go;
-	Fence();
 	return ret;
 } // block
 
@@ -55,14 +54,14 @@ static inline bool block( Barrier * b, TYPE p, TYPE * go ) {
 
 void __attribute__((noinline)) ctor() {
 	worker_ctor();
-	b = (Barrier){ .group = N, .barrier = Allocator( sizeof(typeof(b.barrier[0])) * N ) };
+	b = (Barrier){ .group = N, .token = Allocator( sizeof(typeof(b.token[0])) * N ) };
 	for ( typeof(N) i = 0; i < N; i += 1 ) {
-		b.barrier[i].arr = true;
+		b.token[i].arr = true;
 	} // for
 } // ctor
 
 void __attribute__((noinline)) dtor() {
-	free( (void *)b.barrier );
+	free( (void *)b.token );
 	worker_dtor();
 } // dtor
 

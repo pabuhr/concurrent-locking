@@ -8,7 +8,7 @@ typedef struct CALIGN {
 	TYPE group;
 	struct CALIGN {
 		VTYPE arr;
-	} * barrier;
+	} * token;
 } Barrier;
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
@@ -22,11 +22,11 @@ static inline bool block( Barrier * b, TYPE p ) {
 	TYPE nz = p > 0;									// p0 special case
 	TYPE next = cycleUp( p, N );						// compute right partner
 
-	await( b->barrier[p].arr == nz );					// wait for p0 to arrive
-	b->barrier[next].arr = true;						// unblock partner
+	await( b->token[p].arr == nz );						// wait for p0 to arrive
+	b->token[next].arr = true;							// unblock partner
 	Fence();
-	await( b->barrier[p].arr != nz );					// wait for left partner to unblock me
-	b->barrier[next].arr = false;						// reset for next arrival
+	await( b->token[p].arr != nz );						// wait for left partner to unblock me
+	b->token[next].arr = false;							// reset for next arrival
 	return ! nz;
 } // block
 
@@ -34,14 +34,14 @@ static inline bool block( Barrier * b, TYPE p ) {
 
 void __attribute__((noinline)) ctor() {
 	worker_ctor();
-	b = (Barrier){ .group = N, .barrier = Allocator( sizeof(typeof(b.barrier[0])) * N ) };
+	b = (Barrier){ .group = N, .token = Allocator( sizeof(typeof(b.token[0])) * N ) };
 	for ( typeof(N) i = 0; i < N; i += 1 ) {
-		b.barrier[i].arr = false;
+		b.token[i].arr = false;
 	} // for
 } // ctor
 
 void __attribute__((noinline)) dtor() {
-	free( (void *)b.barrier );
+	free( (void *)b.token );
 	worker_dtor();
 } // dtor
 
