@@ -26,7 +26,7 @@ static inline bool block_aux( CB( Barrier * b,) Barrier_node * bn, TYPE sense ) 
 	bool ret;
 	if ( UNLIKELY( Fai( bn->count, 1 ) == bn->k - 1 ) ) {
 		if ( bn->parent ) {								// last one to reach this node
-			ret = block_aux( CB( b,) bn->parent, sense ); // recursion
+			ret = block_aux( CB( b,) bn->parent, sense ); // RECURSION
 		} else {
 			ret = true;
 			CBEND();									// must appear in safe location
