@@ -1,8 +1,10 @@
 #include "BarrierCallback.h"
 
-typedef struct {
-	TYPE CALIGN group;
-	VTYPE CALIGN * barrier;
+typedef struct CALIGN {
+	TYPE group;
+	struct CALIGN {
+		VTYPE arr;
+	} * barrier;
 	CBDECL();
 } Barrier;
 
@@ -16,16 +18,16 @@ static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sha
 static inline bool block( Barrier * b, TYPE p ) {
 	CBSTART();											// must be first
 	bool ret;
-	if ( p < b->group - 1 ) await( b->barrier[p + 1] );
+	if ( p < b->group - 1 ) await( b->barrier[p + 1].arr );
 	if ( p != 0 ) {
-		b->barrier[p] = true;
-		await( ! b->barrier[p] );
+		b->barrier[p].arr = true;
+		await( ! b->barrier[p].arr );
 		ret = false;
 	} else {
 		CBEND();										// must appear in safe location
 		ret = true;
 	} // if
-	if ( p < b->group - 1 ) b->barrier[p + 1] = false;
+	if ( p < b->group - 1 ) b->barrier[p + 1].arr = false;
 	return ret;
 } // block
 
@@ -35,7 +37,7 @@ void __attribute__((noinline)) ctor() {
 	worker_ctor();
 	b = (Barrier){ .group = N, .barrier = Allocator( sizeof(typeof(b.barrier[0])) * N ) CBINIT() };
 	for ( typeof(N) i = 0; i < N; i += 1 ) {
-		b.barrier[i] = false;
+		b.barrier[i].arr = false;
 	} // for
 } // ctor
 
