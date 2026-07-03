@@ -3,9 +3,6 @@
 
 // Cannot have callback/distinguished-thread without changing from symmetric.
 
-// For TSO, no fencing required because reads and writes are disjoint: their_idx != p, and eventual progress updates the
-// reader. However, there is a delay seeing the read value. Unclear whether the fence or delay is more costly.
-
 typedef struct {
 	TYPE LogNPROCS;
 	TYPE ** intended;
@@ -29,11 +26,11 @@ static inline void block( Barrier * b, TYPE p, TYPE * episode ) {
 		TYPE their_idx = b->intended[p][instance];		// optimization
 		if ( OddOrEven == 0 ) {
 			b->AnswersEven[their_idx][instance] = signal;
-			// Fence(); // TSO optional
+			Fence();
 			await( b->AnswersEven[p][instance] == signal );
 		} else {
 			b->AnswersOdd[their_idx][instance] = signal;
-			// Fence(); // TSO optional
+			Fence();
 			await( b->AnswersOdd[p][instance] == signal );
 		} // if
 	} // for
