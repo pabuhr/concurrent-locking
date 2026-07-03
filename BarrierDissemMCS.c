@@ -3,13 +3,13 @@
 
 // Note algorithm uses ranges 0..Clog2( N ) - 1 == Clog2( N ) for C dimension.
 
-// For TSO, no fencing required because reads and writes are disjoint: 0 != p + 1, so eventual progress updates the
-// reader. However, there is a delay seeing the read value. Unclear whether the fence or delay is more costly.
-
 // Cannot have callback/distinguished-thread without changing from symmetric.
 
 struct flags {
-	VTYPE ** my_flags, *** partner_flags;
+	VTYPE *** partner_flags;
+	struct CALIGN {										// sequester array elements on cache lines
+		VTYPE arr;
+	} ** my_flags;
 };
 
 typedef struct {
@@ -30,12 +30,12 @@ static inline void block( Barrier * b, TYPE p, TYPE * sense, TYPE * parity ) {
 
 	for ( TYPE i = 0; i < b->exponent; i += 1 ) {
 		*b->allnodes[p].partner_flags[lparity][i] = lsense;
-		// Fence(); // TSO optional
-		await( b->allnodes[p].my_flags[lparity][i] == lsense );
+		Fence();
+		await( b->allnodes[p].my_flags[lparity][i].arr == lsense );
 	} // for
 	if ( lparity ) *sense = ! lsense;
 	*parity = ! lparity;
-	Fence();
+//	Fence();
 } // block
 
 #include "BarrierWorker.c"
@@ -62,8 +62,8 @@ void __attribute__((noinline)) ctor() {
 		for ( TYPE i = 0; i < N; i += 1 ) {
 			partner_idx = (pow2 + i) % N;
 			for ( TYPE r = 0; r < 2; r += 1 ) {
-				b.allnodes[i].my_flags[r][c] = 0;
-				b.allnodes[i].partner_flags[r][c] = &b.allnodes[partner_idx].my_flags[r][c];
+				b.allnodes[i].my_flags[r][c].arr = 0;
+				b.allnodes[i].partner_flags[r][c] = &b.allnodes[partner_idx].my_flags[r][c].arr;
 			} // for
 		} // for
 		pow2 *= 2;

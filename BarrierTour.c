@@ -8,8 +8,10 @@ typedef	struct {
 	TYPE LogNPROCS;
 	VTYPE BarrierCount;									// which announcement is being used for current tournament
 	VTYPE Announcement[2];								// global announcement flags to hold threads until after tournament
-	VTYPE ** Answers;									// flags waited on in each step of the tournament
 	TYPE ** Opponent;									// table of tournament opponents
+	struct CALIGN {										// sequester array elements on cache lines
+		VTYPE arr;
+	} ** Answers;										// flags waited on in each step of the tournament
 	CBDECL();
 } Barrier;
 
@@ -30,7 +32,7 @@ static inline bool block( Barrier * b, TYPE p ) {
 			break;										// break out of loop; no longer active
 		} // exit
 		if ( p > b->Opponent[p][instance] ) {			// loser
-			b->Answers[ b->Opponent[p][instance] ][instance] = true;
+			b->Answers[ b->Opponent[p][instance] ][instance].arr = true;
 			Fence();
 		} else if ( b->Opponent[p][instance] >= b->group ) {
 			// win by default if no opponent
@@ -39,8 +41,8 @@ static inline bool block( Barrier * b, TYPE p ) {
 			// Instead, they should be indexed as b->Answers[p][instance], since the loser sets the opponent flag (the
 			// winner's flag). Hence, the winner must check their own flag, if it is set([p]), NOT the flag of the loser
 			// (Opponent[p][instance]), since the loser's flag is never set.
-			await( b->Answers[p][instance] );
-			b->Answers[p][instance] = false;			// reinit
+			await( b->Answers[p][instance].arr );
+			b->Answers[p][instance].arr = false;		// reinit
 			Fence();
 		} // if
 		power += power;
@@ -78,7 +80,7 @@ void __attribute__((noinline)) ctor() {
 	for ( typeof(N) instance = 0; instance < LogNPROCS; instance += 1 ) { // cols
 		for ( typeof(N) process = 0; process < N; process += 1 ) { // rows
 			b.Opponent[process][instance] = process ^ power;
-			b.Answers[process][instance] = false;
+			b.Answers[process][instance].arr = false;
 		} // for
 		power += power;
 	} // for

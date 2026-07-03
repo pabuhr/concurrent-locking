@@ -3,13 +3,12 @@
 
 // Cannot have callback/distinguished-thread without changing from symmetric.
 
-// For TSO, no fencing required because reads and writes are disjoint: 0 != p + 1, so eventual progress updates the
-// reader. However, there is a delay seeing the read value. Unclear whether the fence or delay is more costly.
-
 typedef struct {
 	TYPE LogNPROCS;
 	TYPE ** intended;
-	VTYPE ** Answers;
+	struct CALIGN {										// sequester array elements on cache lines
+		VTYPE arr;
+	} ** Answers;
 } Barrier;
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
@@ -22,11 +21,11 @@ static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sha
 static inline void block( Barrier * b, TYPE p ) {
 	for ( TYPE instance = 0; instance < b->LogNPROCS; instance += 1 ) {
 		TYPE their_idx = b->intended[p][instance];		// optimization
-		await( ! b->Answers[their_idx][instance] );
-		b->Answers[their_idx][instance] = true;
-		// Fence(); // TSO optional
-		await( b->Answers[p][instance] );
-		b->Answers[p][instance] = false;
+		await( ! b->Answers[their_idx][instance].arr );
+		b->Answers[their_idx][instance].arr = true;
+		Fence();
+		await( b->Answers[p][instance].arr );
+		b->Answers[p][instance].arr = false;
 	} // for
 } // block
 
@@ -41,16 +40,16 @@ void __attribute__((noinline)) ctor() {
 	b.Answers = Allocator( N * sizeof(b.Answers[0]) );
 	for ( typeof(N) r = 0; r < N; r += 1 ) {
 		b.intended[r] = Allocator( LogNPROCS * sizeof(b.intended[0][0]) );
-		b.Answers[r] = Allocator( LogNPROCS * sizeof(b.intended[0][0]) );
+		b.Answers[r] = Allocator( LogNPROCS * sizeof(b.Answers[0][0]) );
 	} // for
 
 	TYPE power = 1;
 	for ( typeof(LogNPROCS) c = 0; c < LogNPROCS; c += 1 ) {
 		for ( typeof(N) r = 0; r < N; r += 1 ) {
 			b.intended[r][c] = (power + r) % N;
-			b.Answers[r][c] = false;
+			b.Answers[r][c].arr = false;
 		} // for
-		power *= 2;
+		power += power;
 	} // for
 } // ctor
 
