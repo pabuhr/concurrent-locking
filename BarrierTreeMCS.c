@@ -10,7 +10,7 @@ typedef union {
 	VBYTESIZE flags[FANIN];
 } Fanin;
 
-typedef struct CALIGN {
+typedef struct CALIGN {									// sequester array elements on cache lines
 	VBYTESIZE * parent;
 	VBYTESIZE * children[2];
 	Fanin has_child;

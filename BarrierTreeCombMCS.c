@@ -3,7 +3,7 @@
 
 #include "BarrierCallback.h"
 
-typedef struct CALIGN Barrier_node {
+typedef struct CALIGN Barrier_node {					// sequester array elements on cache lines
 	TYPE k, count;
 	VTYPE locksense;
 	struct Barrier_node * parent;

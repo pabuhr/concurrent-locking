@@ -5,9 +5,9 @@
 
 typedef enum { winner, loser, bye, champion, dropout } Role;
 
-typedef struct CALIGN {
-	VTYPE * opponent;									// volatile to prevent warning
+typedef struct CALIGN {									// sequester array elements on cache lines
 	VTYPE flag;
+	VTYPE * opponent;									// volatile to prevent warning
 	Role role;
 } rount_t;
 
