@@ -8,8 +8,8 @@
 #endif // ! ATOMIC
 
 // Handshaking to prevent re-initialization problem.
-#define UNLOCK( i, p ) { while ( b->locks[i][p] ); b->locks[i][p] = 1; }
-#define LOCK( i, p ) { while ( ! b->locks[i][p] ); b->locks[i][p] = 0; }
+#define UNLOCK( i, p ) { while ( b->locks[i][p].arr ); b->locks[i][p].arr = 1; }
+#define LOCK( i, p ) { while ( ! b->locks[i][p].arr ); b->locks[i][p].arr = 0; }
 
 // The WORK #(p) macro implements the work for an # level barrier.  The argument p is the thread number. The WORK #M(p)
 // macro is the work section for a processor that has to perform substitutions.
@@ -129,12 +129,11 @@
 					UNLOCK( 6, p ^ (1 << 6)); \
 					LOCK( 6, p ); LOCK( 6, p ^ (128 - 1) );
 
-#define LNMAXPROC 7 /* 2^7 == 128 maximum threads */
-#define MAXPROC (1 << LNMAXPROC)
-
 typedef struct {
 	TYPE CALIGN group;
-	VTYPE CALIGN locks[LNMAXPROC][MAXPROC];
+	struct CALIGN {										// sequester array elements on cache lines
+		VTYPE arr;
+	} ** locks;
 } Barrier;
 
 static TYPE PAD1 CALIGN __attribute__(( unused ));		// protect further false sharing
@@ -203,15 +202,25 @@ static inline void block( Barrier * b, TYPE p ) {
 
 void __attribute__((noinline)) ctor() {
 	worker_ctor();
+	if ( N > 128 ) { fprintf( stderr, "thread size %zd exceeds range 1..128\n", N ); abort(); }
 	b.group = N;
+	TYPE LNMAXPROC = Clog2( N );
+	TYPE MAXPROC = 1 << LNMAXPROC;
+	b.locks = Allocator( LNMAXPROC * sizeof(b.locks[0]) );
 	for ( typeof(N) r = 0; r < LNMAXPROC; r += 1 ) {
+		b.locks[r] = Allocator( MAXPROC * sizeof(b.locks[0][0]) );
 		for ( typeof(N) c = 0; c < MAXPROC; c += 1 ) {
-			b.locks[r][c] = 0;
+			b.locks[r][c].arr = 0;
 		} // for
 	} // for
 } // ctor
 
 void __attribute__((noinline)) dtor() {
+	TYPE LNMAXPROC = Clog2( N );
+	for ( typeof(N) r = 0; r < LNMAXPROC; r += 1 ) {
+		free( (void *)b.locks[r] );
+	} // for
+	free( b.locks );
 	worker_dtor();
 } // dtor
 
