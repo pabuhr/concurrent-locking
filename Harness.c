@@ -199,32 +199,34 @@ typedef volatile uint32_t VWHOLESIZE;
 #define Casvw( change, comp, assn ) Casvwm( change, comp, assn, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST )
 #define Fasm( change, assn, memorder ) __atomic_exchange_n( (&(change)), (assn), memorder )
 #define Fas( change, assn ) Fasm( change, assn, __ATOMIC_SEQ_CST )
+#define Faim( change, Inc, memorder ) __atomic_fetch_add( (&(change)), (Inc), memorder )
 #ifndef __cplusplus
-#define Fai( change, Inc ) __atomic_fetch_add( ((TYPEOF(change) *)(&(change))), (Inc), __ATOMIC_SEQ_CST )
+#define Fai( change, Inc ) Faim( change, Inc, __ATOMIC_SEQ_CST )
 #else
 #define Fai( change, Inc ) change.fetch_add( Inc )
 #endif // __cplusplus
-#define Faim( change, Inc, memorder ) __atomic_fetch_add( (&(change)), (Inc), memorder )
 
 #define await( E ) while ( ! (E) ) Pause()
 
 //------------------------------------------------------------------------------
 
-static inline TYPE rdtscl( void ) {
-	#if defined( __i386 ) || defined( __x86_64 )
-	TYPE lo, hi;
-	__asm__ __volatile__ ("rdtsc" : "=a"(lo), "=d"(hi));
-	return ( (TYPE)lo)|( ((TYPE)hi)<<32 );
-
+static inline TYPE rdtsc( void ) {						// read processor's time-stamp counter
+	#if defined( __x86_64__ )
+	TYPE rax, rdx, ecx;
+	__asm__ __volatile__ ( "rdtscp; " : "=a" (rax), "=d" (rdx), "=c" (ecx) :: );
+	return (rdx << 32) + rax;
+	#elif defined( __i386__ )
+	TYPE count;
+	asm volatile ( "rdtsc" : "=A" (count) );
 	#elif defined( __aarch64__ ) || defined( __arm__ )
 	// https://github.com/google/benchmark/blob/v1.1.0/src/cycleclock.h#L116
-	TYPE virtual_timer_value;
-	asm volatile("mrs %0, cntvct_el0" : "=r"(virtual_timer_value));
-	return virtual_timer_value;
+	TYPE count;
+	asm volatile ( "mrs %0, cntvct_el0" : "=r" (count) );
+	return count;
 	#else
-		#error unsupported hardware architecture
+		#error unsupported architecture
 	#endif
-}
+} // rdtsc
 
 // Marsaglia shift-XOR PRNG with thread-local state
 // Period is 4G-1
@@ -349,7 +351,7 @@ static TYPE HPAD2 CALIGN __attribute__(( unused ));		// protect further false sh
 		// for ( volatile TYPE delay = 0; delay < randomNumber; delay += 1 ) {} // short random delay
 		#ifdef RANDOM
 		// TYPE times = PRNG() % NCSTimes;
-		TYPE times = rdtscl() % NCSTimes;
+		TYPE times = rdtsc() % NCSTimes;
 		#else
 		TYPE times = NCSTimes;
 		#endif // RANDOM
@@ -379,7 +381,7 @@ __attribute__(( unused )) static inline RTYPE CS( const TYPE tid __attribute__((
 	volatile RTYPE copy = randomChecksum;
 	#ifdef RANDOM
 	// TYPE times = PRNG() % NCSTimes;
-	TYPE times = rdtscl() % NCSTimes;
+	TYPE times = rdtsc() % NCSTimes;
 	#else
 	TYPE times = CSTimes;
 	#endif // RANDOM
@@ -706,7 +708,7 @@ int main( int argc, char * argv[] ) {
 		exit( EXIT_FAILURE );
 	} // switch
 
-	RandomState = rdtscl();								// seed PRNG
+	RandomState = rdtsc();								// seed PRNG
 
 	#ifdef CFMT
 	if ( N == 1 ) {										// title
