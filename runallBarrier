@@ -8,9 +8,9 @@
 # ARM -march=armv8.2-a+lse => generate Arm LSE extension instructions SWAP and CAS
 # https://community.arm.com/developer/tools-software/tools/b/tools-software-ides-blog/posts/making-the-most-of-the-arm-architecture-in-gcc-10
 
-algorithms="BarrierTree BarrierTreeT BarrierTreeTSR BarrierTreeMCS BarrierRing BarrierRingAravind BarrierCycling BarrierButterfly BarrierDissem BarrierDissemMCS \
-	BarrierSenseRev BarrierTour BarrierTourMCS BarrierFai BarrierFaiMR BarrierStack BarrierTreeCombMCS BarrierC++STD BarrierPthread"
-#algorithms="BarrierFaiMR"
+algorithms="BarrierTreeD BarrierTreeT BarrierTreeTSR BarrierTreeMCS BarrierRing BarrierRingAravindM BarrierCycling BarrierButterfly BarrierDissem BarrierDissemMCS \
+	BarrierSenseSwitch BarrierTour BarrierTourMCS BarrierFaiSR BarrierFaiMR BarrierStack BarrierTreeCombMCS BarrierC++STD BarrierPthread"
+#algorithms="BarrierDissem BarrierDissemMCS BarrierTour"
 
 time=30
 runs=5
