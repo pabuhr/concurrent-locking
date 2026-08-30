@@ -4,7 +4,7 @@
 #include "BarrierCallback.h"
 
 typedef struct {
-	TYPE CALIGN group;
+	STYPE CALIGN group;
 	VSTYPE CALIGN low;
 	VSTYPE CALIGN high;
 	CBDECL();
@@ -24,7 +24,7 @@ static inline bool block( Barrier * b ) {
 	CBSTART();											// must be first
 	STYPE counter = Fai( b->high, 1 );
 
-	if ( LIKELY( counter - b->low != (STYPE)(b->group - 1) ) ) { // wait ?
+	if ( LIKELY( counter - b->low != b->group - 1 ) ) { // rwait ?
 		await( counter - b->low < 0 );
 		return false;
 	} // if
