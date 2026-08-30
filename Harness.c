@@ -290,10 +290,6 @@ static _Atomic(TYPE) Arrived CALIGN = 0;
 static uintptr_t N CALIGN, Threads CALIGN, Time CALIGN;
 static intptr_t Degree CALIGN = -1;
 
-//enum { RUNS = 5 };
-static int RUNS = 5;									// total experiment repetitions
-static volatile int Run CALIGN = 0;						// current experiment repetition
-
 //------------------------------------------------------------------------------
 
 // memory allocator to align or not align storage
@@ -362,6 +358,9 @@ static TYPE HPAD2 CALIGN __attribute__(( unused ));		// protect further false sh
 	#define NCS_DECL
 	#define NCS
 #endif // NCS_DELAY != 0
+
+static int RUNS = 5;									// total experiment repetitions
+static volatile int Run CALIGN = 0;						// current experiment repetition
 
 #ifdef CONVOY
 static TYPE convoy[16][128][128];						// [RUNS][THREADS][THREADS]
@@ -887,7 +886,16 @@ int main( int argc, char * argv[] ) {
 		// threads start first experiment immediately
 		sleep( Time );									// delay for experiment duration
 		stop = true;									// stop threads (atomic)
+
 		while ( Arrived != Threads ) Pause();			// all threads stopped ?
+
+		if ( b.nX != 0 ) printf( "nX %zd\n", b.nX );
+		if ( b.nIn != 0 ) printf( "nIn %zd\n", b.nIn );
+		if ( b.poison != 0 ) printf( "poison %zd\n", b.poison );
+		for ( typeof(N) q = 0; q < N; q += 1 ) {
+			if ( b.quorum[q].sleep != 0 ) printf( "sleep[%zd] %zd\n", q, b.quorum[q].sleep );
+			if ( b.quorum[q].halt != 0 ) printf( "halt[%zd] %zd\n", q, b.quorum[q].halt );
+		}
 
 		if ( randomChecksum != sumOfThreadChecksums ) {
 			printf( "Interference run %d randomChecksum %u sumOfThreadChecksums %u\n", Run, randomChecksum, sumOfThreadChecksums );
@@ -897,6 +905,7 @@ int main( int argc, char * argv[] ) {
 		CurrTid = ULONG_MAX;							// reset for next run
 
 		Run += 1;
+
 		stop = false;									// start threads (atomic)
 		while ( Arrived != 0 ) Pause();					// all threads started ?
 	} // for
