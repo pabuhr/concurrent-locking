@@ -889,14 +889,6 @@ int main( int argc, char * argv[] ) {
 
 		while ( Arrived != Threads ) Pause();			// all threads stopped ?
 
-		if ( b.nX != 0 ) printf( "nX %zd\n", b.nX );
-		if ( b.nIn != 0 ) printf( "nIn %zd\n", b.nIn );
-		if ( b.poison != 0 ) printf( "poison %zd\n", b.poison );
-		for ( typeof(N) q = 0; q < N; q += 1 ) {
-			if ( b.quorum[q].sleep != 0 ) printf( "sleep[%zd] %zd\n", q, b.quorum[q].sleep );
-			if ( b.quorum[q].halt != 0 ) printf( "halt[%zd] %zd\n", q, b.quorum[q].halt );
-		}
-
 		if ( randomChecksum != sumOfThreadChecksums ) {
 			printf( "Interference run %d randomChecksum %u sumOfThreadChecksums %u\n", Run, randomChecksum, sumOfThreadChecksums );
 			abort();
