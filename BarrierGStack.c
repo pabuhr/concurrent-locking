@@ -7,7 +7,7 @@ typedef struct CALIGN {
 } Pair; 
 
 typedef struct CALIGN {
-	STYPE CALIGN group;
+	TYPE CALIGN group;
 	TYPE CALIGN threads;
 	Pair * head CALIGN;
 	QUORUM_DECL;
@@ -74,8 +74,8 @@ static inline BarrierRet block( Barrier * b ) {
 	return Leader;
 } // block
 
-static inline void done( Barrier * b, TYPE p ) {
-	QUORUM_DONE( b, p );
+static inline void done( Barrier * b ) {
+	QUORUM_DONE( b );
 } // done
 
 #include "BarrierWorker3.c"

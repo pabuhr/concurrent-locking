@@ -50,7 +50,7 @@ static void * Worker( void * arg ) {
 			if ( ret == QuorumFail ) { /* printf( "Q" ); */ }
 		} // while
 
-		done( &b, p );										// all threads call
+		done( &b );										// all threads call
 
 		entries[r][p] = totalentries / N;				// convert from entry counts to epochs per thread
 		totalentries = 0;

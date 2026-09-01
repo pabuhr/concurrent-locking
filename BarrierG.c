@@ -37,8 +37,8 @@ static inline BarrierRet block( Barrier * b ) {
 	return Leader;
 } // block
 
-static inline void done( Barrier * b, TYPE p ) {
-	QUORUM_DONE( b, p );
+static inline void done( Barrier * b ) {
+	QUORUM_DONE( b );
 } // done
 
 #include "BarrierWorker3.c"
@@ -50,11 +50,11 @@ void __attribute__((noinline)) ctor() {
 	enum { G = 4 };
 	fprintf( stderr, " G %d ", G );
 	b = (Barrier){ .group = G, .threads = N, .low = 0, .high = 0 CBINIT() };
-	QUORUM_CTOR( b );
+	QUORUM_CTOR( &b );
 } // ctor
 
 void __attribute__((noinline)) dtor() {
-	QUORUM_DTOR( b );
+	QUORUM_DTOR( &b );
 	worker_dtor();
 } // dtor
 
