@@ -20,20 +20,19 @@ static TYPE PAD2 CALIGN __attribute__(( unused ));		// protect further false sha
 typedef enum { Leader, Follower, QuorumFail } BarrierRet;
 
 static inline BarrierRet block( Barrier * b ) {
-	QUORUM_ENTER( b );
+	QUORUM_ENTER( b );									// Fence
 	CBSTART();											// must be first
 	TYPE counter = Fai( b->high, 1 );					// take ticket => establish order
 
 	if ( LIKELY( counter % b->group != b->group - 1 ) ) { // not leader ?
 		await( counter < b->low );						// wait for quorum, potential overflow problem
-		QUORUM_CHECK( b );
+		QUORUM_CHECK( b );								// check for quorum failure and return QuorumFail
 		return Follower;
 	} // if
 	await( counter == b->low + b->group - 1 );			// wait for quorum
 	CBEND();											// must appear in safe location
 	b->low = counter + 1;
-	Fence();											// make write visible
-	QUORUM_EXIT( b );
+	QUORUM_EXIT( b );									// Fence
 	return Leader;
 } // block
 
@@ -41,7 +40,7 @@ static inline void done( Barrier * b ) {
 	QUORUM_DONE( b );
 } // done
 
-#include "BarrierWorker3.c"
+#include "BarrierWorkerG.c"
 
 void __attribute__((noinline)) ctor() {
 	worker_ctor();

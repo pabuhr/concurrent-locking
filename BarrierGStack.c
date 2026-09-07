@@ -78,18 +78,18 @@ static inline void done( Barrier * b ) {
 	QUORUM_DONE( b );
 } // done
 
-#include "BarrierWorker3.c"
+#include "BarrierWorkerG.c"
 
 void __attribute__((noinline)) ctor() {
 	worker_ctor();
 	enum { G = 4 };
 	fprintf( stderr, " G %d ", G );
 	b = (Barrier){ .group = G, .threads = N, .head = NULL CBINIT() };
-	QUORUM_CTOR( b );
+	QUORUM_CTOR( &b );
 } // ctor
 
 void __attribute__((noinline)) dtor() {
-	QUORUM_DTOR( b );
+	QUORUM_DTOR( &b );
 	worker_dtor();
 } // dtor
 
